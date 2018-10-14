@@ -1,0 +1,1 @@
+bass Source/HelloWorld.asm
