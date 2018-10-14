@@ -37,7 +37,7 @@ seek($008000); Start:
   // Print Text  
   mCALLPRINTTERM24BITS(BANK3TEXT)
   //mCALLPRINTTERM16BITS(TEMP)
-  mCALLPRINTTERM24BITS(BANK3TEXTPART2)
+  //mCALLPRINTTERM24BITS(BANK3TEXTPART2)
 
 Loop:
   jmp Loop
@@ -58,10 +58,14 @@ include "TerninalFunctions.ASM"
 
 seek($028000)
 BANK3TEXT:
-db "Text in bank 3.[]"
+db "Text in bank 3.[]012346578901234"
 //Line feed, I believe in linux line endings
 db 0x0D
+db "Bank 3 part 2"
+db 0x0D
+db "Bank 3 part 3"
 db 0x00
+
 BANK3TEXTPART2:
 db "Break the worlds shell, for the revolution of the world!!"
 db 0x00 //Null byte

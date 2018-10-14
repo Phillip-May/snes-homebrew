@@ -17,8 +17,7 @@ scope TermPrivate {
 //Text can't cross bank bonaries
 //Uses DMA0 for VRAM access
 fPRINTTERM24BITS:
-  //Setup stack (Link)
-  db 0x42, 0x00   
+  //Setup stack (Link)  
   phx 		  //Original 16 bit address
   ldx #0x0000
   phx 		  //Variable String length
@@ -32,8 +31,49 @@ fPRINTTERM24BITS:
   -
     inx
     lda 0x0000,x
+    cmp #0x0D //Line feed
+    bne	++     //If line feed
+      //Call print string with x value up to current
+      //Change original address to address after after
+      //print. Context save
+      phx
+      pha
+      php
+      //Calculate current size
+      rep #0x20    // Set 16-Bit Accumulator
+      txa 		   //New x, Original x is current value on stack
+      sbc 7,s      //Subtract to get size
+      //Size of string in bytes is now in accumulator
+      tay       //y holds size temporarilly          
+      lda 7,s   //Grab 16 bit pointer
+      tax       //Store it in x
+      tya 		//accumulator holds size
+      //Databank and directpage are still correct
+      jsr TermPrivate.fPRINTTERMSIZE24BITS
+      //Linebreak code
+      db 0x42, 0x00      
+      lda.b TermPrivate.wCursorPos
+	  bit #0x000F
+	  beq + //Equal means zero flag
+
+      lda.b TermPrivate.wCursorPos
+      lsr; lsr; lsr; lsr; lsr;
+      inc  //Increment to the next line
+      asl; asl; asl; asl; asl
+      +
+      sta.b TermPrivate.wCursorPos
+      //Update 16 bit address used to determine size
+      lda 3,s 	   //Grab new start position from context save
+      inc 		   //Special character means do not display
+      sta 7,s //Update start position
+      //Context restore
+      plp
+      pla
+      plx
+    +
     cmp #0x00
     bne - //If not null byte keep reading
+  //Final print
   //Number of bytes in string is original new x - orignal x  
   rep #0x20 // Set 16-Bit Accumulator
   txa //New x  //Original x is current value on stack
@@ -43,10 +83,10 @@ fPRINTTERM24BITS:
   //Function call for print string
   //Data bank and direct page are already set
   //Size is already in 16 bit accumulator
-  pha
-  lda 5,s   	 	 //Grab 16 bit pointer
+  tay
+  lda 3,s   	 	 //Grab 16 bit pointer
   tax 				 //Store it in the x register
-  pla 				 //Restore 16 bit size to accumulator
+  tya 				 //Restore 16 bit size to accumulator
   jsr TermPrivate.fPRINTTERMSIZE24BITS
   //Restore (Unlink) stack
   rep #0x10          // 16-bit x,y
@@ -69,7 +109,6 @@ rtl
 //Uses DMA channel 0
 scope TermPrivate {
   fPRINTTERMSIZE24BITS:
-  db 0x42, 0x00  
   //Set up stack (Link)
   phx				//16-bit pointer
   pha				//16 bit size
@@ -94,7 +133,6 @@ scope TermPrivate {
   stx REG_A1B0       // $43X4: Source Bank
   ldx.b #$01 << 0    // Start DMA Transfer On Channel
   stx.w REG_MDMAEN   // $420B: DMA Enable
-  db 0x42, 0x00
   //Increment cursor position variable, x register is current size
   lda 1,s 			 //Load size
   adc.b wCursorPos	 //Add to old possition
