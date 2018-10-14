@@ -58,7 +58,7 @@ include "TerninalFunctions.ASM"
 
 seek($028000)
 BANK3TEXT:
-db "Text in bank 3"
+db "Text in bank 3."
 //Line feed, I believe in linux line endings
 db 0x0D
 db 0x00

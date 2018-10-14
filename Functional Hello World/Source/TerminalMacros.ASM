@@ -1,6 +1,6 @@
 arch snes.cpu
 //Tile map start location
-constant BGTILEMAPLINE1($F840) //First line is partially cutoff
+constant BGTILEMAPLINE1($7840) //First line is partially cutoff
 
 //The temrinal module runs on Mode 1
 //8x8 tiles
@@ -17,8 +17,16 @@ macro TERMINIT() {
 
   // Setup BG1 4 Color Background
   lda.b #%01111100  // AAAAAASS: S = BG Map Size, A = BG Map Address
-  lda.b #(BGTILEMAPLINE1 >> (8+1)) + 0b00
-  sta.w REG_BG1SC   // $2108: BG1 32x32, BG1 Map Address = $3F (VRAM Address / $400)
+  db 0x42, 0x00
+  ldx.w #wCursorPos >> 8 << 8 //Direct page bank to variables bank
+  phx
+  pld          //Direct page will use bank variable page
+
+  lda.b #(BGTILEMAPLINE1 >> (8+1)) + 0b00 //Upper byte shifted by 1
+  sta REG_BG1SC     // $2108: BG1 32x32, BG1 Map Address = $3F (VRAM Address / $400)
+  ldx.w #(BGTILEMAPLINE1 >> 1)
+  stx.b wCursorPos  //Also save starting cursor position, using direct page
+
   lda.b #%00000000  // BBBBAAAA: A = BG1 Tile Address, B = BG2 Tile Address
   sta.w REG_BG12NBA // $210B: BG1 Tile Address = $0 (VRAM Address / $1000)
 
@@ -36,28 +44,18 @@ macro TERMINIT() {
   -
     bit.w REG_RDNMI // $4210: Read NMI Flag Register
     bpl - // Wait For NMI Flag
-  //Set screen to max bright
+  //Set screen to max brightness
   lda.b #0x0F // 8-Bit A
   sta.w REG_INIDISP // $2100: Turn Screen To Brightness Level
-}
-
-macro mCALLPRINTTERM16BITS(sz16BIT) {
-  //Context save 
-  php
-  rep #0x10 // 16-bit x,y
-  ldx.w #{sz16BIT} //Give address via x register
-  jsr fRINTTERM16BITS
-  plp
 }
 
 macro mCALLPRINTTERM24BITS(sz24BIT) {
   //Context save 
   php
-  db 0x42, 0x00
   sep #0x20 // Set 8-Bit Accumulator
   rep #0x10 // 16-bit x,y
   ldx.w #{sz24BIT} //Give address via x reigster
   lda.b #{sz24BIT} >> 16 //Give bank via accumulator
-  jsl fRINTTERM24BITS
+  jsl fPRINTTERM24BITS
   plp
 }
