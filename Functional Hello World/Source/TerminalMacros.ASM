@@ -1,7 +1,4 @@
 arch snes.cpu
-//Tile map start location
-constant BGTILEMAPLINE1($7840) //First line is partially cutoff
-
 //The temrinal module runs on Mode 1
 //8x8 tiles
 //32x32 tile background
@@ -18,14 +15,14 @@ macro TERMINIT() {
   // Setup BG1 4 Color Background
   lda.b #%01111100  // AAAAAASS: S = BG Map Size, A = BG Map Address
   db 0x42, 0x00
-  ldx.w #wCursorPos >> 8 << 8 //Direct page bank to variables bank
+  ldx.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variables bank
   phx
   pld          //Direct page will use bank variable page
 
-  lda.b #(BGTILEMAPLINE1 >> (8+1)) + 0b00 //Upper byte shifted by 1
+  lda.b #(TermPrivate.BGTILEMAPLINE1 >> (8+1)) + 0b00 //Upper byte shifted by 1
   sta REG_BG1SC     // $2108: BG1 32x32, BG1 Map Address = $3F (VRAM Address / $400)
-  ldx.w #(BGTILEMAPLINE1 >> 1)
-  stx.b wCursorPos  //Also save starting cursor position, using direct page
+  ldx.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
+  stx.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct page
 
   lda.b #%00000000  // BBBBAAAA: A = BG1 Tile Address, B = BG2 Tile Address
   sta.w REG_BG12NBA // $210B: BG1 Tile Address = $0 (VRAM Address / $1000)

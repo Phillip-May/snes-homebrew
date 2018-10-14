@@ -1,7 +1,13 @@
-//Variables
-//Cursor current position (VRAM location)
-//Shifted//Upper byte shifted by 1 over 1
-constant wCursorPos($000105)
+//Constants
+scope TermPrivate {
+  //Tile map start location
+  constant BGTILEMAPLINE1($7840) //First line is partially cutoff
+  
+  //Variables
+  //Cursor current position (VRAM location)
+  //Shifted//Upper byte shifted by 1 over 1
+  constant wCursorPos($000105)
+}
 
 //Passes 24 bit address to string
 //Lower 16 bits in x register
@@ -30,7 +36,7 @@ fPRINTTERM24BITS:
   //Size of string in bytes is now in accumulator
   pha
 
-  ldx.w #wCursorPos >> 8 << 8 //Direct page bank to variable bank
+  ldx.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variable bank
   phx
   pld 				 //Direct page will use bank variable page
   //Move x number of bytes to VRAM tilemap (screen base)
@@ -39,7 +45,7 @@ fPRINTTERM24BITS:
   sep #0x20			 // Set 8-bit accumulator
   stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
   //Grab cursor position which is Vram destination
-  ldx.b wCursorPos	 //Direct page + variable offset
+  ldx.b TermPrivate.wCursorPos	 //Direct page + variable offset
   // Set VRAM Destination
   stx.w REG_VMADDL   // $2116: VRAM
 
@@ -52,9 +58,9 @@ fPRINTTERM24BITS:
   db 0x42,0x00
   rep #0x20 // Set 16-Bit Accumulator
   txa
-  adc.b wCursorPos
+  adc.b TermPrivate.wCursorPos
   dec
-  sta.b wCursorPos
+  sta.b TermPrivate.wCursorPos
   sep #0x20 // Set 8-Bit Accumulator
 
 
@@ -68,4 +74,10 @@ fPRINTTERM24BITS:
   sta.w REG_MDMAEN   // $420B: DMA Enable
 rtl
   
-fRINTTERM24BITS:
+//Private function
+//Parameters
+//Prints string of size x to terminal
+//Does not wait for a null byte
+scope TerminalPrivate {
+  fPRINTTERMSIZE24BITS:
+}
