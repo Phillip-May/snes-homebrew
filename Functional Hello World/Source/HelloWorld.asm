@@ -38,12 +38,14 @@ seek($008000); Start:
   mCALLPRINTTERM24BITS(BANK3TEXT)
   //mCALLPRINTTERM16BITS(TEMP)
   mCALLPRINTTERM24BITS(BANK3TEXTPART2)
+
+
   
 Loop:
   jmp Loop
 
 HELLOWORLD:
-  db "Hello, World!" // Hello World Text
+  db "Hello, World!{}" // Hello World Text
   db 0x00            //Null Byte
 
 BGCHR:
@@ -58,10 +60,9 @@ include "TerninalFunctions.ASM"
 
 seek($028000)
 BANK3TEXT:
-db "Text in bank 3."
+db "Text in bank 3.[]"
 //Line feed, I believe in linux line endings
-db 0x0D
 db 0x00
 BANK3TEXTPART2:
-db "Break the worlds shell, for the revolution of the world."
+db "Break the worlds shell, for the revolution of the world!!"
 db 0x00 //Null byte

@@ -27,8 +27,7 @@ fPRINTTERM24BITS:
   txa //New x
   //Original x is current value on stack
   sbc 1,s //One value forward because it's a 16 bit number
-  //Size of string is now in accumulator
-  dec //DMA Transfer will not include the Null byte
+  //Size of string in bytes is now in accumulator
   pha
 
   ldx.w #wCursorPos >> 8 << 8 //Direct page bank to variable bank
@@ -49,11 +48,12 @@ fPRINTTERM24BITS:
   sta.w REG_BBAD0    // $43X1: DMA Destination
   plx			     // Set Size In Bytes To DMA Transfer
   stx.w REG_DAS0L    // $43X5: DMA Transfer Size/HDMA
-  //Increment cursor position variable, x position is current size
+  //Increment cursor position variable, x register is current size
   db 0x42,0x00
   rep #0x20 // Set 16-Bit Accumulator
   txa
   adc.b wCursorPos
+  dec
   sta.b wCursorPos
   sep #0x20 // Set 8-Bit Accumulator
 
