@@ -14,7 +14,6 @@ macro TERMINIT() {
 
   // Setup BG1 4 Color Background
   lda.b #%01111100  // AAAAAASS: S = BG Map Size, A = BG Map Address
-  db 0x42, 0x00
   ldx.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variables bank
   phx
   pld          //Direct page will use bank variable page
@@ -49,10 +48,16 @@ macro TERMINIT() {
 macro mCALLPRINTTERM24BITS(sz24BIT) {
   //Context save 
   php
-  sep #0x20 // Set 8-Bit Accumulator
-  rep #0x10 // 16-bit x,y
-  ldx.w #{sz24BIT} //Give address via x reigster
-  lda.b #{sz24BIT} >> 16 //Give bank via accumulator
+  //Setup
+  sep #0x20              // Set 8-Bit Accumulator
+  rep #0x10              // 16-bit x,y
+  lda.b #{sz24BIT} >> 16 //Give bank via data bank register
+  pha                    //Push onto stack
+  plb                    //Give upper bytes of pointer
+  ldx.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variable bank
+  phx                    //Direct page for static variables
+  pld                    //Direct page will use bank variable page
+  ldx.w #{sz24BIT}       //Give address via x reigster  
   jsl fPRINTTERM24BITS
   plp
 }
