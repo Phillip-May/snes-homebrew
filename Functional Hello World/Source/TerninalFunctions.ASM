@@ -1,7 +1,7 @@
 //Constants
 scope TermPrivate {
   //Tile map start location
-  constant BGTILEMAPLINE1($7840) //First line is partially cutoff
+  constant BGTILEMAPLINE1($7800) //First line is partially cutoff
   
   //Variables
   //Cursor current position (VRAM location)
@@ -133,8 +133,7 @@ scope TermPrivate {
   phb				 // Set Source Bank
   plx 				 // Source Bank is current
   stx REG_A1B0       // $43X4: Source Bank
-  
-  db 0x42, 0x00
+
   //Wait for VBlank
   sep #0x20
   WaitHVB()

@@ -28,6 +28,7 @@ seek($028000); fill $8000 // Fill Upto $7FFF (Bank 2) With Zero Bytes
 include "../LIB/SNES.INC"        // Include SNES Definitions
 include "../LIB/SNES_HEADER.ASM" // Include Header & Vector Table
 include "../LIB/SNES_GFX.INC"    // Include Graphics Macros
+include "../LIB/SNES_INPUT.INC"
 include "TerminalMacros.ASM"
 
 seek($008000); Start:
@@ -36,24 +37,40 @@ seek($008000); Start:
   TERMINIT()
   // Print Text
   mCALLPRINTTERM24BITS(BANK3TEXT)
-  mCALLPRINTTERM24BITS(HELLOWORLD)  
-  mCALLPRINTTERM24BITS(BANK3TEXT)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(BANK3TEXT)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(BANK3TEXT)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(BANK3TEXTPART2)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(BANK3TEXT)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(HELLOWORLD)
-  mCALLPRINTTERM24BITS(BANK3TEXTPART2)
 
+db 0x42, 0x00
+lda.b #$01
+sta.w REG_NMITIMEN // Enable Joypad NMI Reading Interrupt
+ldx.w #$0000 // Reset BG X Position
+ldy.w #$0000 // Reset BG Y Position
 
 Loop:
+  WaitNMI() // Wait For Vertical Blank
+InputLoop: 
+  WaitNMI() // Wait For Vertical Blank
+
+  Up:
+    ReadJOY({JOY_UP}) // Test Joypad UP Button
+    beq Down          // IF (UP ! Pressed) Branch Down
+    BGScroll(REG_BG1VOFS, de, y) // Decrement BG1 Vertical Scroll Position
+
+  Down:
+    ReadJOY({JOY_DOWN}) // Test DOWN Button
+    beq Left            // IF (DOWN ! Pressed) Branch Down
+    BGScroll(REG_BG1VOFS, in, y) // Increment BG1 Vertical Scroll Position
+
+  Left:
+    ReadJOY({JOY_LEFT}) // Test LEFT Button
+    beq Right           // IF (LEFT ! Pressed) Branch Down
+    BGScroll(REG_BG1HOFS, de, x) // Decrement BG1 Horizontal Scroll Position
+
+  Right:
+    ReadJOY({JOY_RIGHT}) // Test RIGHT Button
+    beq Finish           // IF (RIGHT ! Pressed) Branch Down
+    BGScroll(REG_BG1HOFS, in, x) // Increment BG1 Horizontal Scroll Position
+
+  Finish:
+    jmp InputLoop
   jmp Loop
 
 HELLOWORLD:
@@ -76,10 +93,69 @@ BANK3TEXT:
 db "Text in bank 3.[]012346578901234"
 //Line feed, I believe in linux line endings
 db 0x0D
+db "Bank 3 part 1"
+db 0x0D
 db "Bank 3 part 2"
 db 0x0D
 db "Bank 3 part 3"
 db 0x0D
+db "Bank 3 part 4"
+db 0x0D
+db "Bank 3 part 5"
+db 0x0D
+db "Bank 3 part 6"
+db 0x0D
+db "Bank 3 part 7"
+db 0x0D
+db "Bank 3 part 9"
+db 0x0D
+db "Bank 3 part 10"
+db 0x0D
+db "Bank 3 part 11"
+db 0x0D
+db "Bank 3 part 12"
+db 0x0D
+db "Bank 3 part 13"
+db 0x0D
+db "Bank 3 part 14"
+db 0x0D
+db "Bank 3 part 15"
+db 0x0D
+db "Bank 3 part 16"
+db 0x0D
+db "Bank 3 part 17"
+db 0x0D
+db "Bank 3 part 18"
+db 0x0D
+db "Bank 3 part 19"
+db 0x0D
+db "Bank 3 part 20"
+db 0x0D
+db "Bank 3 part 21"
+db 0x0D
+db "Bank 3 part 22"
+db 0x0D
+db "Bank 3 part 23"
+db 0x0D
+db "Bank 3 part 24"
+db 0x0D
+db "Bank 3 part 25"
+db 0x0D
+db "Bank 3 part 26"
+db 0x0D
+db "Bank 3 part 27"
+db 0x0D
+db "Bank 3 part 28"
+db 0x0D
+db "Bank 3 part 29"
+db 0x0D
+db "Bank 3 part 30"
+db 0x0D
+db "Bank 3 part 31"
+db 0x0D
+db "Bank 3 part 32"
+db 0x0D
+db "Bank 3 part 33"
 db 0x00
 
 BANK3TEXTPART2:
