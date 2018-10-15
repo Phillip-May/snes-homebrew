@@ -50,8 +50,7 @@ fPRINTTERM24BITS:
       tya 		//accumulator holds size
       //Databank and directpage are still correct
       jsr TermPrivate.fPRINTTERMSIZE24BITS
-      //Linebreak code
-      db 0x42, 0x00      
+      //Linebreak code     
       lda.b TermPrivate.wCursorPos
 	  bit #0x000F
 	  beq + //Equal means zero flag
@@ -115,6 +114,9 @@ scope TermPrivate {
   sep #0x10         //8-bit x,y
   rep #0x20			//16-bit accumulator
   //Move x number of bytes to VRAM tilemap (screen base)
+  cmp #0x0000		 //Make sure transfer is not 0 bytes
+  beq +				 //Skip to the end if zero
+
   //Only Lo bytes as Hi bytes are tile properties
   //DMA setup stuff
   stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
@@ -131,14 +133,23 @@ scope TermPrivate {
   phb				 // Set Source Bank
   plx 				 // Source Bank is current
   stx REG_A1B0       // $43X4: Source Bank
+  
+  db 0x42, 0x00
+  //Wait for VBlank
+  sep #0x20
+  WaitHVB()
+
+
   ldx.b #$01 << 0    // Start DMA Transfer On Channel
   stx.w REG_MDMAEN   // $420B: DMA Enable
   //Increment cursor position variable, x register is current size
+  rep #0x20			 //16 bit accumulator
   lda 1,s 			 //Load size
   adc.b wCursorPos	 //Add to old possition
   dec 				 //Account for null byte
   sta.b wCursorPos
   //Restore stack (Unlink)
+  +
   pla
   pla
   rts
