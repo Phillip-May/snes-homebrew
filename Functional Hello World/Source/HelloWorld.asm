@@ -18,8 +18,6 @@ macro updateDataBank(bank) {
   plb  
 }
 
-//Removed terminit
-
 //Includes
 //If a bank is not entirefilled with zero's, snes9x ignores it.
 seek($008000); fill $8000 // Fill Upto $7FFF (Bank 0) With Zero Bytes
@@ -34,15 +32,11 @@ include "TerminalMacros.ASM"
 seek($008000); Start:
   //Initialisation
   SNES_INIT(SLOWROM)   // Run SNES Initialisation Routine
-  TERMINIT()
+  jsl fTERMINIT24BITS
   // Print Text
-  mCALLPRINTTERM24BITS(BANK3TEXT)
-
-db 0x42, 0x00
-lda.b #$01
-sta.w REG_NMITIMEN // Enable Joypad NMI Reading Interrupt
-ldx.w #$0000 // Reset BG X Position
-ldy.w #$0000 // Reset BG Y Position
+  //mCALLPRINTTERM24BITS(BANK3TEXT)
+  lda.b #$01
+  sta.w REG_NMITIMEN // Enable Joypad NMI Reading Interrupt
 
 Loop:
   WaitNMI() // Wait For Vertical Blank
@@ -52,22 +46,22 @@ InputLoop:
   Up:
     ReadJOY({JOY_UP}) // Test Joypad UP Button
     beq Down          // IF (UP ! Pressed) Branch Down
-    BGScroll(REG_BG1VOFS, de, y) // Decrement BG1 Vertical Scroll Position
+    mCALLPRINTTERM24BITS(BANK3TEXTPART2)
 
   Down:
     ReadJOY({JOY_DOWN}) // Test DOWN Button
     beq Left            // IF (DOWN ! Pressed) Branch Down
-    BGScroll(REG_BG1VOFS, in, y) // Increment BG1 Vertical Scroll Position
+    mCALLPRINTTERM24BITS(HELLOWORLD)
 
   Left:
     ReadJOY({JOY_LEFT}) // Test LEFT Button
     beq Right           // IF (LEFT ! Pressed) Branch Down
-    BGScroll(REG_BG1HOFS, de, x) // Decrement BG1 Horizontal Scroll Position
+    jsl fCLEARTERM24BITS
 
   Right:
     ReadJOY({JOY_RIGHT}) // Test RIGHT Button
     beq Finish           // IF (RIGHT ! Pressed) Branch Down
-    BGScroll(REG_BG1HOFS, in, x) // Increment BG1 Horizontal Scroll Position
+    mCALLPRINTTERM24BITS(BANK3TEXT)
 
   Finish:
     jmp InputLoop
@@ -75,15 +69,7 @@ InputLoop:
 
 HELLOWORLD:
   db "Hello, World!{}" // Hello World Text
-  db 0x0D
   db 0x00            //Null Byte
-
-BGCHR:
-  include "Font8x8.asm" // Include BG 1BPP 8x8 Tile Font Character Data (1016 Bytes)
-BGPAL:
-  dw $0000, $7FFF // Black / White Palette (4 Bytes)
-BGCLEAR:
-  dw $0020 // BG Clear Character Space " " Fixed value upper byte is tile properties
 
 seek($018000)
 include "TerninalFunctions.ASM"
