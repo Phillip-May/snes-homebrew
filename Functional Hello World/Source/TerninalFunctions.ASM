@@ -116,7 +116,7 @@ fCLEARTERM24BITS:
   rep   #0x10                // 16-bit x,y
   ldx.w #0x7800              // Dest
   ldy.w #0x0400              // Size
-  db 0x42, 0x00
+  //db 0x42, 0x00
   jsl fClEARVRAM24BITS
 
   rep #0x10              // 16-bit x,y
@@ -346,7 +346,7 @@ scope TermPrivate {
   //Make write head loop
   lda.b wCursorPos
   adc 1,s
-  cmp #0x3FFF + 1
+  cmp #0x3FFF + 3
   //Need to reset write head to the top of the tile map past 0x3FFF
   bpl + //If (cursor pos > 0x3FFF)
     brl ++

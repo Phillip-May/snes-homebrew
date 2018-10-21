@@ -70,9 +70,21 @@ InputLoop:
     jmp InputLoop
   jmp Loop
 
+//Print stack to console in case of crash
+iCRASHHANDLER:
+  mCALLPRINTTERM24BITS(CRASHMESSAGE)
+  db 0x42, 0x00
+
+  CRASHHANG:
+  jmp CRASHHANG
+
 HELLOWORLD:
-  db "1234567890ABCDEFGHIJ" // Hello World Text
+  //db "1234567890ABCDEFGHIJ" // Hello World Text
+  db "A" // Hello World Text
   db 0x00            //Null Byte
+CRASHMESSAGE:
+  db "Well looks like it crashed"
+  db 0x00
 
 seek($018000)
 include "TerninalFunctions.ASM"
