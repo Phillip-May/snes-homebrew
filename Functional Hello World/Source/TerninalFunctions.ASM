@@ -21,8 +21,22 @@ scope TermPrivate {
 
 }
 
+
+//No Requirements
+//No Parameters
+//Initialises the terminal
 fTERMINIT24BITS:
+  //Link
+  pha
+  phx
+  phy
+  phb
+  php
+
+  sep #0x20              // Set 8-Bit Accumulator
+  rep #0x10              // 16-bit x,y
   jsl fCLEARTERM24BITS      //Clears Vram tile map and waits for NMI
+  WaitHVB()
   LoadPAL(TermPrivate.BGPAL, $00, 4, 0) // Load BG Palette Data
   LoadLOVRAM(TermPrivate.BGCHR, $0000, $3F8, 0) // Load 1BPP Tiles To VRAM Lo Bytes (Converts To 2BPP Tiles)  
   // Setup Video
@@ -49,36 +63,151 @@ fTERMINIT24BITS:
   //Turn the screen on
   //Set screen to max brightness
   lda.b #0x0F // 8-Bit A
-  sta.w REG_INIDISP // $2100: Turn Screen To Brightness Level
+  sta.w REG_INIDISP // $2100: Turn Screen on to Brightness Level
+
+  //Unlink
+  plp  
+  plb
+  ply
+  plx
+  pla  
 rtl
 
 
 //Requires direct page be set to page for terminal variables
 fCLEARTERM24BITS:
-  sep #0x20              // Set 8-Bit Accumulator
-  rep #0x10              // 16-bit x,y
-  ldx.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variable bank
-  phx                    //Direct page for static variables
+  //Link
+  pha
+  phx
+  phy
+  phb
+  php
+
+  rep #0x20              // Set 16-Bit Accumulator
+  sep #0x10              // 8-bit x,y
+
+  lda.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variable bank
+  pha                    //Direct page for static variables
   pld                    //Direct page will use bank variable page  
   //Set direct page
-  ldx.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
-  stx.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct page
-  lda.b #0x00
-  sta.b TermPrivate.bScroll
+  lda.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
+  sta.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct page
+  ldx.b #0x00
+  stx.b TermPrivate.bScroll
 
   stz.w REG_BG1HOFS // Store Zero To BG1 Horizontal Scroll Pos Low Byte
   stz.w REG_BG1HOFS // Store Zero To BG1 Horizontal Scroll Pos High Byte
-  lda.b #TermPrivate.BGSCROLLRESETLOW
-  sta.w REG_BG1VOFS // Store Zero To BG1 Vertical Scroll Pos Low Byte
-  sta.b TermPrivate.bScrollPosition
+  ldx.b #TermPrivate.BGSCROLLRESETLOW
+  stx.w REG_BG1VOFS // Store Zero To BG1 Vertical Scroll Pos Low Byte
+  stx.b TermPrivate.bScrollPosition
   stz.w REG_BG1VOFS // Store Zero To BG1 Vertical Pos High Byte
   //Wait for Vblank (NMI)
-  WaitHVB()
+  sep #0x10              // 8-bit x,y
+  ldx.b    #%10000000   // Force VBlank by turning off the screen.
+  stx.w    $2100 
+  
+  //Source address
+  sep #0x10                // 8-bit x,y
+  rep #0x20                // 16-bit accumulator
+  ldx.b #(TermPrivate.BGCLEAR2 >> 16)
+  phx
+  plb
+  lda.w #TermPrivate.BGCLEAR2
+  rep   #0x10                // 16-bit x,y
+  ldx.w #0x7800              // Dest
+  ldy.w #0x0400              // Size
+  db 0x42, 0x00
+  jsl fClEARVRAM24BITS
 
   rep #0x10              // 16-bit x,y
-  ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0400, 0) // Clear VRAM Map To Fixed Tile Word
+  sep #0x20              // Set 8-Bit Accumulator
+  //ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0400, 0) // Clear VRAM Map To Fixed Tile Word
+  sep #0x10              // 8-bit x,y
+  ldx.b     #%00001111   //End of forced Vblank
+  stx.w     $2100
+  
+  //Unlink
+  plp  
+  plb
+  ply
+  plx
+  pla
 rtl
 
+//SRC 16 bit address in accumulator and 8 bit bank in db
+//Dest 16 bit address of vram destiantion in x register
+//Size 16 bit size in y register
+//DMA channel 1
+fClEARVRAM24BITS:
+  //Link
+  php
+  pha                //Source address
+  phx                //Destination
+  phy                //Size
+
+  rep #0x20              // 16-bit accumulator
+  sep #0x10              // 8-bit x,y
+
+  // Transfer Lo Byte
+  stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
+  //lda.w #{DEST} >> 1 // Set VRAM Destination
+  lda   3,s
+  lsr
+  sta.w REG_VMADDL   // $2116: VRAM
+
+  ldx.b #$08           // Set DMA Mode (Write Byte, Fixed Source)
+  stx.w REG_DMAP1 // $43X0: DMA Control
+  ldx.b #$18           // Set Destination Register ($2118: VRAM Write)
+  stx.w REG_BBAD1 // $43X1: DMA Destination
+  //lda.w #{SRC}         // Set Source Offset (Lo Byte)
+  lda   5,s
+  sta.w REG_A1T1L // $43X2: DMA Source
+  //ldx.b #{SRC} >> 16   // Set Source Bank
+  phb
+  plx
+  stx.w REG_A1B1  // $43X4: Source Bank
+  //lda.w #{SIZE}        // Set Size In Bytes To DMA Transfer
+  lda 1,s
+  sta.w REG_DAS1L // $43X5: DMA Transfer Size/HDMA
+
+  ldx     #%10000000   // Force VBlank by turning off the screen.
+  stx     $2100
+  ldx.b #$01 << 1 // Start DMA Transfer On Channel
+  stx.w REG_MDMAEN     // $420B: DMA Enable  
+  ldx     #%00001111   //End of forced Vblank
+  stx     $2100
+
+  // Transfer Hi Byte
+  ldx.b #$80         // Set Increment VRAM Address After Accessing Hi Byte
+  stx.w REG_VMAIN    // $2115: Video Port Control
+  //lda.w #{DEST} >> 1 // Set VRAM Destination
+  lda   3,s
+  sta.w REG_VMADDL   // $2116: VRAM
+
+  ldx.b #$19           // Set Destination Register ($2119: VRAM Write)
+  stx.w REG_BBAD1 // $43X1: DMA Destination
+  //lda.w #({SRC} + 1)   // Set Source Offset (Hi Byte)
+  lda   5,s
+  inc
+  sta.w REG_A1T1L // $43X2: DMA Source
+  //lda.w #{SIZE}        // Set Size In Bytes To DMA Transfer
+  lda   1,s
+  sta.w REG_DAS1L // $43X5: DMA Transfer Size/HDMA
+
+  ldx.b     #%10000000   // Force VBlank by turning off the screen.
+  stx.w     $2100
+  ldx.b #$01 << 1 // Start DMA Transfer On Channel
+  stx.w REG_MDMAEN     // $420B: DMA Enable  
+  ldx.b     #%00001111   //End of forced Vblank
+  stx.w     $2100
+
+  rep #0x10              // 16-bit x,y
+  //Unlink
+  pla
+  pla
+  pla
+  plp
+rtl
 
 //Passes 24 bit address to string
 //Lower 16 bits in x register
@@ -212,10 +341,6 @@ scope TermPrivate {
     lda #0x0001
     ora.b bScroll   //or so only flag is set
     sta.b bScroll
-    //db 0x42, 0x00
-    //lda.b bScrollPosition
-    //sbc #0x08
-    //sta.b bScrollPosition
   +
   
   //Make write head loop
@@ -234,7 +359,6 @@ scope TermPrivate {
     ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0080, 0) // Clear VRAM Map To Fixed Tile Word
     rep #0x20
     sep #0x10              // 16-bit x,y
-    db 0x42, 0x00
     stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
     lda.b wCursorPos   // Direct page + variable offset, cursor position is current destination
     sta.w REG_VMADDL   // $2116: VRAM Set VRAM Destination

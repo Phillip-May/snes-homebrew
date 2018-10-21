@@ -57,7 +57,9 @@ InputLoop:
   Left:
     ReadJOY({JOY_LEFT}) // Test LEFT Button
     beq Right           // IF (LEFT ! Pressed) Branch Down
+    //db 0x42, 0x00
     jsl fCLEARTERM24BITS
+    //db 0x42, 0x00
 
   Right:
     ReadJOY({JOY_RIGHT}) // Test RIGHT Button
