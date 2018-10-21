@@ -123,13 +123,16 @@ fPRINTTERM24BITS:
       jsr TermPrivate.fPRINTTERMSIZE24BITS
       //Linebreak code     
       lda.b TermPrivate.wCursorPos
-	  bit #0x000F
-	  beq + //Equal means zero flag
+	    bit #0x000F
+	    beq + //Equal means zero flag
 
       lda.b TermPrivate.wCursorPos
       lsr; lsr; lsr; lsr; lsr;
       inc  //Increment to the next line
       asl; asl; asl; asl; asl
+      //lda.b bScrollPosition
+      //sbc #0x08
+      //sta.b bScrollPosition
       +
       sta.b TermPrivate.wCursorPos
       //Update 16 bit address used to determine size
@@ -204,7 +207,7 @@ scope TermPrivate {
   //Make write head loop
   lda.b wCursorPos
   adc 1,s
-  cmp #0x3FFF
+  cmp #0x3FFF + 1
   //Need to reset write head to the top of the tile map past 0x3FFF
   bmi + //If (cursor pos > 0x3FFF)
     //Wait for VBlank
@@ -270,15 +273,15 @@ scope TermPrivate {
     lda 5,s
     sec
     sbc 7,s
-    //Make sure New is bigger than
+    //Make sure New is bigger than old
     bpl +
-    //If that fails scroll size /32 with minimum of 1
+    //If that fails scroll size //32 with minimum of 1
     db 0x42, 0x00
-    lda 1,s  
-    lsr; lsr; lsr; lsr; lsr;
-    //cmp #0x0001
+    and #0x00FF
+    //lsr; lsr; lsr; lsr; lsr;
+    cmp #0x0001
     bne + //If a non zero value
-    lda #0x0001
+    lda #0x0000
     +
   +
   //accumulator now contains the number of lines to scroll
