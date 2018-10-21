@@ -46,7 +46,8 @@ InputLoop:
   Up:
     ReadJOY({JOY_UP}) // Test Joypad UP Button
     beq Down          // IF (UP ! Pressed) Branch Down
-    mCALLPRINTTERM24BITS(BANK3TEXTPART2)
+    mCALLPRINTTERM24BITS(BANK3TEXTPART3)
+    mCALLPRINTTERM24BITS(BANK3TEXTPART4)
 
   Down:
     ReadJOY({JOY_DOWN}) // Test DOWN Button
@@ -68,7 +69,7 @@ InputLoop:
   jmp Loop
 
 HELLOWORLD:
-  db "Hello, World!{}" // Hello World Text
+  db "13245678901234567890" // Hello World Text
   db 0x00            //Null Byte
 
 seek($018000)
@@ -146,5 +147,13 @@ db 0x00
 
 BANK3TEXTPART2:
 db "Break the worlds shell, for the revolution of the world!!"
-db 0x0D
+db 0x00
 db 0x00 //Null byte
+
+BANK3TEXTPART3:
+db "Break the worlds shell for"
+db 0x00
+
+BANK3TEXTPART4:
+db " the revolution of the world!!"
+db 0x00

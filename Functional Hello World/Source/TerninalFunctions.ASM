@@ -199,11 +199,25 @@ scope TermPrivate {
   bne +     //Skip to the end if zero
   
   lda.b wCursorPos
-  sta 9,s
   //Undo the scroll
   brl ENDPRINTTERMSIZE24
   +
 
+  //If past the limit set the scroll flag
+  lda 1,s          // Grab size
+  adc wCursorPos
+  cmp #0x3F80
+  //Screen needs to start scrolling the first time wCursorPos passes 0x3f80
+  bmi + //If (cursor pos > 0x3F80)
+    lda #0x0001
+    ora.b bScroll   //or so only flag is set
+    sta.b bScroll
+    //db 0x42, 0x00
+    //lda.b bScrollPosition
+    //sbc #0x08
+    //sta.b bScrollPosition
+  +
+  
   //Make write head loop
   lda.b wCursorPos
   adc 1,s
@@ -230,21 +244,6 @@ scope TermPrivate {
     plp        
   +
 
-  //If past the limit set the scroll flag
-  lda 1,s          // Grab size
-  adc wCursorPos
-  cmp #0x3F80
-  //Screen needs to start scrolling the first time wCursorPos passes 0x3f80
-  bmi + //If (cursor pos > 0x3F80)
-    lda #0x0001
-    ora.b bScroll   //or so only flag is set
-    sta.b bScroll
-    //db 0x42, 0x00
-    //lda.b bScrollPosition
-    //sbc #0x08
-    //sta.b bScrollPosition
-  +
-  
   ldx #0x00  
   lda #0x0001
   and bScroll   //and returns non zero it means flag is set
@@ -279,9 +278,9 @@ scope TermPrivate {
     db 0x42, 0x00
     and #0x00FF
     //lsr; lsr; lsr; lsr; lsr;
-    cmp #0x0001
-    bne + //If a non zero value
-    lda #0x0000
+    //cmp #0x0001
+    //bne + //If a non zero value
+    //lda #0x0000
     +
   +
   //accumulator now contains the number of lines to scroll
@@ -292,7 +291,7 @@ scope TermPrivate {
   and #0x00FF
   sta.b bScrollPosition //New value for bScrollYRegister
 
-  //thing used to be here
+  //used to be here
   
   //Clear the line in front of what is being printed
   rep #0x10              // 16-bit x,y
