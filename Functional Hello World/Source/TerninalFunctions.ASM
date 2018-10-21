@@ -223,24 +223,46 @@ scope TermPrivate {
   adc 1,s
   cmp #0x3FFF + 1
   //Need to reset write head to the top of the tile map past 0x3FFF
-  bmi + //If (cursor pos > 0x3FFF)
+  bpl + //If (cursor pos > 0x3FFF)
+    brl ++
+    +
     //Wait for VBlank
     php
-    sep #0x20          //8 bit accumulator
-    WaitHVB()  
-    rep #0x20
-    rep #0x10              // 16-bit x,y
-    ldx.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
-    stx.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct page
-    //Clear the first two lines
     rep #0x10              // 16-bit x,y
     sep #0x20
     WaitHVB()
-    //lda.b bScrollPosition
-    //adc #0x08
-    //sta.b bScrollPosition
     ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0080, 0) // Clear VRAM Map To Fixed Tile Word
-    sep #0x10
+    rep #0x20
+    sep #0x10              // 16-bit x,y
+    db 0x42, 0x00
+    stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
+    lda.b wCursorPos   // Direct page + variable offset, cursor position is current destination
+    sta.w REG_VMADDL   // $2116: VRAM Set VRAM Destination
+
+    stz.w REG_DMAP0    // Set DMA Mode (Write Byte, Increment Source) ($43X0: DMA Control)
+    ldx.b #$18         // Set Destination Register ($2118: VRAM Write)
+    stx.w REG_BBAD0    // $43X1: DMA Destination
+    lda   3,s        // Set Size In Bytes To DMA Transfer
+    sta.w REG_DAS0L    // $43X5: DMA Transfer Size/HDMA
+    lda   5,s        // Set Source Offset
+    sta.w REG_A1T0L    // $43X2: DMA Source 
+    phb        // Set Source Bank
+    plx          // Source Bank is current
+    stx REG_A1B0       // $43X4: Source Bank
+
+    //Wait for VBlank
+    sep #0x20          //8 bit accumulator
+    lda.b #$01 << 0 // Start DMA Transfer On Channel
+    WaitHVB()
+    sta.w REG_MDMAEN     // $420B: DMA Enable
+    sep #0x10              // 16-bit x,bScrollYRegister
+    rep #0x20          //8 bit accumulator
+    lda.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
+    sta.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct  
+    sep #0x20
+    rep #0x10              // 16-bit x,y   
+    ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0080, 0) // Clear VRAM Map To Fixed Tile Word 
+    //Clear the first two lines
     plp        
   +
 
@@ -275,7 +297,6 @@ scope TermPrivate {
     //Make sure New is bigger than old
     bpl +
     //If that fails scroll size //32 with minimum of 1
-    db 0x42, 0x00
     and #0x00FF
     //lsr; lsr; lsr; lsr; lsr;
     //cmp #0x0001
@@ -343,7 +364,7 @@ scope TermPrivate {
   rep #0x20
 
   //Only Lo bytes as Hi bytes are tile properties
-  //DMA setup stuff
+  //DMA setup stuff for text
   stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
   lda.b wCursorPos	 // Direct page + variable offset, cursor position is current destination
   sta.w REG_VMADDL   // $2116: VRAM Set VRAM Destination

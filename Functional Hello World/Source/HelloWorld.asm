@@ -69,7 +69,7 @@ InputLoop:
   jmp Loop
 
 HELLOWORLD:
-  db "13245678901234567890" // Hello World Text
+  db "1234567890ABCDEFGHIJ" // Hello World Text
   db 0x00            //Null Byte
 
 seek($018000)
