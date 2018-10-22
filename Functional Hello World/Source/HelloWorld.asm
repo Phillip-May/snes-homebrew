@@ -46,8 +46,9 @@ InputLoop:
   Up:
     ReadJOY({JOY_UP}) // Test Joypad UP Button
     beq Down          // IF (UP ! Pressed) Branch Down
-    mCALLPRINTTERM24BITS(BANK3TEXTPART3)
-    mCALLPRINTTERM24BITS(BANK3TEXTPART4)
+    mCALLPRINTTERM24BITS(BANK3TEXTPART2)
+    //mCALLPRINTTERM24BITS(BANK3TEXTPART3)
+    //mCALLPRINTTERM24BITS(BANK3TEXTPART4)
 
   Down:
     ReadJOY({JOY_DOWN}) // Test DOWN Button
@@ -80,7 +81,7 @@ iCRASHHANDLER:
 
 HELLOWORLD:
   //db "1234567890ABCDEFGHIJ" // Hello World Text
-  db "A" // Hello World Text
+  db "P" // Hello World Text
   db 0x00            //Null Byte
 CRASHMESSAGE:
   db "Well looks like it crashed"
@@ -165,7 +166,7 @@ db 0x00
 db 0x00 //Null byte
 
 BANK3TEXTPART3:
-db "Break the worlds shell for"
+db "1B{"
 db 0x00
 
 BANK3TEXTPART4:
