@@ -1,7 +1,7 @@
 //Constants
 scope TermPrivate {
   //Tile map start location
-  constant BGTILEMAPLINE1($7800) //First line is partially cutoff
+  constant BGTILEMAPLINE1($3C00) //First line is partially cutoff (7800 >> 1)
   constant BGSCROLLRESETLOW(0xFF)//This fixes it
 
   //Const data for dma ram clear
@@ -50,9 +50,9 @@ fTERMINIT24BITS:
   phx
   pld          //Direct page will use bank variable page
 
-  lda.b #(TermPrivate.BGTILEMAPLINE1 >> (8+1)) + 0b00 //Upper byte shifted by 1
+  lda.b #(TermPrivate.BGTILEMAPLINE1 >> (8)) + 0b00 //Upper byte shifted by 1
   sta REG_BG1SC     // $2108: BG1 32x32, BG1 Map Address = $3F (VRAM Address / $400)
-  ldx.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
+  ldx.w #(TermPrivate.BGTILEMAPLINE1)
   stx.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct page
 
   lda.b #%00000000  // BBBBAAAA: A = BG1 Tile Address, B = BG2 Tile Address
@@ -91,7 +91,7 @@ fCLEARTERM24BITS:
   pha                    //Direct page for static variables
   pld                    //Direct page will use bank variable page  
   //Set direct page
-  lda.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
+  lda.w #(TermPrivate.BGTILEMAPLINE1)
   sta.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct page
   ldx.b #0x00
   stx.b TermPrivate.bScroll
@@ -238,9 +238,9 @@ fPRINTTERM24BITS:
 
   lda 7,s
   adc 5,s
-  cmp #0x3FFF + 3
+  cmp #0x3FFF + 1
   bmi ++           //If segment goes over the limit
-  db 0x42, 0x00
+  //db 0x42, 0x00
   //Print segment of size accumulator
   lda 7,s         //Calculate space left
   clc
@@ -265,7 +265,7 @@ fPRINTTERM24BITS:
   cmp #0x0000
   bne ENDPRINT16
   //Only if needed
-  db 0x42, 0x00  
+  //db 0x42, 0x00  
   lda 9,s
   adc 1,s
   tax
@@ -298,6 +298,7 @@ fPRINTTERM24BITS:
 rtl
   
 //Private function
+//Assumes that no print crosses right bondary
 //Parameters
 //Data bank of string location in databank register
 //Directpage of terminal cursor page in directpage register
@@ -319,222 +320,42 @@ scope TermPrivate {
   phb
   php  
   //Set up stack (Link)
-  phx       //16 bit original wcurpos
-  phx       //16 bit variable
+  phx       //16 bit variable wCursor original
   phx       //16 bit variable
   phx				//16-bit pointer
-  pha				//16 bit size
-  sep #0x10         //8-bit x,y
-  rep #0x20			//16-bit accumulator
+  pha				//16 bit size of string
+  phx       //16 bit string pointer
   lda.b wCursorPos
   sta 9,s
-
-  //Move accumulator number of bytes to VRAM tilemap (screen base)
-  lda 1,s
-  cmp #0x0000    //Make sure transfer is not 0 bytes
-  bne +     //Skip to the end if zero
   
-  lda.b wCursorPos
-  //Undo the scroll
-  brl ENDPRINTTERMSIZE24
-  +
-
-  //If past the limit set the scroll flag
-  lda 1,s          // Grab size
-  adc wCursorPos
-  cmp #0x3F80
-  //Screen needs to start scrolling the first time wCursorPos passes 0x3f80
-  bmi + //If (cursor pos > 0x3F80)
-    lda #0x0001
-    ora.b bScroll   //or so only flag is set
-    sta.b bScroll
-  +
-  
-  //Make write head loop
-  lda.b wCursorPos
-  adc 1,s
-  cmp #0x3FFF + 3
-  //Need to reset write head to the top of the tile map past 0x3FFF
-  bpl + //If (cursor pos > 0x3FFF)
-    brl ++
-    +
-    //Wait for VBlank
-    php
-    rep #0x10              // 16-bit x,y
-    sep #0x20
-    //WaitHVB()
-    WaitNMI()
-    ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0080, 0) // Clear VRAM Map To Fixed Tile Word
-    rep #0x20
-    sep #0x10              // 16-bit x,y
-    stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
-    lda.b wCursorPos   // Direct page + variable offset, cursor position is current destination
-    sta.w REG_VMADDL   // $2116: VRAM Set VRAM Destination
-
-    stz.w REG_DMAP0    // Set DMA Mode (Write Byte, Increment Source) ($43X0: DMA Control)
-    ldx.b #$18         // Set Destination Register ($2118: VRAM Write)
-    stx.w REG_BBAD0    // $43X1: DMA Destination
-    lda   3,s        // Set Size In Bytes To DMA Transfer
-    sta.w REG_DAS0L    // $43X5: DMA Transfer Size/HDMA
-    lda   5,s        // Set Source Offset
-    sta.w REG_A1T0L    // $43X2: DMA Source 
-    phb        // Set Source Bank
-    plx          // Source Bank is current
-    stx REG_A1B0       // $43X4: Source Bank
-
-    //Wait for VBlank
-    sep #0x20          //8 bit accumulator
-    lda.b #$01 << 0 // Start DMA Transfer On Channel
-    //WaitHVB()
-    WaitNMI()
-    sta.w REG_MDMAEN     // $420B: DMA Enable
-    sep #0x10              // 16-bit x,bScrollYRegister
-    rep #0x20          //8 bit accumulator
-    lda.w #(TermPrivate.BGTILEMAPLINE1 >> 1)
-    sta.b TermPrivate.wCursorPos  //Also save starting cursor position, using direct  
-    sep #0x20
-    rep #0x10              // 16-bit x,y   
-    ClearVRAM(TermPrivate.BGCLEAR2, $7800, $0080, 0) // Clear VRAM Map To Fixed Tile Word 
-    //Clear the first two lines
-    plp        
-  +
-
-  ldx #0x00  
-  lda #0x0001
-  and bScroll   //and returns non zero it means flag is set
-  beq ++         //Skip if scroll is not set
-    lda 1,s          // Grab size
-    adc.b wCursorPos   //Add to old possition
-    //Acumulator contains new write head location
-    //Calculate if over the limit for one line
-    -                   //This calculates the line number of the current write head
-      inx
-      sbc #0x0020       //Subtract 32 for 32 characters per line
-      bpl -             //If not negative
-    lda #0x0000
-    txa
-    sta 5,s
-    ldx #0x00
-    lda.b wCursorPos    //Repeat the same calculation with old write head
-    -                   //This calculates the line number of the current write head
-      inx
-      sbc #0x0020       //Subtract 32 for 32 characters per line
-      bpl -             //If not negative
-    //New minus old for lines to scroll
-    lda #0x0000
-    txa
-    sta 7,s
-    lda 5,s
-    sec
-    sbc 7,s
-    //Make sure New is bigger than old
-    bpl +
-    //If that fails scroll size //32 with minimum of 1
-    and #0x00FF
-    //lsr; lsr; lsr; lsr; lsr;
-    //cmp #0x0001
-    //bne + //If a non zero value
-    //lda #0x0000
-    +
-  +
-  //accumulator now contains the number of lines to scroll
-  asl
-  asl
-  asl
-  adc.b bScrollPosition
-  and #0x00FF
-  sta.b bScrollPosition //New value for bScrollYRegister
-
-  //used to be here
-  
-  //Clear the line in front of what is being printed
-  rep #0x10              // 16-bit x,y
-  sep #0x20
-  //WaitHVB()
-  WaitNMI()
-  stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
-  rep #0x20
-  lda.b wCursorPos
-  adc #0x0020  
-  //ldx.w #$7800 >> 1 // Set VRAM Destination
-  sta.w REG_VMADDL   // $2116: VRAM
-  sep #0x20
-
-  lda.b #$08           // Set DMA Mode (Write Byte, Fixed Source)
-  sta.w REG_DMAP0 // $43X0: DMA Control
-  lda.b #$18           // Set Destination Register ($2118: VRAM Write)
-  sta.w REG_BBAD0 // $43X1: DMA Destination
-  ldx.w #TermPrivate.BGCLEAR2         // Set Source Offset (Lo Byte)
-  stx.w REG_A1T0L // $43X2: DMA Source
-  lda.b #TermPrivate.BGCLEAR2 >> 16   // Set Source Bank
-  sta.w REG_A1B0  // $43X4: Source Bank
-  ldx.w #0x0060       // Set Size In Bytes To DMA Transfer
-  stx.w REG_DAS0L // $43X5: DMA Transfer Size/HDMA
-
-  lda.b #$01 << 0 // Start DMA Transfer On Channel
-  sta.w REG_MDMAEN     // $420B: DMA Enable
-
-  // Transfer Hi Byte
-  lda.b #$80         // Set Increment VRAM Address After Accessing Hi Byte
-  sta.w REG_VMAIN    // $2115: Video Port Control
-  rep #0x20
-  lda.b wCursorPos
-  adc #0x0020   
-  //ldx.w #$7800 >> 1 // Set VRAM Destination
-  sta.w REG_VMADDL   // $2116: VRAM
-  sep #0x20
-
-  lda.b #$19           // Set Destination Register ($2119: VRAM Write)
-  sta.w REG_BBAD0 // $43X1: DMA Destination
-  ldx.w #(TermPrivate.BGCLEAR2 + 1)   // Set Source Offset (Hi Byte)
-  stx.w REG_A1T0L // $43X2: DMA Source
-  ldx.w #0x0060        // Set Size In Bytes To DMA Transfer
-  stx.w REG_DAS0L // $43X5: DMA Transfer Size/HDMA
-
-  lda.b #$01 << 0 // Start DMA Transfer On Channel
-  //WaitHVB()
-  WaitNMI()
-  sta.w REG_MDMAEN     // $420B: DMA Enable
-  sep #0x10
-  rep #0x20
-
-  //Only Lo bytes as Hi bytes are tile properties
-  //DMA setup stuff for text
-  stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
-  lda.b wCursorPos	 // Direct page + variable offset, cursor position is current destination
-  sta.w REG_VMADDL   // $2116: VRAM Set VRAM Destination
-
-  stz.w REG_DMAP0    // Set DMA Mode (Write Byte, Increment Source) ($43X0: DMA Control)
-  ldx.b #$18         // Set Destination Register ($2118: VRAM Write)
-  stx.w REG_BBAD0    // $43X1: DMA Destination
-  lda   1,s		     // Set Size In Bytes To DMA Transfer
-  sta.w REG_DAS0L    // $43X5: DMA Transfer Size/HDMA
-  lda   3,s    		 // Set Source Offset
-  sta.w REG_A1T0L    // $43X2: DMA Source 
-  phb				 // Set Source Bank
-  plx 				 // Source Bank is current
-  stx REG_A1B0       // $43X4: Source Bank
-
-  //Wait for VBlank
-  sep #0x20          //8 bit accumulator
-  //WaitHVB()
-  WaitNMI()
-
-  //Update scroll register
-  lda.b bScrollPosition
-  sta.w REG_BG1VOFS // Store accumulator To BG1 Vertical Scroll Pos Low Byte
-  stz.w REG_BG1VOFS // Store Zero To BG1 Vertical Pos High Byte
-
-  ldx.b #$01 << 0    // Start DMA Transfer On Channel 0
-  stx.w REG_MDMAEN   // $420B: DMA Enable
-  //ldx.b #$01 << 1    // Start DMA Transfer On Channel 1
-  //stx.w REG_MDMAEN   // $420B: DMA Enable
-  //Increment cursor position variable, x register is current size
-  rep #0x20			 //16 bit accumulator
-  lda 1,s 			 //Load size
-  adc.b wCursorPos	 //Add to old possition
-  //dec                //Im not setting carry before subbing somewhere
+  //Reset Write head if over the limit
+  cmp #0x3FFF + 1
+  bmi +
+  lda #TermPrivate.BGTILEMAPLINE1
   sta.b wCursorPos
+  bra +
+  nop
+  +
+  //Wait Vblank
+  sep #0x20              // Set 8-Bit Accumulator
+  WaitHVB()  
+  rep #0x20              // Set 16-Bit Accumulator
+  
+  //Call Load LoVram
+  lda 3,s
+  tay
+  lda.b TermPrivate.wCursorPos
+  tax
+  lda 1,s
+  jsl fLOADVRAMLOW
+  //Increment wCursor
+  lda.b TermPrivate.wCursorPos
+  clc
+  adc 3,s
+  sta TermPrivate.wCursorPos
+
+  
+  +
   //Restore stack (Unlink)
   ENDPRINTTERMSIZE24:
   pla
@@ -550,3 +371,59 @@ scope TermPrivate {
   pla  
   rts
 }
+
+//LoadLOVRAM(HELLOWORLD, $F944, 13, 0) // Load Text To VRAM Lo Bytes
+//Accumulator 16 bit pointer, db for upper 8 bits
+//X register 16 bit VRAM destination
+//Y register 16 bit size of data in bytes
+fLOADVRAMLOW:
+  //Link context save
+  pha
+  phx
+  phy
+  phb
+  php  
+  //Set up stack (Link)
+  pha     //16-bit pointer
+  phx     //16- bit VRAM destination
+  phy     //16-bit size in bytes
+
+  stz.w REG_VMAIN    // Set Increment VRAM Address After Accessing Lo Byte ($2115: Video Port Control)
+  //ldx.w #{DEST} >> 1 // Set VRAM Destination
+  lda 3,s
+  //lsr
+  sta.w REG_VMADDL   // $2116: VRAM
+
+  //stz.w REG_DMAP0    // Set DMA Mode (Write Byte, Increment Source) ($43X0: DMA Control)
+  sep #0x20
+  lda.b #$18              // Set Destination Register ($2118: VRAM Write)
+  sta.w REG_BBAD0    // $43X1: DMA Destination
+  rep #0x20
+  //ldx.w #{SRCTILES}       // Set Source Offset
+  lda 5,s
+  sta.w REG_A1T0L    // $43X2: DMA Source
+  //lda.b #{SRCTILES} >> 16 // Set Source Bank
+  sep #0x20
+  phb
+  pla
+  sta.w REG_A1B0     // $43X4: Source Bank
+  rep #0x20
+  //ldx.w #{SIZETILES}      // Set Size In Bytes To DMA Transfer
+  lda 1,s
+  sta.w REG_DAS0L    // $43X5: DMA Transfer Size/HDMA
+  sep #0x20
+  lda.b #$01 << 0 // Start DMA Transfer On Channel
+  sta.w REG_MDMAEN     // $420B: DMA Enable
+  rep #0x20
+
+  //Unlink Variables
+  plx
+  plx
+  plx
+  //Unlink context restore
+  plp  
+  plb
+  ply
+  plx
+  pla
+  rtl
