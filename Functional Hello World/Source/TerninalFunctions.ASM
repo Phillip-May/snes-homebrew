@@ -222,55 +222,48 @@ fPRINTTERM24BITS:
   //Calculate total size
   lda 9,s    //String offset in db bank
   tax
+  dex
   -
   inx
   lda 0x0000,x   //Grab charatcer at x offset in db bank
   and #0x00FF    //Only one byte at a time
   cmp #0x0000
   bne -          //If not null byte keep reading
-  inx
   txa
-  clc
+  sec
   sbc 9,s        //Start offset-endoffset
   sta 5,s        //Total size calculated
-  //Calculate segment size (linebreak)
-  sta 3,s        //Current segment is total by default
 
-  lda 7,s
-  adc 5,s
-  cmp #0x3FFF + 1
-  bmi ++           //If segment goes over the limit
-  //db 0x42, 0x00
+  //Seperate into segments
+  lda 7,s         //Original wCursorPos
+  clc
+  adc 5,s         //Size
+  cmp #0x4000 + 1
+  bmi +           //If segment goes over the limit
+  db 0x42, 0x00
   //Print segment of size accumulator
   lda 7,s         //Calculate space left
-  clc
-  sbc #0x3FFF + 1
-  eor #0xFFFF      //accumulator will be what's left
-  cmp #0x0000
-  bne +
-  lda #0x0001      //Minimum of 1 character
-  +
-  sta 1,s
+  sec
+  sbc #0x4000 + 1
+  eor #0xFFFF
+  sta 1,s         //Amount of characters left that can be printed on this line
   
   lda 9,s
   tax
   lda 1,s
-
-  //lda 9,s
-  //tax
-  //lda 5,s
   jsr TermPrivate.fPRINTTERMSIZE16BITS
   //Now print the second half
   lda 1,s
   cmp #0x0000
-  bne ENDPRINT16
+  beq ENDPRINT16
   //Only if needed
   //db 0x42, 0x00  
   lda 9,s
+  clc
   adc 1,s
   tax
   lda 5,s
-  clc
+  sec
   sbc 1,s
   jsr TermPrivate.fPRINTTERMSIZE16BITS
 
@@ -322,8 +315,8 @@ scope TermPrivate {
   //Set up stack (Link)
   phx       //16 bit variable wCursor original
   phx       //16 bit variable
-  phx				//16-bit pointer
-  pha				//16 bit size of string
+  phx       //16-bit pointer
+  pha       //16 bit size of string
   phx       //16 bit string pointer
   lda.b wCursorPos
   sta 9,s
@@ -336,6 +329,11 @@ scope TermPrivate {
   bra +
   nop
   +
+  //Skip if transfer size is 0
+  lda 3,s
+  cmp #0x0000
+  beq + 
+
   //Wait Vblank
   sep #0x20              // Set 8-Bit Accumulator
   WaitHVB()  
@@ -376,6 +374,7 @@ scope TermPrivate {
 //Accumulator 16 bit pointer, db for upper 8 bits
 //X register 16 bit VRAM destination
 //Y register 16 bit size of data in bytes
+//Kind of breaks with a size of 0
 fLOADVRAMLOW:
   //Link context save
   pha

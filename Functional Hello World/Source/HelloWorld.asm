@@ -81,7 +81,7 @@ iCRASHHANDLER:
 
 HELLOWORLD:
   //db "1234567890ABCDEFGHIJ" // Hello World Text
-  db "P" // Hello World Text
+  db "G" // Hello World Text
   db 0x00            //Null Byte
 CRASHMESSAGE:
   db "Well looks like it crashed"
@@ -161,7 +161,7 @@ db "Bank 3 part 33"
 db 0x00
 
 BANK3TEXTPART2:
-db "Break the worlds shell, for the revolution of the world!!"
+db "Break the worlds shell, for the revolution of the world!!ABCD"
 db 0x00
 db 0x00 //Null byte
 
