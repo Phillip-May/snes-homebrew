@@ -98,7 +98,6 @@ fCLEARTERM24BITS:
 
   stz.w REG_BG1HOFS // Store Zero To BG1 Horizontal Scroll Pos Low Byte
   stz.w REG_BG1HOFS // Store Zero To BG1 Horizontal Scroll Pos High Byte
-  db 0x42, 0x00
   ldx.b #TermPrivate.BGSCROLLRESETLOW
   stx.w REG_BG1VOFS // Store Zero To BG1 Vertical Scroll Pos Low Byte
   stx.b TermPrivate.bScrollPosition
@@ -111,7 +110,7 @@ fCLEARTERM24BITS:
   ldx.b #(TermPrivate.BGCLEAR2 >> 16)
   phx
   plb
-  lda.w #TermPrivate.BGCLEAR2
+  lda.w #TermPrivate.BGCLEAR2//Character for space
   rep   #0x10                // 16-bit x,y
   ldx.w #0x7800              // Dest
   ldy.w #0x0400              // Size
@@ -136,6 +135,11 @@ fClEARVRAM24BITS:
   pha                //Source address
   phx                //Destination
   phy                //Size
+
+  //Wait Vblank
+  sep #0x20              // Set 8-Bit Accumulator
+  WaitHVB()    
+  rep #0x20              // Set 16-Bit Accumulator
 
   rep #0x20              // 16-bit accumulator
   sep #0x10              // 8-bit x,y
@@ -357,10 +361,6 @@ scope TermPrivate {
   and #0x0001
   cmp #0x0001
   bne +        //If flag is set
-    db 0x42, 0x00 
-    nop
-    nop
-    nop
     //Only 28 lines on screen at a time
     lda.b TermPrivate.wCursorPos
     and #0x0FF0
@@ -398,6 +398,26 @@ scope TermPrivate {
   stz.w REG_BG1VOFS // Store Zero To BG1 Vertical Pos High Byte
   rep #0x20
   //End of scrolling stuff
+
+  //CLear the line right below the newly printed line
+  //SRC 16 bit address in accumulator and 8 bit bank in db
+  //Dest 16 bit address of vram destiantion in x register
+  //Size 16 bit size in y register
+  //DMA channel 1
+  //fClEARVRAM24BITS
+  sep #0x10                // 8-bit x,y
+  ldx.b #(TermPrivate.BGCLEAR2 >> 16)
+  phx
+  plb
+  rep #0x10
+  lda.b TermPrivate.wCursorPos
+  asl  
+  tax                        // Dest  
+  ldy.w #0x0020              // Size
+  lda.w #TermPrivate.BGCLEAR2//Character for space
+  jsl fClEARVRAM24BITS
+
+
 
   //Restore stack (Unlink)
   ENDPRINTTERMSIZE24:
