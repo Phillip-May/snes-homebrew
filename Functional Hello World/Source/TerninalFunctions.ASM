@@ -287,16 +287,18 @@ fPRINTTERM24BITS:
   clc
   adc #0x0020     //Next Line
   cmp #0x3FFF + 1
-  bmi +           //If past the tile map limit
+  bmi +           //If past the tile map limit, clear the first line
   db 0x42, 0x00   
-  lda.b TermPrivate.wCursorPos
-  sec
-  sbc.w #0x4001
-  eor #0xFFFF
-  //If size of zero clear nothing
-  cmp #0x0000
-  beq ENDPRINT24  
-  tay             //Size
+  sep #0x10                // 8-bit x,y
+  ldx.b #(TermPrivate.BGCLEAR2 >> 16)
+  phx
+  plb
+  rep #0x10
+  ldx.w #0x7800              // Dest
+  ldy.w #0x0020              // Size
+  lda.w #TermPrivate.BGCLEAR2//Character for space
+  jsl fClEARVRAM24BITS
+  bra ENDPRINT24
   bra ++
   +               //If not past the tile map limit
   lda.b TermPrivate.wCursorPos
