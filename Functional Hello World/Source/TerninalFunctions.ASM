@@ -2,7 +2,7 @@
 scope TermPrivate {
   //Tile map start location
   constant BGTILEMAPLINE1($3C00) //First line is partially cutoff (7800 >> 1)
-  constant BGSCROLLRESETLOW(0xFF)//This fixes it
+  constant BGSCROLLRESETLOW(0xFF)//This fixes it 07 would be one line down
 
   //Const data for dma ram clear
   BGCHR:
@@ -98,6 +98,7 @@ fCLEARTERM24BITS:
 
   stz.w REG_BG1HOFS // Store Zero To BG1 Horizontal Scroll Pos Low Byte
   stz.w REG_BG1HOFS // Store Zero To BG1 Horizontal Scroll Pos High Byte
+  db 0x42, 0x00
   ldx.b #TermPrivate.BGSCROLLRESETLOW
   stx.w REG_BG1VOFS // Store Zero To BG1 Vertical Scroll Pos Low Byte
   stx.b TermPrivate.bScrollPosition
@@ -218,7 +219,7 @@ fPRINTTERM24BITS:
   pha         //16 bit total size
   pha         //16 bit current segment size
   pha         //16 bit current subsegment size
-  
+
   //Calculate total size
   lda 9,s    //String offset in db bank
   tax
@@ -231,7 +232,7 @@ fPRINTTERM24BITS:
   bne -          //If not null byte keep reading
   txa
   sec
-  sbc 9,s        //Start offset-endoffset
+  sbc 9,s        //Endoffset-Start offset
   sta 5,s        //Total size calculated
 
   //Seperate into segments
@@ -240,7 +241,6 @@ fPRINTTERM24BITS:
   adc 5,s         //Size
   cmp #0x4000 + 1
   bmi +           //If segment goes over the limit
-  db 0x42, 0x00
   //Print segment of size accumulator
   lda 7,s         //Calculate space left
   sec
@@ -255,7 +255,7 @@ fPRINTTERM24BITS:
   //Now print the second half
   lda 1,s
   cmp #0x0000
-  beq ENDPRINT16
+  beq ENDPRINT24
   //Only if needed
   //db 0x42, 0x00  
   lda 9,s
@@ -266,7 +266,6 @@ fPRINTTERM24BITS:
   sec
   sbc 1,s
   jsr TermPrivate.fPRINTTERMSIZE16BITS
-
   bra ++
   +
   lda 9,s
@@ -275,7 +274,7 @@ fPRINTTERM24BITS:
   jsr TermPrivate.fPRINTTERMSIZE16BITS
   +  
 
-  ENDPRINT16:
+  ENDPRINT24:
   //Variable unlink
   pla
   pla
@@ -332,11 +331,11 @@ scope TermPrivate {
   //Skip if transfer size is 0
   lda 3,s
   cmp #0x0000
-  beq + 
+  beq ENDPRINTTERMSIZE24 
 
   //Wait Vblank
   sep #0x20              // Set 8-Bit Accumulator
-  WaitHVB()  
+  WaitHVB()    
   rep #0x20              // Set 16-Bit Accumulator
   
   //Call Load LoVram
@@ -352,8 +351,54 @@ scope TermPrivate {
   adc 3,s
   sta TermPrivate.wCursorPos
 
-  
-  +
+  //Update scroll register
+  //Check scrolling stuff   
+  lda.b TermPrivate.bScroll
+  and #0x0001
+  cmp #0x0001
+  bne +        //If flag is set
+    db 0x42, 0x00 
+    nop
+    nop
+    nop
+    //Only 28 lines on screen at a time
+    lda.b TermPrivate.wCursorPos
+    and #0x0FF0
+    lsr;lsr;lsr;lsr
+    lsr
+    sec
+    sbc #0x007B
+    asl
+    asl
+    asl
+    dec
+    and #0x00FF
+    sep #0x20   //8 bit accumulator
+    sta.b TermPrivate.bScrollPosition
+    rep #0x20   //16 bit accumulator
+    bra ENDSCROLL24  
+  +            //Else if flag is not set
+  //Check to see if past the scroll point
+  lda.b TermPrivate.wCursorPos
+  clc
+  adc 3,s
+  cmp #0x3f80
+  bmi +
+    //Set the flag high
+    lda.b TermPrivate.bScroll
+    and #0xFFFE
+    clc
+    adc #0x0001
+    sta TermPrivate.bScroll  
+  +  
+  ENDSCROLL24:
+  sep #0x20
+  lda.b TermPrivate.bScrollPosition
+  sta.w REG_BG1VOFS
+  stz.w REG_BG1VOFS // Store Zero To BG1 Vertical Pos High Byte
+  rep #0x20
+  //End of scrolling stuff
+
   //Restore stack (Unlink)
   ENDPRINTTERMSIZE24:
   pla
