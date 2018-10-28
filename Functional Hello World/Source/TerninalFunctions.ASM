@@ -278,6 +278,47 @@ fPRINTTERM24BITS:
   jsr TermPrivate.fPRINTTERMSIZE16BITS
   +  
 
+  //CLear the line right below the newly printed line
+  //SRC 16 bit address in accumulator and 8 bit bank in db
+  //Dest 16 bit address of vram destiantion in x register
+  //Size 16 bit size in y register
+  //Set size to cover next line 
+  lda.b TermPrivate.wCursorPos
+  clc
+  adc #0x0020     //Next Line
+  cmp #0x3FFF + 1
+  bmi +           //If past the tile map limit
+  db 0x42, 0x00   
+  lda.b TermPrivate.wCursorPos
+  sec
+  sbc.w #0x4001
+  eor #0xFFFF
+  //If size of zero clear nothing
+  cmp #0x0000
+  beq ENDPRINT24  
+  tay             //Size
+  bra ++
+  +               //If not past the tile map limit
+  lda.b TermPrivate.wCursorPos
+  clc
+  adc #0x0020     //Next Line
+  and #0xFFF0  
+  sec
+  sbc.b TermPrivate.wCursorPos
+  tay             //Size
+  +               
+
+  sep #0x10                // 8-bit x,y
+  ldx.b #(TermPrivate.BGCLEAR2 >> 16)
+  phx
+  plb
+  rep #0x10
+  lda.b TermPrivate.wCursorPos
+  asl  
+  tax                        // Dest 
+  lda.w #TermPrivate.BGCLEAR2//Character for space
+  jsl fClEARVRAM24BITS
+
   ENDPRINT24:
   //Variable unlink
   pla
@@ -398,26 +439,6 @@ scope TermPrivate {
   stz.w REG_BG1VOFS // Store Zero To BG1 Vertical Pos High Byte
   rep #0x20
   //End of scrolling stuff
-
-  //CLear the line right below the newly printed line
-  //SRC 16 bit address in accumulator and 8 bit bank in db
-  //Dest 16 bit address of vram destiantion in x register
-  //Size 16 bit size in y register
-  //DMA channel 1
-  //fClEARVRAM24BITS
-  sep #0x10                // 8-bit x,y
-  ldx.b #(TermPrivate.BGCLEAR2 >> 16)
-  phx
-  plb
-  rep #0x10
-  lda.b TermPrivate.wCursorPos
-  asl  
-  tax                        // Dest  
-  ldy.w #0x0020              // Size
-  lda.w #TermPrivate.BGCLEAR2//Character for space
-  jsl fClEARVRAM24BITS
-
-
 
   //Restore stack (Unlink)
   ENDPRINTTERMSIZE24:
