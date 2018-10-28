@@ -286,7 +286,7 @@ fPRINTTERM24BITS:
   lda.b TermPrivate.wCursorPos
   clc
   adc #0x0020     //Next Line
-  cmp #0x3FFF + 1
+  cmp #0x4000 + 1
   bmi +           //If past the tile map limit, clear the first line
   db 0x42, 0x00   
   sep #0x10                // 8-bit x,y
@@ -299,17 +299,14 @@ fPRINTTERM24BITS:
   lda.w #TermPrivate.BGCLEAR2//Character for space
   jsl fClEARVRAM24BITS
   bra ENDPRINT24
-  bra ++
   +               //If not past the tile map limit
   lda.b TermPrivate.wCursorPos
   clc
   adc #0x0020     //Next Line
-  and #0xFFF0  
+  //and #0xFFF0  
   sec
   sbc.b TermPrivate.wCursorPos
   tay             //Size
-  +               
-
   sep #0x10                // 8-bit x,y
   ldx.b #(TermPrivate.BGCLEAR2 >> 16)
   phx
@@ -319,7 +316,7 @@ fPRINTTERM24BITS:
   asl  
   tax                        // Dest 
   lda.w #TermPrivate.BGCLEAR2//Character for space
-  jsl fClEARVRAM24BITS
+  jsl fClEARVRAM24BITS           
 
   ENDPRINT24:
   //Variable unlink

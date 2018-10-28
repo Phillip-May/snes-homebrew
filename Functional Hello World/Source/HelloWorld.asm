@@ -77,6 +77,7 @@ iCRASHHANDLER:
   db 0x42, 0x00
 
   CRASHHANG:
+  nop
   jmp CRASHHANG
 
 HELLOWORLD:
