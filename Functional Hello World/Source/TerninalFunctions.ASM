@@ -11,6 +11,8 @@ scope TermPrivate {
     dw $0000, $7FFF // Black / White Palette (4 Bytes)  
   BGCLEAR2:
     dw $0020 // BG Clear Character Space " " Fixed value upper byte is tile properties
+  ASCII32SPACES:
+    fill 32, 0x20
 
   //Variables
   //Cursor current position (VRAM location)
@@ -205,6 +207,7 @@ rtl
 //Lower 16 bits in x register
 //Upper 8 bits in data bank register
 //Direct page to terminal variables
+//Accumulator register contains size.
 //Text can't cross bank bonaries
 //Uses DMA0 for VRAM access
 fPRINTTERM24BITS:
@@ -218,26 +221,15 @@ fPRINTTERM24BITS:
   rep #0x20   //16 bit accumulator
   rep #0x10   //16 bit x,y register
   phx         //16-bit String pointer
-  lda TermPrivate.wCursorPos
-  pha         //Original Cursor position
+  ldx TermPrivate.wCursorPos
+  phx         //Original Cursor position
   pha         //16 bit total size
   pha         //16 bit current segment size
   pha         //16 bit current subsegment size
 
   //Calculate total size
-  lda 9,s    //String offset in db bank
-  tax
-  dex
-  -
-  inx
-  lda 0x0000,x   //Grab charatcer at x offset in db bank
-  and #0x00FF    //Only one byte at a time
-  cmp #0x0000
-  bne -          //If not null byte keep reading
-  txa
-  sec
-  sbc 9,s        //Endoffset-Start offset
   sta 5,s        //Total size calculated
+
 
   //Seperate into segments
   lda 7,s         //Original wCursorPos
@@ -288,7 +280,7 @@ fPRINTTERM24BITS:
   adc #0x0020     //Next Line
   cmp #0x4000 + 1
   bmi +           //If past the tile map limit, clear the first line
-  db 0x42, 0x00   
+  //db 0x42, 0x00   
   sep #0x10                // 8-bit x,y
   ldx.b #(TermPrivate.BGCLEAR2 >> 16)
   phx
@@ -451,7 +443,7 @@ scope TermPrivate {
   plb
   ply
   plx
-  pla  
+  pla
   rts
 }
 
@@ -504,6 +496,162 @@ fLOADVRAMLOW:
   plx
   plx
   plx
+  //Unlink context restore
+  plp  
+  plb
+  ply
+  plx
+  pla
+  rtl
+
+  //Takes a 16 bit string pointer in the databank and accumulator, returns the size in accumulator
+  fStrlen24:
+  //Link context save
+  phx
+  phy
+  phb
+  php
+  //Calculate total size
+  //Variables
+  pha             //Start offset of string
+  tax
+  dex
+  -
+  inx
+  lda 0x0000,x   //Grab charatcer at x offset in db bank
+  and #0x00FF    //Only one byte at a time
+  cmp #0x0000
+  bne -          //If not null byte keep reading
+  txa
+  sec
+  sbc 1,s        //Endoffset-Start offset
+  //Unlink variables
+  plx
+  //Unlink
+  plp  
+  plb
+  ply
+  plx
+  rtl
+
+//Takes pointer in x register, and top 8 bits in db
+//It will load the direct page itself
+fPrintString24:
+  //Link context save
+  pha
+  phx
+  phy
+  phb
+  php  
+  //Variables
+  rep #0x20
+  rep #0x10
+  pha                    //Variable that stores end of the string
+  pha                    //Start of subsegment
+  phx                    //Pointer to start of strings section
+                         //int i is contained in working register
+  //Set direct page for Terminal variables
+  ldy.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variable bank
+  phy                    //Direct page for static variables
+  pld                    //Direct page will use bank variable page
+  //Calculate the end of the string
+  clc
+  adc 1,s
+  sta 5,s
+  
+  //db 0x42, 0x00
+  lda 5,s
+  //x contains pointer to start of string
+  
+  rep #0x20
+  -               //Start of while loop
+  txa             //lda index
+  cmp 5,s
+  beq FINALPRINT          //if at end print final part
+  
+  lda #0x00FF
+  and 0x0000,x    //lda char
+  
+  cmp #0x000A
+  beq +
+  cmp #0x000D
+  beq +
+
+  inx             //Move to next character
+  bra -
+  +               //Print a subsegment
+
+  phx
+  txa
+  sec
+  sbc 3,s         //Find size compared to last subsegment
+  tay
+  lda 3,s
+  tax
+  tya
+  jsl fPRINTTERM24BITS
+  //Actually new line here
+  //Increment wCursorPos and check for limit
+  //Increment scroll register
+  //db 0x42, 0x00
+  //Increment wCursorPos
+  lda.b TermPrivate.wCursorPos
+  //Shitty insert
+  //Print 32 spaces which don't matter because the cursor will write over them anywa
+  pha
+  db 0x42, 0x00
+  ldx TermPrivate.ASCII32SPACES
+  lda #0x0032
+  jsl fPRINTTERM24BITS
+  pla
+  //End of shitty insert
+  clc
+  adc #32 - 1
+  lsr; lsr; lsr; lsr; lsr;
+  asl; asl; asl; asl; asl;
+  sta.b TermPrivate.wCursorPos
+
+  //Reset cursor position if over the limit
+  lda.b TermPrivate.wCursorPos
+  //Reset Write head if over the limit
+
+
+  //Reset cursor position if over the limit
+  lda.b TermPrivate.wCursorPos
+  //Reset Write head if over the limit
+  cmp #0x3FFF + 1
+  bmi +
+  lda #TermPrivate.BGTILEMAPLINE1
+  sta TermPrivate.wCursorPos
+  +
+  
+
+
+  //Update subsegment and skip special character
+  plx
+  inx
+  txa
+  sta 1,s         //Update subsegment
+  inx
+  bra -
+  FINALPRINT:              //End of while
+  //Print final subsegment
+  txa             //Load accumulator end pointer
+  sec
+  sbc 1,s         //Find size compared to last subsegemnt
+  tay   
+  lda 1,s
+  tax    
+  tya
+  //Accumulator contains size, x contains end
+  jsl fPRINTTERM24BITS  
+  
+  
+  
+  //Variable unlink
+  pla
+  pla
+  pla
   //Unlink context restore
   plp  
   plb

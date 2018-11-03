@@ -162,7 +162,7 @@ db "Bank 3 part 33"
 db 0x00
 
 BANK3TEXTPART2:
-db "Break the worlds shell, for the revolution of the world!!ABCD"
+db "Break the worlds shell, for the revolution of the world!!ABCDE"
 db 0x00
 db 0x00 //Null byte
 

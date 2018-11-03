@@ -13,10 +13,11 @@ macro mCALLPRINTTERM24BITS(sz24BIT) {
   lda.b #{sz24BIT} >> 16 //Give bank via data bank register
   pha                    //Push onto stack
   plb                    //Give upper bytes of pointer
-  ldx.w #TermPrivate.wCursorPos >> 8 << 8 //Direct page bank to variable bank
-  phx                    //Direct page for static variables
-  pld                    //Direct page will use bank variable page
-  ldx.w #{sz24BIT}       //Give address via x reigster  
-  jsl fPRINTTERM24BITS
+  ldx.w #{sz24BIT}       //Give address via x reigster
+  rep #0x20
+  lda.w #{sz24BIT}
+  jsl fStrlen24
+  //Accumulator contains size
+  jsl fPrintString24
   plp
 }
