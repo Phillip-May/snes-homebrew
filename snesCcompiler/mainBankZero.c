@@ -1,22 +1,26 @@
 #define MY_REGISTER (*(volatile uint16_t*)0x12345678u)
-#include <stdint.h>
+typedef	unsigned char	byte;
+typedef	unsigned short	word;
+
+
+//#include <INTTYPES.H>
+
+#include "lib/snes.h"
 
 void main(void){
-	volatile int i;
-	i = 0x40;
-	while(1 == 1){
-		unsigned char temp;
-		i++;
-		temp = (*(unsigned char*)0x4210);
-		temp = (temp & 0x80);
-		if (temp == 0x80){
-			(*(unsigned char *)0x00212C) = 0x00;
-			(*(unsigned char *)0x002100) = 0x0F;
-			(*(unsigned char *)0x002121) = 0x00;
-			(*(unsigned char *)0x002122) = 0xFF;
-			(*(unsigned char *)0x002122) = 0x7F;
-		} 
-		
+	
+	//*(byte*)0x2122 = 0x55;
+	//*(byte*)0x2122 = 0xBB;
+	REG_CGDATA = 0x1F;
+	//REG_CGDATAbits.TRISB0 = 1;
+	REG_CGDATA = 0x00;
+	*(byte*)0x2121 = 0x00;
+	*(byte*)0x2100 = 0x0F;
+	*(byte*) 0x2100 = 0x0f; // Plane 0 (bit one) enable register
+
+	
+	while(1){
+
 	}
 }
 

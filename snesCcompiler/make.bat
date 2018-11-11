@@ -1,3 +1,4 @@
-wdc816cc -wl -sm -mk -mt mainBankZero.c
+wdc816cc -wl -sm -mk -mt -I "C:\wdc\Tools\include" mainBankZero.c 
 wdc816as vectors.asm
-wdcln -HB -C018000,008000 -D00000, mainBankZero.obj vectors.obj
+wdc816as lib/snes.inc
+wdcln -HB -C018000,008000 -D00000, mainBankZero.obj vectors.obj lib/snes.obj
