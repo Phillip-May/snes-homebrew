@@ -1,0 +1,1 @@
+#define MY_REGISTER (*(volatile uint16_t*)0x12345678u)
