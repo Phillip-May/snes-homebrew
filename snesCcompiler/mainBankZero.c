@@ -5,15 +5,17 @@ void main(void){
 	volatile int i;
 	i = 0x40;
 	while(1 == 1){
-		int temp;
+		unsigned char temp;
 		i++;
 		temp = (*(unsigned char*)0x4210);
-		temp = temp & 0x00F0;
-		*(unsigned char*)0x212C = 0x00;
-		*(unsigned char*)0x2100 = 0x0F;
-		*(unsigned char*)0x2121 = 0x00;
-		*(unsigned char*)0x2122 = 0xFF;
-		*(unsigned char*)0x2122 = 0x7F;
+		temp = (temp & 0x80);
+		if (temp == 0x80){
+			(*(unsigned char *)0x00212C) = 0x00;
+			(*(unsigned char *)0x002100) = 0x0F;
+			(*(unsigned char *)0x002121) = 0x00;
+			(*(unsigned char *)0x002122) = 0xFF;
+			(*(unsigned char *)0x002122) = 0x7F;
+		} 
 		
 	}
 }
@@ -21,3 +23,5 @@ void main(void){
 void far IRQHandler(void){
 	
 }
+
+#define PortA (*(unsigned char *)0xfff002) 
