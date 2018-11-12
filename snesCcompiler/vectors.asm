@@ -179,8 +179,28 @@ DIRQ:
 	XREF CONST_ZERO
 CONST_ZERO:
     BYTE $00, $00
-	BYTE $12, $34
-	BYTE $56, $78
+;Dummy stuff for standard library to compile at all
+;This may need to be improved later
+;Basically if stuff breaks blame this
+	XDEF ~~unlink
+~~unlink:
+	XDEF ~~close
+~~close:
+	XDEF ~~open
+~~open:
+	XDEF ~~heap_end
+~~heap_end:
+	XDEF ~~heap_start
+~~heap_start:
+	XDEF ~~isatty
+~~isatty:
+	XDEF ~~write
+~~write:
+	XDEF ~~lseek
+~~lseek:
+
+
+
 	
 ;******************************************************************************
 ;*** SNES ROM Registartion Data                                             ***

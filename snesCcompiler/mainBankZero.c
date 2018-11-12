@@ -11,13 +11,13 @@ typedef	unsigned short	word;
 
 void main(void){
 	volatile int variable;
-	char testString[100];
+	//char testString[100];
 	//sprintf(testString,"C compiler text");
-	testString[0] = 'D';
-	//CGDATA = 0x00;
-	//CGDATA = 0x1F;
-	//CGADD = 0x00;
-	//INIDISP = 0x0F;
+	//testString[0] = 'D';
+	CGDATA = 0x00;
+	CGDATA = 0x1F;
+	CGADD = 0x00;
+	INIDISP = 0x0F;
 
 	
 	while(1){
