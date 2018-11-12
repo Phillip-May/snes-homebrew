@@ -11,7 +11,7 @@ STARTUP SECTION OFFSET $000000,$008000
 
 	XDEF  	START
 START:
-        XREF  	__main
+        XREF  	~~main
   	
 		sei             ; Disabled interrupts
         clc             ; clear carry to switch to native mode
@@ -156,11 +156,11 @@ START:
 		longa	on
 		longi	on
 
-        jsl   	>__main
+        jsl   	>~~main
         brk
 
 		XDEF  	IRQ
-		XREF	__IRQHandler
+		XREF	~~IRQHandler
 IRQ:	
 	LONGA	ON
 	LONGI	ON
@@ -168,7 +168,7 @@ IRQ:
 	pha
 	phx
 	phy
-	jsl	__IRQHandler
+	jsl	~~IRQHandler
 	ply
 	plx
 	pla
