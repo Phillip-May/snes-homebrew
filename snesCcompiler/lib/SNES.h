@@ -413,7 +413,7 @@ extern volatile COLDATABITS COLDATAbits;
 extern volatile unsigned char SETINI;
 typedef struct tagSETINIBITS {
   unsigned IEN:1;
-  unsigned ONJVSEL:1;
+  unsigned OBJVSEL:1;
   unsigned H512E:1;
   unsigned :2;
   unsigned EXTBGEN:1;

@@ -10,8 +10,9 @@
 
 void far main(void){
 	volatile int variable;
-	char testString[20];
+	char testString[40];
 	INIDISPBITS temp;
+	variable = 123;
 	CGDATA = 0x00;
 	CGDATA = 0x1F;
 	CGADD = 0x00;
@@ -27,8 +28,6 @@ void far main(void){
 	//Method 3
 	INIDISP = 0x0F;
 	VMADD = 0x1234;
-	
-	
 	while(1){
 	}
 }
