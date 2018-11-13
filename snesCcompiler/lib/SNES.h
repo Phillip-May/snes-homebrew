@@ -3,7 +3,7 @@
 //microchip xc header files
 
 //$2100
-extern volatile unsigned char  INIDISP;
+extern volatile unsigned char INIDISP;
 typedef struct tagINIDISPBITS {
   unsigned BRIGHTNESS:4;
   unsigned :3;
