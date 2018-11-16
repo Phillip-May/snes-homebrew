@@ -270,18 +270,36 @@
 
 //DMA/HDMA control registers
 //Just use u8/16_reg(0x43xx)
+//DMA0
 #define REG_DMAP0        (*(vu8*)0x4300) // 
-#define REG_BBAD0        (*(vu8*)0x4301) // 
+#define REG_BBAD0        (*(vu8*)0x4301) //
+#define REG_A1T0         (*(vu16*)0x4302) // 
 #define REG_A1T0L        (*(vu8*)0x4302) // 
 #define REG_A1T0H        (*(vu8*)0x4303) // 
-#define REG_A1B0         (*(vu8*)0x4304) // 
+#define REG_A1B0         (*(vu8*)0x4304) //
+#define REG_DAS0         (*(vu16*)0x4305) //  
 #define REG_DAS0L        (*(vu8*)0x4305) // 
 #define REG_DAS0H        (*(vu8*)0x4306) // 
 #define REG_DASB0        (*(vu8*)0x4307) // 
 #define REG_A2A0L        (*(vu8*)0x4308) // 
 #define REG_A2A0H        (*(vu8*)0x4309) // 
 #define REG_NTRL0        (*(vu8*)0x430A) // 
-
+//DMA/HDMA control registers
+//Just use u8/16_reg(0x43xx)
+//DMA1
+#define REG_DMAP1        (*(vu8*)0x4310) // 
+#define REG_BBAD1        (*(vu8*)0x4311) //
+#define REG_A1T1         (*(vu16*)0x4312) // 
+#define REG_A1T1L        (*(vu8*)0x4312) // 
+#define REG_A1T1H        (*(vu8*)0x4313) // 
+#define REG_A1B1         (*(vu8*)0x4314) //
+#define REG_DAS1         (*(vu16*)0x4315) //  
+#define REG_DAS1L        (*(vu8*)0x4315) // 
+#define REG_DAS1H        (*(vu8*)0x4316) // 
+#define REG_DASB1        (*(vu8*)0x4317) // 
+#define REG_A2A1L        (*(vu8*)0x4318) // 
+#define REG_A2A1H        (*(vu8*)0x4319) // 
+#define REG_NTRL1        (*(vu8*)0x431A) // 
 
 /*  <---Registers used for DMA--->
  DMA transfers take 8 master cycles per byte transferred, no matter the FastROM setting.
