@@ -1,0 +1,12 @@
+
+Section: ORG:    ROM ORG:  SIZE:
+CODE     028000  010000      8DFH (  2271)
+KDATA    048000  020000     7232H ( 29234)
+DATA     7E2000  018000       38H (    56)
+UDATA    7E2038  ------        8H (     8)
+startup  000000  000000       7EH (   126)
+registra 007FB0  007FB0       2FH (    47)
+vectors  007FE4  007FE4       1CH (    28)
+filler   02FFFF  02FFFF        1H (     1)
+Total                       7C1BH ( 31771)
+

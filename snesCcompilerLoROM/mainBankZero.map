@@ -1,0 +1,66 @@
+Section CODE:
+	00028000 _BEG_CODE
+	00028000 ~~main
+	00028088 ~~IRQHandler
+	00028098 ~~termM0Init
+	000280ad ~~termM0PrintStringXY
+	000280ca ~~LoadVram
+	0002814f ~~LoadCGRam
+	000281c5 ~~ButtonTest
+	000282bf ~~initSNES
+	000286e4 ~~farmalloc
+	00028828 ~~farsbrk
+	0002887c ~~strcpy
+	000288a1 ~~~lasr
+	000288df _END_CODE
+
+Section KDATA:
+	00048000 _BEG_KDATA
+	00048000 ~~school_bin_size
+	00048004 ~~school_bin
+	0004f004 ~~school_pal_size
+	0004f008 ~~school_pal
+	0004f20a ~~testString
+	0004f232 _END_KDATA
+
+Section DATA:
+	007e2000 _BEG_DATA
+	007e2000 ~~testStringRam
+	007e2028 ~~heap_start
+	007e202c ~~heap_end
+	007e2030 ~~far_heap_start
+	007e2034 ~~far_heap_end
+	007e2038 _END_DATA
+
+Section UDATA:
+	007e2038 _BEG_UDATA
+	007e2038 ~~_far_heap_top
+	007e203c ~~_far_mem_start
+	007e2040 _END_UDATA
+
+Section startup:
+	00000000 _BEG_STARTUP
+	0000007e _END_STARTUP
+
+Section registration_data:
+	00007fb0 _BEG_REGISTRATION_DATA
+	00007fdf _END_REGISTRATION_DATA
+
+Section vectors:
+	00007fe4 _BEG_VECTORS
+	00008000 _END_VECTORS
+
+Section filler:
+	0002ffff _BEG_FILLER
+	00030000 _END_FILLER
+
+ABSOLUTES:
+	00000000 START
+	0000006e IRQ
+	0000007e ~~unlink
+	0000007e ~~close
+	0000007e ~~open
+	0000007e ~~isatty
+	0000007e ~~write
+	0000007e ~~lseek
+

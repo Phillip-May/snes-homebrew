@@ -36,7 +36,7 @@ void main(void){
 	REG_CGDATA = 0x7e;		
 	
 	//Simple recreation of input test
-	ButtonTest();
+	//ButtonTest();
 	while(1){
 
 	}
