@@ -13,17 +13,22 @@ typedef	unsigned char byte;
 #include "include\SNES.h"
 #include "include\initsnes.h"
 
-char testString[40] = "Initial string in heap";
+const char testString[40] = "Initial string in ROM";
+char testStringRam[40] = "Initial string in heap";
 void main(void){
 	//Variables
 	int8_t regRead1; //Variable for storing hardware registers
 	int8_t regRead2; //Variable for storing hardware registers
+	uint8_t *test_heap;
 	//Initialization
 	//Initialize the stack
 	initSNES(SLOWROM);
-	ButtonTest();
-
+	test_heap = (uint8_t*)farmalloc((uint32_t)1024);
+	strcpy(testStringRam,testString);
+	testStringRam[0] = 'C';
+	
 	//Simple recreation of input test
+	ButtonTest();
 	while(1){
 
 	}
@@ -31,6 +36,16 @@ void main(void){
 
 void far IRQHandler(void){
 	
+}
+
+int termM0Init(void){
+	
+	return 0;
+}
+
+int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY){
+	
+	return 0;
 }
 
 //A little program that demonstrates reading inputs and waiting for VBlank

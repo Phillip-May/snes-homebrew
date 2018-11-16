@@ -192,7 +192,7 @@ E_IRQ   DW   DIRQ
 ;This is to inflate the file size to the nearest bank because snes9x hates
 ;Non standard roms. The actual ROM chip would have extra empty space so the binary
 ;Should as well.
-FILLER	SECTION OFFSET $01FFFF
+FILLER	SECTION OFFSET $02FFFF
 FILLERBYTE byte $00
 
 END
