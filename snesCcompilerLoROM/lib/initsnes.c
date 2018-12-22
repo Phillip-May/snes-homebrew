@@ -2,7 +2,13 @@
 
 //Based on the init snes macro by peter Lemons.
 //Takes 8 bit unsigned integer RomSpeed, 0 means Slow ROM, 1 means Fast ROM
+//I also added some other hardware related functions because they are hardware
+//Related and needlessly big.
+//I am aware a switch is not ideal here, you could just add a constant to the
+//registers offset but I chose to use a switch anyway in the hope it's
+//optimised out.
 void initSNES(uint8_t RomSpeed){
+
 	int i;
 	int cCONSTZERO = 0;
 	int* pCONSTZERO = &cCONSTZERO;
@@ -108,7 +114,14 @@ void initSNES(uint8_t RomSpeed){
 
 	//REG_DMAP0 = 0x8008;// DMA0 DMA/HDMA Parameters ($4300)
 	//REG_DAS0L = 0x00;// DMA0 DMA Count / Indirect HDMA Address: Transfer 64KB ($4305)
-	
+	//Clear CGRAM with DMA0
+	REG_CGADD = 0x0000;
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x22;
+	REG_A1T0 = 0x0000;
+	REG_A1B0 = 0x00;
+	REG_DAS0 = 0x01FF;
+	REG_MDMAEN = 0x01;	
 	
 	asm{
 		ldx #$0000
@@ -116,9 +129,8 @@ void initSNES(uint8_t RomSpeed){
 		stz $2183
 		ldx $8008
 		stx $4300
-		BYTE $42, $00
 	}
-	
+	//BYTE $42, $00
 
 	asm{
 		ldx #$FF00 //This should not be hardcoded but I cant get it to work othwerise
@@ -154,3 +166,185 @@ void initSNES(uint8_t RomSpeed){
 	REG_BBAD0 = 0x22;
 	REG_MDMAEN = 0x01;
 }
+
+//======================================
+// LoadCGRam - Load Palette Data To CGRAM
+//======================================
+//  SRC: 24-Bit Address Of Source Data
+// DEST: 8-Bit CGRAM Word Destination Address (Color # To Start On) * 2
+// SIZE: Size Of Data (# Of Colours To Copy) in sets of two
+// CHAN: DMA Channel To Transfer Data (0..7) This takes an int to prevent a 
+// compiler warning.
+int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination, uint16_t cSize,
+				int cChannel){
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers				 
+	
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);
+	REG_CGADD = pCGRAMDestination;
+	
+	switch(cChannel){
+		case 0:
+			REG_DMAP0 = 0x00;
+			REG_BBAD0 = 0x22;
+			REG_A1T0 = regWrite1;
+			REG_A1B0 = regWrite2;
+			REG_DAS0 = cSize;
+			REG_MDMAEN = 0x01;
+			break;
+		case 1:
+			REG_DMAP1 = 0x00;
+			REG_BBAD1 = 0x22;
+			REG_A1T1 = regWrite1;
+			REG_A1B1 = regWrite2;
+			REG_DAS1 = cSize;
+			REG_MDMAEN = 0x02;
+			break;
+		case 2:
+			REG_DMAP2 = 0x00;
+			REG_BBAD2 = 0x22;
+			REG_A1T2 = regWrite1;
+			REG_A1B2 = regWrite2;
+			REG_DAS2 = cSize;
+			REG_MDMAEN = 0x04;
+			break;
+		case 3:
+			REG_DMAP3 = 0x00;
+			REG_BBAD3 = 0x22;
+			REG_A1T3 = regWrite1;
+			REG_A1B3 = regWrite2;
+			REG_DAS3 = cSize;
+			REG_MDMAEN = 0x08;
+			break;
+		case 4:
+			REG_DMAP4 = 0x00;
+			REG_BBAD4 = 0x22;
+			REG_A1T4 = regWrite1;
+			REG_A1B4 = regWrite2;
+			REG_DAS4 = cSize;
+			REG_MDMAEN = 0x10;
+			break;
+		case 5:
+			REG_DMAP5 = 0x00;
+			REG_BBAD5 = 0x22;
+			REG_A1T5 = regWrite1;
+			REG_A1B5 = regWrite2;
+			REG_DAS5 = cSize;
+			REG_MDMAEN = 0x20;
+			break;
+		case 6:
+			REG_DMAP6 = 0x00;
+			REG_BBAD6 = 0x22;
+			REG_A1T6 = regWrite1;
+			REG_A1B6 = regWrite2;
+			REG_DAS6 = cSize;
+			REG_MDMAEN = 0x40;
+			break;
+		case 7:
+			REG_DMAP7 = 0x00;
+			REG_BBAD7 = 0x22;
+			REG_A1T7 = regWrite1;
+			REG_A1B7 = regWrite2;
+			REG_DAS7 = cSize;
+			REG_MDMAEN = 0x80;
+			break;
+		default:
+			//Insert some compiler/run-time warning if possible
+			return -1;
+			break;
+	}
+	
+	return 0;
+}
+
+//==================================
+// LoadVRAM - Load GFX Data To VRAM
+//==================================
+//  SRC: 24-Bit Address Of Source Data
+// DEST: 16-Bit VRAM Destination (WORD Address)
+// SIZE: Size Of Data (BYTE Size)
+// CHAN: DMA Channel To Transfer Data (0..7)
+//Load Data into Vram, using DMA channel 0
+int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize, int cChannel){
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers				 
+	REG_VMAIN = 0x80;
+	REG_VMADDL = (pVRAMDestination >> 1);
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
+	switch(cChannel){
+		case 0:
+			REG_DMAP0 = 0x01;
+			REG_BBAD0 = 0x18;
+			REG_A1T0 = regWrite1;
+			REG_A1B0 = regWrite2;
+			REG_DAS0 = cSize;
+			REG_MDMAEN = 0x01;			
+			break;
+		case 1:
+			REG_DMAP1 = 0x01;
+			REG_BBAD1 = 0x18;
+			REG_A1T1 = regWrite1;
+			REG_A1B1 = regWrite2;
+			REG_DAS1 = cSize;
+			REG_MDMAEN = 0x02;			
+			break;
+		case 2:
+			REG_DMAP2 = 0x01;
+			REG_BBAD2 = 0x18;
+			REG_A1T2 = regWrite1;
+			REG_A1B2 = regWrite2;
+			REG_DAS2 = cSize;
+			REG_MDMAEN = 0x04;			
+			break;
+		case 3:
+			REG_DMAP3 = 0x01;
+			REG_BBAD3 = 0x18;
+			REG_A1T3 = regWrite1;
+			REG_A1B3 = regWrite2;
+			REG_DAS3 = cSize;
+			REG_MDMAEN = 0x08;			
+			break;
+		case 4:
+			REG_DMAP4 = 0x01;
+			REG_BBAD4 = 0x18;
+			REG_A1T4 = regWrite1;
+			REG_A1B4 = regWrite2;
+			REG_DAS4 = cSize;
+			REG_MDMAEN = 0x10;			
+			break;
+		case 5:
+			REG_DMAP5 = 0x01;
+			REG_BBAD5 = 0x18;
+			REG_A1T5 = regWrite1;
+			REG_A1B5 = regWrite2;
+			REG_DAS5 = cSize;
+			REG_MDMAEN = 0x20;			
+			break;
+		case 6:
+			REG_DMAP6 = 0x01;
+			REG_BBAD6 = 0x18;
+			REG_A1T6 = regWrite1;
+			REG_A1B6 = regWrite2;
+			REG_DAS6 = cSize;
+			REG_MDMAEN = 0x40;			
+			break;
+		case 7:
+			REG_DMAP7 = 0x01;
+			REG_BBAD7 = 0x18;
+			REG_A1T7 = regWrite1;
+			REG_A1B7 = regWrite2;
+			REG_DAS7 = cSize;
+			REG_MDMAEN = 0x80;			
+			break;
+		default:
+			//Insert some compiler/run-time warning if possible
+			return -1;
+			break;
+	}		
+	
+	return 0;
+}	

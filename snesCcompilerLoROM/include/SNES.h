@@ -300,6 +300,93 @@
 #define REG_A2A1L        (*(vu8*)0x4318) // 
 #define REG_A2A1H        (*(vu8*)0x4319) // 
 #define REG_NTRL1        (*(vu8*)0x431A) // 
+//DMA2
+#define REG_DMAP2        (*(vu8*)0x4320) // 
+#define REG_BBAD2        (*(vu8*)0x4321) //
+#define REG_A1T2         (*(vu16*)0x4322) // 
+#define REG_A1T2L        (*(vu8*)0x4322) // 
+#define REG_A1T2H        (*(vu8*)0x4323) // 
+#define REG_A1B2         (*(vu8*)0x4324) //
+#define REG_DAS2         (*(vu16*)0x4325) //  
+#define REG_DAS2L        (*(vu8*)0x4325) // 
+#define REG_DAS2H        (*(vu8*)0x4326) // 
+#define REG_DASB2        (*(vu8*)0x4327) // 
+#define REG_A2A2L        (*(vu8*)0x4328) // 
+#define REG_A2A2H        (*(vu8*)0x4329) // 
+#define REG_NTRL2        (*(vu8*)0x432A) // 
+//DMA3
+#define REG_DMAP3        (*(vu8*)0x4330) // 
+#define REG_BBAD3        (*(vu8*)0x4331) //
+#define REG_A1T3         (*(vu16*)0x4332) // 
+#define REG_A1T3L        (*(vu8*)0x4332) // 
+#define REG_A1T3H        (*(vu8*)0x4333) // 
+#define REG_A1B3         (*(vu8*)0x4334) //
+#define REG_DAS3         (*(vu16*)0x4335) //  
+#define REG_DAS3L        (*(vu8*)0x4335) // 
+#define REG_DAS3H        (*(vu8*)0x4336) // 
+#define REG_DASB3        (*(vu8*)0x4337) // 
+#define REG_A2A3L        (*(vu8*)0x4338) // 
+#define REG_A2A3H        (*(vu8*)0x4339) // 
+#define REG_NTRL3        (*(vu8*)0x433A) // 
+//DMA4
+#define REG_DMAP4        (*(vu8*)0x4340) // 
+#define REG_BBAD4        (*(vu8*)0x4341) //
+#define REG_A1T4         (*(vu16*)0x4342) // 
+#define REG_A1T4L        (*(vu8*)0x4342) // 
+#define REG_A1T4H        (*(vu8*)0x4343) // 
+#define REG_A1B4         (*(vu8*)0x4344) //
+#define REG_DAS4         (*(vu16*)0x4345) //  
+#define REG_DAS4L        (*(vu8*)0x4345) // 
+#define REG_DAS4H        (*(vu8*)0x4346) // 
+#define REG_DASB4        (*(vu8*)0x4347) // 
+#define REG_A2A4L        (*(vu8*)0x4348) // 
+#define REG_A2A4H        (*(vu8*)0x4349) // 
+#define REG_NTRL4        (*(vu8*)0x434A) // 
+//DMA5
+#define REG_DMAP5        (*(vu8*)0x4350) // 
+#define REG_BBAD5        (*(vu8*)0x4351) //
+#define REG_A1T5         (*(vu16*)0x4352) // 
+#define REG_A1T5L        (*(vu8*)0x4352) // 
+#define REG_A1T5H        (*(vu8*)0x4353) // 
+#define REG_A1B5         (*(vu8*)0x4354) //
+#define REG_DAS5         (*(vu16*)0x4355) //  
+#define REG_DAS5L        (*(vu8*)0x4355) // 
+#define REG_DAS5H        (*(vu8*)0x4356) // 
+#define REG_DASB5        (*(vu8*)0x4357) // 
+#define REG_A2A5L        (*(vu8*)0x4358) // 
+#define REG_A2A5H        (*(vu8*)0x4359) // 
+#define REG_NTRL5        (*(vu8*)0x435A) // 
+//DMA6
+#define REG_DMAP6        (*(vu8*)0x4360) // 
+#define REG_BBAD6        (*(vu8*)0x4361) //
+#define REG_A1T6         (*(vu16*)0x4362) // 
+#define REG_A1T6L        (*(vu8*)0x4362) // 
+#define REG_A1T6H        (*(vu8*)0x4363) // 
+#define REG_A1B6         (*(vu8*)0x4364) //
+#define REG_DAS6         (*(vu16*)0x4365) //  
+#define REG_DAS6L        (*(vu8*)0x4365) // 
+#define REG_DAS6H        (*(vu8*)0x4366) // 
+#define REG_DASB6        (*(vu8*)0x4367) // 
+#define REG_A2A6L        (*(vu8*)0x4368) // 
+#define REG_A2A6H        (*(vu8*)0x4369) // 
+#define REG_NTRL6        (*(vu8*)0x436A) // 
+//DMA7
+#define REG_DMAP7        (*(vu8*)0x4370) // 
+#define REG_BBAD7        (*(vu8*)0x4371) //
+#define REG_A1T7         (*(vu16*)0x4372) // 
+#define REG_A1T7L        (*(vu8*)0x4372) // 
+#define REG_A1T7H        (*(vu8*)0x4373) // 
+#define REG_A1B7         (*(vu8*)0x4374) //
+#define REG_DAS7         (*(vu16*)0x4375) //  
+#define REG_DAS7L        (*(vu8*)0x4375) // 
+#define REG_DAS7H        (*(vu8*)0x4376) // 
+#define REG_DASB7        (*(vu8*)0x4377) // 
+#define REG_A2A7L        (*(vu8*)0x4378) // 
+#define REG_A2A7H        (*(vu8*)0x4379) // 
+#define REG_NTRL7        (*(vu8*)0x437A) // 
+
+
+
 
 /*  <---Registers used for DMA--->
  DMA transfers take 8 master cycles per byte transferred, no matter the FastROM setting.

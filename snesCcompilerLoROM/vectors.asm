@@ -4,7 +4,7 @@
 ;*** Define a special section in case most of the code is not in bank 0.    ***
 ;******************************************************************************
 
-STACK   EQU   $01ff     ;CHANGE THIS FOR YOUR SYSTEM
+STACK   EQU   $1fff     ;CHANGE THIS FOR YOUR SYSTEM
 
 ;Software, rom start offset
 STARTUP SECTION OFFSET $000000,$008000
@@ -14,6 +14,7 @@ STARTUP SECTION OFFSET $000000,$008000
     .xref    _ROM_BEG_DATA
     .xref    _BEG_UDATA
     .xref    _END_UDATA
+	;External C function names
     .xref    ~~NmiHandler
     .xref    ~~IrqHandler
     .xref    ~~main
@@ -31,74 +32,58 @@ START:
         rep     #$38    ; Binary mode (decimal mode off), X/Y 16 bit
 		LONGI	ON;
 		LONGA	ON;
-		ldx #$1fff;
-		txs
+		ldx #STACK;
+		txs				; Stack pointer set correctly
 		lda #$0000
-		tcd
-		sep #$20;
-		LONGA	OFF;
-		
+		tcd				; Page 0 direct page
+		;sep #$20;
+		;LONGA	OFF;
 		
 		;Start of arm9 stuff
-		; Clear WRAM
-		ldy     #$0000
-		sty     $2181           ; Transfer to $7E:0000
-		stz     $2183           ; Select first WRAM bank ($7E)
-
-		ldx     #$8008          ; Fixed source byte write to $2180
-		stx     $4300
-		ldx     #CONST_ZERO
-		lda     #^CONST_ZERO
-
-		stx     $4302           ; DMA destination address
-		sta     $4304           ; Destination bank
-		sty     $4305           ; Transfer 64KiB
-
-		lda     #$01
-		sta     $420B
-		nop
-		sta     $420B           ; $2181-$2183 and $4305 wrap appropriately
-
-		ldx     #$0000
-		ldy     #$0000          ; 64KiB		
-
+		; Clear WRAM (Stack+Low+High WRAM)
+		rep #$20;
+		LONGA	ON;
+		ldy #$0000;		
+		DMA_WRAM_START:
+		;DMA 1 Byte		
+		lda #$0000;
+		;LoROM offset for my const Zero
+		ldx #<CONST_ZERO+$8000;
+		mvn #$00,#$7E
+		tya
+		bne DMA_WRAM_START
+		
+		
+		; Clear Extended WRAM
+		DMA_EXTENDED_WRAM_START:
+		;DMA 1 Byte		
+		lda #$0000;
+		;LoROM offset for my const Zero
+		ldx #<CONST_ZERO+$8000;
+		mvn #$00,#$7F
+		tya
+		bne DMA_EXTENDED_WRAM_START
 		
 		rep     #$30
 		longa	on
 		longi	on
 		;Next, we want to copy the initialized data section from ROM to RAM. Data must been stored in ROM at address _ROM_BEG_DATA
 		lda     #_END_DATA-_BEG_DATA        ; Number of bytes to copy
-		beq     ?skip                       ; If none, just skip
+		beq     SKIP                       ; If none, just skip
 
 		dec     a                           ; Decrement size for mvn
 
 		ldx     #<_ROM_BEG_DATA             ; Load source into X
 		ldy     #<_BEG_DATA                 ; Load dest into Y
-		;HardCoded to bank 3 for data
+		;HardCoded to bank 3 for data's initial values
 		mvn     #$03,#^_BEG_DATA ; Copy bytes		
-		?skip:
-	    ldx     #_END_UDATA-_BEG_UDATA  ; Get number of bytes to clear
-	    beq     ?DONE                   ; Nothing to do
-	 
-	    lda     #0                      ; Get a zero for storing
-	 
-	    .longa  off                     ; Set 8 bit accumulator
-	   sep     #$20
-	 
-	    ldy     #_BEG_UDATA             ; Get beginning of zeros
-	
-		?LOOP:
-	    sta     |0,Y                    ; Clear memory
-	    iny                             ; Bump pointer
-	    dex                             ; Decrement count
-	    bne     ?LOOP                   ; Continue till done
-
-		?DONE:		
+		
+		SKIP:
 		
 		.longi  on
 		.longa  on
 		rep     #$30
-
+		
 		lda     #$0000          ; Set direct page to $0000 for no apparent reason
 		tcd
 	
