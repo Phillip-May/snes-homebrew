@@ -98,8 +98,8 @@
  $89 to write 4bpp column, $85 seems to work as well?
 */
 #define REG_VMADD       (*(vu16*)0x2116)// VRAM address, pointer to 16 bits
-#define REG_VMADDL      (*(vu8*)0x2116) // Low byte of VRAM read/write address
-#define REG_VMADDH      (*(vu8*)0x2117) // High byte of VRAM read/write address
+//#define REG_VMADDL      (*(vu8*)0x2116) // Low byte of VRAM read/write address
+//#define REG_VMADDH      (*(vu8*)0x2117) // High byte of VRAM read/write address
 #define REG_VMDATA      (*(vu16*)0x2118)// VRAM data write, pointer to 16 bits
 #define REG_VMDATAL     (*(vu8*)0x2118) // Write register for low VRAM bank
 #define REG_VMDATAH     (*(vu8*)0x2119) // Write register for high VRAM bank
@@ -201,7 +201,7 @@
 
 //WRAM B-bus registers
 #define REG_WMDATA  (*(vu8*)0x2180) // Read/write to/from WRAM on B bus (fast access), one byte at a time
-#define REG_WMADD   (*(vu16*)0x2181 // WMADDL&M pointer to 16 bits
+#define REG_WMADD   (*(vu16*)0x2181) // WMADDL&M pointer to 16 bits
 #define REG_WMADDL  (*(vu8*)0x2181) // low byte of address into wram
 #define REG_WMADDM  (*(vu8*)0x2182) // high byte
 #define REG_WMADDH  (*(vu8*)0x2183) // bank byte, only one bit because there are only two banks ($7E/$7F)

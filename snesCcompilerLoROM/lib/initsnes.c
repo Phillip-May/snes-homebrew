@@ -123,19 +123,12 @@ void initSNES(uint8_t RomSpeed){
 	REG_DAS0 = 0x01FF;
 	REG_MDMAEN = 0x01;	
 	
-	asm{
-		ldx #$0000
-		stx $2181
-		stz $2183
-		ldx $8008
-		stx $4300
-	}
-	//BYTE $42, $00
+	REG_WMADD = 0x0000;
+	REG_WMADDH = 0x00;
+	REG_DMAP0 = 0x08;
+	
+	REG_A1T0 = 0xFF00;
 
-	asm{
-		ldx #$FF00 //This should not be hardcoded but I cant get it to work othwerise
-		stx $4302
-	}
 	REG_A1B0 = 0x00;
 	
   	REG_DAS0L = 0x00;// DMA0 DMA Count / Indirect HDMA Address: Transfer 64KB ($4305)
@@ -148,8 +141,7 @@ void initSNES(uint8_t RomSpeed){
 
 	// VRAM
 	REG_VMAIN = 0x80;
-	REG_VMADDL = 0x00;
-	REG_VMADDH = 0x00;
+	REG_VMADD = 0x0000;
 	REG_DAS0L = 0x00;
 	REG_DAS0H = 0x00;
 	
@@ -271,7 +263,7 @@ int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x80;
-	REG_VMADDL = (pVRAMDestination >> 1);
+	REG_VMADD = (pVRAMDestination >> 1);
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
@@ -348,3 +340,75 @@ int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 	
 	return 0;
 }	
+
+//=============================================
+// LoadLOVRAM - Load GFX Data To VRAM Lo Bytes
+//=============================================
+//  SRCTILES: 24-Bit Address Of Source Tile Data
+//      DEST: 16-Bit VRAM Destination (WORD Address)
+// SIZETILES: Size Of Tile Data (BYTE Size)
+//      CHAN: DMA Channel To Transfer Data (0..7)
+int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize, int cChannel){
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers				 
+	REG_VMAIN = 0x00;
+	REG_VMADD = (pVRAMDestination >> 1);
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
+	REG_DMAP7 = 0x00;
+	REG_BBAD7 = 0x18;
+	REG_A1T7 = regWrite1;
+	REG_A1B7 = regWrite2;
+	REG_DAS7 = cSize;
+	REG_MDMAEN = 0x80;
+	return 0;
+}
+
+//===================================
+// ClearVRAM - Clear VRAM Fixed Word 
+//===================================
+//  SRC: 24-Bit Address Of Source Data
+// DEST: 16-Bit VRAM Destination (WORD Address)
+// SIZE: Size Of Data (BYTE Size)
+// CHAN: DMA Channel To Transfer Data (0..7)
+int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize, int cChannel){
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers				 
+	uint16_t regWrite3;
+
+	regWrite3 = (pVRAMDestination >> 1);
+	//Transfer LoByte
+	REG_VMAIN = 0x00;
+	REG_VMADD = regWrite3;
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
+	REG_DMAP6 = 0x08;
+	REG_BBAD6 = 0x18;
+	REG_A1T6 = regWrite1;
+	REG_A1B6 = regWrite2;
+	REG_DAS6 = cSize;
+	REG_MDMAEN = 0x40;
+	
+	//Transfer HiByte
+	REG_VMAIN = 0x80;
+	REG_VMADD = regWrite3;
+	regWrite1 = (uint16_t) ((uint32_t)pSource+1);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
+	REG_BBAD6 = 0x19;
+	REG_A1T6 = regWrite1;
+	REG_A1B6 = regWrite2;
+	REG_DAS6 = cSize;
+	REG_MDMAEN = 0x40;
+	
+	return 0;
+}
+
+
+
+
+

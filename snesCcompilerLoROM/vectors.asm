@@ -72,13 +72,15 @@ START:
 		beq     SKIP                       ; If none, just skip
 
 		dec     a                           ; Decrement size for mvn
-
+		
+		;BYTE $42, 00
 		ldx     #<_ROM_BEG_DATA             ; Load source into X
 		ldy     #<_BEG_DATA                 ; Load dest into Y
 		;HardCoded to bank 3 for data's initial values
 		mvn     #$03,#^_BEG_DATA ; Copy bytes		
 		
 		SKIP:
+		;BYTE $42, 00
 		
 		.longi  on
 		.longa  on

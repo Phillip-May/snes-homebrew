@@ -13,4 +13,8 @@ int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination,
 				uint16_t cSize, int cChannel);
 int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination, 
 				uint16_t cSize, int cChannel);
+int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize, int cChannel);
+int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize, int cChannel);				
 #endif

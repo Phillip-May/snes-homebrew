@@ -14,8 +14,11 @@ typedef	unsigned char byte;
 #include "include\initsnes.h"
 #include "include\imagedata.h"
 
-//const char testString[40] = "Initial string in ROM";
-//char testStringRam[40] = "Initial string in heap";
+const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F};
+const unsigned char BGCLEAR[] = {0x20, 0x00};
+const unsigned char HELLOWORLD[] = "Hello World!";
+const char testString[40] = "Initial string in ROM";
+char testStringRam[40] = "Initial string in User Data";
 void main(void){
 	//Variables
 	static int something = 5;
@@ -25,21 +28,15 @@ void main(void){
 	//Initialization
 	//Initialize the stack
 	initSNES(SLOWROM);
-	//test_heap = (uint8_t*)farmalloc((uint32_t)1024);
-	//strcpy(testStringRam,testString);
-	//testStringRam[0] = 'C';
-	something = something - 1;
 	
-	LoadVram(school_bin, 0x0000, (uint16_t) school_bin_size, 7);
-	LoadCGRam(school_pal, 0x10, sizeof(school_pal), something);
-	REG_CGADD = 0x00;
-	REG_CGDATA = 0xca;
-	REG_CGDATA = 0x7e;
+	//LoadVram(school_bin, 0x0000, (uint16_t) school_bin_size, 7);
+	//LoadCGRam(school_pal, 0x10, sizeof(school_pal), something);
 	
 	//Simple recreation of input test
 	//ButtonTest();
+	Mode0Text();
 	while(1){
-
+		REG_INIDISP = 0x0F;
 	}
 }
 
@@ -58,6 +55,7 @@ int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY){
 }	 
 
 //A little program that demonstrates reading inputs and waiting for VBlank
+//Requires snes to be initialised
 void ButtonTest(void){
 	//Variables
 	int8_t regRead1; //Variable for storing hardware registers
@@ -70,7 +68,7 @@ void ButtonTest(void){
 	//Simple code to verify the program can do a thing
 	REG_CGADD = 0x00;
 	REG_CGDATA = 0x00;
-	REG_CGDATA = 0x78;	
+	REG_CGDATA = 0x78;
 	
 	//Simple recreation of input test
 	while(1){
@@ -93,6 +91,29 @@ void ButtonTest(void){
 			REG_CGDATA = 0x00;
 			REG_CGDATA = 0x78;				
 		}
-		
 	}	
+}
+
+//A little program that demonstrates text display using mode 0
+//Requires snes to be initialised
+void Mode0Text(){
+	LoadCGRam(BGPAL, 0x00, 4, 0); // Load BG Palette Data
+	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin), 7);
+    ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
+	
+	LoadLoVram(HELLOWORLD, 0xF944, sizeof(HELLOWORLD)-1, 0); // Load Text To VRAM Lo Bytes
+	
+	REG_BGMODE  = 0x08;
+	REG_BG1SC  = 0xFC;
+	REG_BG12NBA = 0x00;
+	REG_TM = 0x01;
+	
+	REG_BG1HOFS = 0x00;
+	REG_BG1HOFS = 0x00;
+	REG_BG1VOFS = 0x00;
+	REG_BG1VOFS = 0x00;
+	
+	while(1){
+		REG_INIDISP = 0x0F;
+	}
 }
