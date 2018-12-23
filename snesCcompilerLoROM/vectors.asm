@@ -128,6 +128,9 @@ CONST_ZERO:
 ~~write:
 	XDEF ~~lseek
 ~~lseek:
+	XDEF ~~ftod
+~~ftod
+
 
 
 

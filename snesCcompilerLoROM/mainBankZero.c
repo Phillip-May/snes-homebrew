@@ -14,17 +14,17 @@ typedef	unsigned char byte;
 #include "include\initsnes.h"
 #include "include\imagedata.h"
 
-const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F};
-const unsigned char BGCLEAR[] = {0x20, 0x00};
-const unsigned char HELLOWORLD[] = "Hello World!";
 const char testString[40] = "Initial string in ROM";
-char testStringRam[40] = "Initial string in User Data";
+const char testString2[40] = "\nInitial string in ROM 2";
+//char testStringRam[40] = "Initial string in User Data";
+char testStringRam[40] = "Error";
 void main(void){
 	//Variables
 	static int something = 5;
 	int8_t regRead1; //Variable for storing hardware registers
 	int8_t regRead2; //Variable for storing hardware registers
-	uint8_t *test_heap;
+	uint8_t *test_heap2;
+	uint32_t counter = 40000;
 	//Initialization
 	//Initialize the stack
 	initSNES(SLOWROM);
@@ -34,9 +34,25 @@ void main(void){
 	
 	//Simple recreation of input test
 	//ButtonTest();
-	Mode0Text();
+	//Mode0Text();
+	termM0Init();
+	termM0PrintString("Part 1\nLine 2\nLine 3\nLine 4 is very long");
+	termM0PrintString("\rMore text\nLine 5\n");
+	termM0PrintString("\nLine 6\r");
+	termM0PrintString("12346578901234657890123465789012\n");
+	termM0PrintString("\nABC");
+	termM0PrintString("\n123");
+	termM0PrintString(testString);
+	termM0PrintString(testString2);
+	
+	REG_INIDISP = 0x0F;
 	while(1){
-		REG_INIDISP = 0x0F;
+		do{ //Wait for Vblank
+			regRead1 = REG_RDNMI;
+		} while( (regRead1 > 0));
+		//termM0PrintStringXY(testStringRam);
+		//sprintf(testStringRam,"Value: %06d\0",counter);
+		counter++;
 	}
 }
 
@@ -44,15 +60,67 @@ void far IRQHandler(void){
 	
 }
 
-int termM0Init(void){
+int termM0Init(void){	
+	const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F};
+	const unsigned char BGCLEAR[] = {0x20, 0x00};
+	LoadCGRam(BGPAL, 0x00, 4, 0); // Load BG Palette Data
+	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin), 7);
+    ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
 	
+	REG_BGMODE  = 0x08;
+	REG_BG1SC  = 0xFC;
+	REG_BG12NBA = 0x00;
+	REG_TM = 0x01;
+	
+	REG_BG1HOFS = 0x00;
+	REG_BG1HOFS = 0x00;
+	REG_BG1VOFS = 0x00;
+	REG_BG1VOFS = 0x00;	
 	return 0;
 }
 //Takes an input and maps prints to an xy on the tile
-int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY){
-	
+int termM0PrintString(const char *szInput){
+	static uint16_t curWritePos = 0xF800;
+	uint8_t *test_heap;
+	uint8_t curOffset = 0;
+	int i;
+	test_heap = (uint8_t*)farmalloc((uint32_t)(strlen(szInput)+1));
+	//strcpy(test_heap,szInput);
+	for (i = 0; i < (strlen(szInput)+1); i++){
+		if( (szInput[i] == '\n') ) {
+			curOffset = i;
+			if (strlen(test_heap) != 0){
+				LoadLoVram(test_heap, curWritePos, strlen(test_heap), 0); // Load Text To VRAM Lo Bytes
+				curWritePos = curWritePos + (strlen(test_heap) << 1);
+			}
+			curOffset = i + 1;
+			//Change edgecase behaviour
+			/*if ( (curWritePos & 0x003F) != 0x0000 ){
+			//	curWritePos = (curWritePos & 0xFFC0) + 0x40;	
+			}*/
+			curWritePos = (curWritePos & 0xFFC0) + 0x40;
+		}
+		else if( (szInput[i] == '\r') ) {
+			if (strlen(test_heap) != 0){
+				LoadLoVram(test_heap, curWritePos, strlen(test_heap), 0); // Load Text To VRAM Lo Bytes
+			}
+			curOffset = i + 1;
+			curWritePos = (curWritePos & 0xFFC0);
+		}
+		else if( (szInput[i] == '\0') ) {
+			test_heap[i-curOffset] = '\0';
+			if (strlen(test_heap) != 0){
+				LoadLoVram(test_heap, curWritePos, strlen(test_heap), 0); // Load Text To VRAM Lo Bytes
+				curWritePos = curWritePos + (strlen(test_heap) << 1);
+			}
+			curOffset = i + 1;
+		}
+		test_heap[i-curOffset] = szInput[i];
+		test_heap[i-curOffset+1] = '\0';
+	}
+	farfree(test_heap);
 	return 0;
-}	 
+}
 
 //A little program that demonstrates reading inputs and waiting for VBlank
 //Requires snes to be initialised
@@ -97,6 +165,16 @@ void ButtonTest(void){
 //A little program that demonstrates text display using mode 0
 //Requires snes to be initialised
 void Mode0Text(){
+	int8_t regRead1;
+	const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F};
+	const unsigned char BGCLEAR[] = {0x20, 0x00};
+	const unsigned char HELLOWORLD[] = "Hello World!";
+
+	
+	REG_INIDISP = 0x0F;
+	do{ //Wait for Vblank
+		regRead1 = REG_RDNMI;
+	} while( (regRead1 > 0));	
 	LoadCGRam(BGPAL, 0x00, 4, 0); // Load BG Palette Data
 	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin), 7);
     ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
@@ -114,6 +192,7 @@ void Mode0Text(){
 	REG_BG1VOFS = 0x00;
 	
 	while(1){
-		REG_INIDISP = 0x0F;
+		//REG_INIDISP = 0x0F;
 	}
 }
+

@@ -1,4 +1,4 @@
 int termM0Init(void);
-int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY);
+int termM0PrintString(const char *szInput);
 void ButtonTest(void);
 void Mode0Text(void);
