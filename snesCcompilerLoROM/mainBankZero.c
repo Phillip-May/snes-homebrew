@@ -14,6 +14,24 @@ typedef	unsigned char byte;
 #include "include\initsnes.h"
 #include "include\imagedata.h"
 
+int LoadOAMCopy(const stOAMCopy *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize, int cChannel){
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers				 
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
+	REG_OAMADD = pVRAMDestination;
+	REG_DAS0 = cSize;
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x04;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;	
+	
+	REG_MDMAEN = 0x01;
+	return 0;
+}
+
 const char testString[40] = "Initial string in ROM";
 const char testString2[40] = "\nInitial string in ROM 2";
 //char testStringRam[40] = "Initial string in User Data";
@@ -25,6 +43,8 @@ void main(void){
 	int8_t regRead2; //Variable for storing hardware registers
 	uint8_t *test_heap2;
 	uint32_t counter = 40000;
+	stOAMCopy *pOAMCopy;
+	char *stringa1;
 	//Initialization
 	//Initialize the stack
 	initSNES(SLOWROM);
@@ -35,6 +55,7 @@ void main(void){
 	//Simple recreation of input test
 	//ButtonTest();
 	//Mode0Text();
+	/*
 	termM0Init();
 	termM0PrintString("Part 1\nLine 2\nLine 3\nLine 4 is very long");
 	termM0PrintString("\rMore text\nLine 5\n");
@@ -44,6 +65,19 @@ void main(void){
 	termM0PrintString("\n123");
 	termM0PrintString(testString);
 	termM0PrintString(testString2);
+	*/
+	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr), 0); // Load BG Palette Data
+	LoadVram(biker_pic, 0x0000, sizeof(biker_pic), 7);
+	
+	pOAMCopy = (stOAMCopy *) farcalloc(1,sizeof(stOAMCopy));
+	pOAMCopy->OBJ000X = 112;
+	pOAMCopy->OBJ000Y = 96;
+	pOAMCopy->CHARNUM000 = 0;
+	pOAMCopy->PROPERTIES000 = 0x70;
+	REG_OBJSEL = 0xA0;
+	REG_TM = 0x10;
+	
+	LoadOAMCopy(pOAMCopy,0x0000,sizeof(stOAMCopy),0);
 	
 	REG_INIDISP = 0x0F;
 	while(1){
