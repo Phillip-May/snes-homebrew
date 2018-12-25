@@ -14,7 +14,27 @@ typedef	unsigned char byte;
 #include "include\initsnes.h"
 #include "include\imagedata.h"
 
-int LoadOAMCopy(const stOAMCopy *pSource, uint16_t pVRAMDestination,
+int initOAMCopy(unsigned char *pSource){
+	uint16_t i;
+	for (i = 0; i < 128; i++){
+		*pSource = 0x01;
+		pSource++;
+		*pSource = 0x00;
+		pSource++;
+		*pSource = 0x00;
+		pSource++;
+		*pSource = 0x00;
+		pSource++;
+	}
+	for(i = 0; i < 32; i++){
+		*pSource = 0x55;
+		pSource++;
+	}
+	
+	return 0;
+}
+
+int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
@@ -43,7 +63,7 @@ void main(void){
 	int8_t regRead2; //Variable for storing hardware registers
 	uint8_t *test_heap2;
 	uint32_t counter = 40000;
-	stOAMCopy *pOAMCopy;
+	union uOAMCopy *pOAMCopy;
 	char *stringa1;
 	//Initialization
 	//Initialize the stack
@@ -69,15 +89,19 @@ void main(void){
 	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr), 0); // Load BG Palette Data
 	LoadVram(biker_pic, 0x0000, sizeof(biker_pic), 7);
 	
-	pOAMCopy = (stOAMCopy *) farcalloc(1,sizeof(stOAMCopy));
-	pOAMCopy->OBJ000X = 112;
-	pOAMCopy->OBJ000Y = 96;
-	pOAMCopy->CHARNUM000 = 0;
-	pOAMCopy->PROPERTIES000 = 0x70;
+	//This seems correct to me but the compiler still spits out warnings.
+	pOAMCopy = (union uOAMCopy *) farcalloc(1,sizeof(union uOAMCopy));
+	initOAMCopy(pOAMCopy->Bytes);
+	
+	pOAMCopy->Names.OBJ000X = 112;
+	pOAMCopy->Names.OBJ000Y = 96;
+	pOAMCopy->Names.CHARNUM000 = 0;
+	pOAMCopy->Names.PROPERTIES000 = 0x70;
+	pOAMCopy->Names.OAMTABLE2BYTE00 = 0x54;
 	REG_OBJSEL = 0xA0;
 	REG_TM = 0x10;
-	
-	LoadOAMCopy(pOAMCopy,0x0000,sizeof(stOAMCopy),0);
+
+	LoadOAMCopy(pOAMCopy->Bytes,0x0000,sizeof(union uOAMCopy),0);
 	
 	REG_INIDISP = 0x0F;
 	while(1){
