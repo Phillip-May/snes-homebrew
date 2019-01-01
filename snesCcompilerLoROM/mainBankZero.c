@@ -101,16 +101,17 @@ void main(void){
 	REG_OBJSEL = 0xA0;
 	REG_TM = 0x10;
 
-	LoadOAMCopy(pOAMCopy->Bytes,0x0000,sizeof(union uOAMCopy),0);
 	
 	REG_INIDISP = 0x0F;
 	while(1){
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
 		} while( (regRead1 > 0));
+		LoadOAMCopy(pOAMCopy->Bytes,0x0000,sizeof(union uOAMCopy),0);
 		//termM0PrintStringXY(testStringRam);
 		//sprintf(testStringRam,"Value: %06d\0",counter);
 		counter++;
+		pOAMCopy->Names.OBJ000Y = counter;
 	}
 }
 
