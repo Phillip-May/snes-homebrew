@@ -1,10 +1,19 @@
 /*
 *   SNES MMIO register definitions
 */
+#include <inttypes.h>
 
 #ifndef __SNES_REGS_H
 #define __SNES_REGS_H
-#include "include\int.h"
+typedef int8_t s8;
+typedef volatile int8_t vs8;
+typedef int16_t s16;
+typedef volatile int16_t vs16;
+
+typedef uint8_t u8;
+typedef volatile uint8_t vu8;
+typedef uint16_t u16;
+typedef volatile uint16_t vu16;
 
 #define u8_reg(addr) (*(vu8*)addr)
 #define u16_reg(addr) (*(vu16*)addr)

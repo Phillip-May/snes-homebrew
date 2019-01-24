@@ -1,4 +1,5 @@
 #include "include\SNES.h"
+#include <STDINT.H>
 
 //Based on the init snes macro by peter Lemons.
 //Takes 8 bit unsigned integer RomSpeed, 0 means Slow ROM, 1 means Fast ROM
@@ -408,7 +409,47 @@ int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 	return 0;
 }
 
+//===================================
+// LoadOAMCopy - Clear VRAM Fixed Word 
+//===================================
+//  SRC: 24-Bit Address Of Source Data
+// DEST: 16-Bit OAM Destination (WORD Address)
+// SIZE: Size Of Data (BYTE Size)
+// CHAN: DMA Channel To Transfer Data (0..7)
+int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize, int cChannel){
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers				 
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
+	REG_OAMADD = pVRAMDestination;
+	REG_DAS0 = cSize;
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x04;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;	
+	
+	REG_MDMAEN = 0x01;
+	return 0;
+}
 
-
-
-
+int initOAMCopy(unsigned char *pSource){
+	uint16_t i;
+	for (i = 0; i < 128; i++){
+		*pSource = 0x01;
+		pSource++;
+		*pSource = 0x00;
+		pSource++;
+		*pSource = 0x00;
+		pSource++;
+		*pSource = 0x00;
+		pSource++;
+	}
+	for(i = 0; i < 32; i++){
+		*pSource = 0x55;
+		pSource++;
+	}
+	
+	return 0;
+}

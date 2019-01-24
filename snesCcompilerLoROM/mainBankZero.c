@@ -2,6 +2,7 @@
 typedef	unsigned char byte;
 //LoROM mememory map
 
+
 #include <FLOAT.H>
 #include <INTTYPES.H>
 #include <STDINT.H>
@@ -14,50 +15,20 @@ typedef	unsigned char byte;
 #include "include\initsnes.h"
 #include "include\imagedata.h"
 
-int initOAMCopy(unsigned char *pSource){
-	uint16_t i;
-	for (i = 0; i < 128; i++){
-		*pSource = 0x01;
-		pSource++;
-		*pSource = 0x00;
-		pSource++;
-		*pSource = 0x00;
-		pSource++;
-		*pSource = 0x00;
-		pSource++;
-	}
-	for(i = 0; i < 32; i++){
-		*pSource = 0x55;
-		pSource++;
-	}
-	
-	return 0;
-}
-
-int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
-				uint16_t cSize, int cChannel){
-	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
-	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	
-	REG_OAMADD = pVRAMDestination;
-	REG_DAS0 = cSize;
-	REG_DMAP0 = 0x00;
-	REG_BBAD0 = 0x04;
-	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;	
-	
-	REG_MDMAEN = 0x01;
-	return 0;
-}
-
 const char testString[40] = "Initial string in ROM";
 const char testString2[40] = "\nInitial string in ROM 2";
 //char testStringRam[40] = "Initial string in User Data";
 char testStringRam[40] = "Error";
 void main(void){
 	//Variables
+	uint8_t lastInputLo;
+	uint8_t lastInputHi;
+	uint16_t spriteX = 0x00;
+	uint8_t spriteY = 0x00;	
+	uint16_t BGTileLocation = 0xF800;
+	unsigned char BGTile[] = {0x20, 0x00};
+	uint16_t BGTileValue = 0x0020;
+	int i = 0;
 	static int something = 5;
 	int8_t regRead1; //Variable for storing hardware registers
 	int8_t regRead2; //Variable for storing hardware registers
@@ -69,25 +40,14 @@ void main(void){
 	//Initialize the stack
 	initSNES(SLOWROM);
 	
-	//LoadVram(school_bin, 0x0000, (uint16_t) school_bin_size, 7);
-	//LoadCGRam(school_pal, 0x10, sizeof(school_pal), something);
-	
-	//Simple recreation of input test
-	//ButtonTest();
-	//Mode0Text();
-	/*
-	termM0Init();
-	termM0PrintString("Part 1\nLine 2\nLine 3\nLine 4 is very long");
-	termM0PrintString("\rMore text\nLine 5\n");
-	termM0PrintString("\nLine 6\r");
-	termM0PrintString("12346578901234657890123465789012\n");
-	termM0PrintString("\nABC");
-	termM0PrintString("\n123");
-	termM0PrintString(testString);
-	termM0PrintString(testString2);
-	*/
+	LoadVram(school_bin, 0x2000, (uint16_t) school_bin_size, 7);
+	LoadCGRam(school_pal, 0x00, sizeof(school_pal), something);
 	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr), 0); // Load BG Palette Data
 	LoadVram(biker_pic, 0x0000, sizeof(biker_pic), 7);
+	
+	//ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
+	//Initialise BG1's tilemap to incrementing tiles indexes bitmap
+	LoadVram(school_tilemap, BGTileLocation, sizeof(school_tilemap), 7);	
 	
 	//This seems correct to me but the compiler still spits out warnings.
 	pOAMCopy = (union uOAMCopy *) farcalloc(1,sizeof(union uOAMCopy));
@@ -98,20 +58,59 @@ void main(void){
 	pOAMCopy->Names.CHARNUM000 = 0;
 	pOAMCopy->Names.PROPERTIES000 = 0x70;
 	pOAMCopy->Names.OAMTABLE2BYTE00 = 0x54;
-	REG_OBJSEL = 0xA0;
-	REG_TM = 0x10;
-
 	
+	
+	REG_OBJSEL = 0xA0;
+	REG_TM = 0x11;
+	
+	REG_BGMODE  = 0x09;
+	//Tilemap offset
+	REG_BG1SC  = 0xFC;
+	REG_BG12NBA = 0x01;
+	
+	REG_BG1HOFS = 0x00;
+	REG_BG1HOFS = 0x00;
+	REG_BG1VOFS = 0x00;
+	REG_BG1VOFS = 0x00;	
+		
+	REG_NMITIMEN = 0x01;
 	REG_INIDISP = 0x0F;
 	while(1){
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
 		} while( (regRead1 > 0));
+		lastInputLo = REG_JOY1L;
+		lastInputHi = REG_JOY1H;
 		LoadOAMCopy(pOAMCopy->Bytes,0x0000,sizeof(union uOAMCopy),0);
-		//termM0PrintStringXY(testStringRam);
-		//sprintf(testStringRam,"Value: %06d\0",counter);
-		counter++;
-		pOAMCopy->Names.OBJ000Y = counter;
+		//Up
+		if (lastInputHi & 0x08){
+			spriteY--;
+			spriteY--;
+			spriteY--;
+			spriteY--;
+		}//Down
+		else if (lastInputHi & 0x04) {
+			spriteY++;
+			spriteY++;
+			spriteY++;
+			spriteY++;
+		}//Left
+		if (lastInputHi & 0x02) {
+			spriteX--;
+			spriteX--;
+			spriteX--;
+			spriteX--;
+		}//Right
+		else if (lastInputHi & 0x01) {
+			spriteX++;
+			spriteX++;
+			spriteX++;
+			spriteX++;
+		}//Idle
+		
+		pOAMCopy->Names.OBJ000X = spriteX;
+		pOAMCopy->Names.OAMTABLE2BYTE00 = (spriteX & 0x0100) >> 8;
+		pOAMCopy->Names.OBJ000Y = spriteY;
 	}
 }
 
@@ -208,7 +207,7 @@ void ButtonTest(void){
 		
 		regRead1 = REG_JOY1L;
 		regRead2 = REG_JOY1H;
-		if ( (REG_JOY1L != 0) || (REG_JOY1H != 0)){
+		if ( (regRead1 != 0) || (regRead2 != 0)){
 			REG_CGADD = 0x00;
 			REG_CGDATA = 0x1F;
 			REG_CGDATA = 0x00;				
@@ -254,4 +253,3 @@ void Mode0Text(){
 		//REG_INIDISP = 0x0F;
 	}
 }
-

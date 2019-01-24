@@ -17,4 +17,7 @@ int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize, int cChannel);
 int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize, int cChannel);				
+int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize, int cChannel);
+int initOAMCopy(unsigned char *pSource);
 #endif
