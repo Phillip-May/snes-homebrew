@@ -1,0 +1,140 @@
+Section CODE:
+	0006a000 _BEG_CODE
+	0006a000 ~~initSNES
+	0006a463 ~~LoadCGRam
+	0006a682 ~~LoadVram
+	0006a8a8 ~~LoadLoVram
+	0006a925 ~~ClearVram
+	0006aa0a ~~LoadOAMCopy
+	0006aa7c ~~initOAMCopy
+	0006ab07 ~~farcalloc
+	0006ab6f ~~farfree
+	0006ac68 ~~farmalloc
+	0006adac ~~farsbrk
+	0006ae00 ~~sprintf
+	0006ae71 ~~strcat
+	0006aebc ~~strcpy
+	0006aee1 ~~strlen
+	0006aeff ~~~asl
+	0006af07 ~~~div
+	0006af2b ~~~fmov
+	0006af4c ~~~fsw
+	0006af76 ~~~llsr
+	0006afa6 ~~~lmul
+	0006aff2 ~~~mod
+	0006b016 ~~~mul
+	0006b057 ~~~udv
+	0006b08b ~~_format
+	0006b873 ~~~ludv
+	0006b88d ~~~lumd
+	0006b8a2 ~~~swt
+	0006b8c3 ~~_flsbuf
+	0006bb6d ~~_getbuf
+	0006bc36 ~~malloc
+	0006bd13 ~~sbrk
+	0006bd61 ~~~comdiv
+	0006bda2 ~~_closeall
+	0006bde2 ~~fclose
+	0006bee5 ~~fflush
+	0006bf62 ~~free
+	0006c02b ~~~umd
+	0006c031 _END_CODE
+
+Section KDATA:
+	00048000 _BEG_KDATA
+	00048000 ~~school_bin_size
+	00048004 ~~school_bin
+	0004f004 ~~school_pal_size
+	0004f008 ~~school_pal
+	0004f028 ~~school_tilemap_size
+	0004f02c ~~school_tilemap
+	0004f771 _END_KDATA
+
+Section DATA:
+	007e2000 _BEG_DATA
+	007e2000 ~~testStringRam
+	007e202e ~~heap_start
+	007e2032 ~~heap_end
+	007e2036 ~~far_heap_start
+	007e203a ~~far_heap_end
+	007e2060 ~~_ctype
+	007e2161 ~~_iob
+	007e22f5 _END_DATA
+
+Section UDATA:
+	007e22f5 _BEG_UDATA
+	007e22f5 ~~_far_heap_top
+	007e22f9 ~~_far_mem_start
+	007e24fd ~~_heap_top
+	007e2501 ~~_close_stdio
+	007e2505 ~~_mem_start
+	007e2509 _END_UDATA
+
+Section bank0:
+	0c018000 _BEG_BANK0
+	0c018000 ~~testString
+	0c018028 ~~testString2
+	0c018050 ~~main
+	0c0182ca ~~IRQHandler
+	0c0182da ~~termM0PrintString
+	0c0184af _END_BANK0
+
+Section bank4:
+	00058000 _BEG_BANK4
+	00058000 ~~biker_pic_size
+	00058004 ~~biker_pic
+	00058804 ~~biker_clr_size
+	00058808 ~~biker_clr
+	00058828 _END_BANK4
+
+Section bank5:
+	00068000 _BEG_BANK5
+	00068000 ~~string1
+	00068010 ~~string2
+	00068031 ~~sFourHex
+	00068036 ~~sTwoHex
+	0006803b ~~string5
+	00068040 ~~sX
+	00068042 ~~sSpace
+	00068044 ~~SNESFONT_bin
+	0006843c ~~reverse
+	000684df ~~itoaNew
+	000685b2 ~~WaitVram
+	000685e2 ~~CrashHandler
+	00068879 ~~BGPAL
+	0006887d ~~BGCLEAR
+	0006887f ~~termM0Init
+	00068940 ~~termM0PrintStringXY
+	0006898e _END_BANK5
+
+Section startup:
+	00000000 _BEG_STARTUP
+	0000005f _END_STARTUP
+
+Section crashhook:
+	00000500 _BEG_CRASHHOOK
+	00000519 _END_CRASHHOOK
+
+Section registration_data:
+	00007fb0 _BEG_REGISTRATION_DATA
+	00007fdf _END_REGISTRATION_DATA
+
+Section vectors:
+	00007fe4 _BEG_VECTORS
+	00008000 _END_VECTORS
+
+Section filler:
+	0003ffff _BEG_FILLER
+	00040000 _END_FILLER
+
+ABSOLUTES:
+	00000000 START
+	00000049 IRQ
+	00000519 ~~unlink
+	00000519 ~~close
+	00000519 ~~open
+	00000519 ~~isatty
+	00000519 ~~write
+	00000519 ~~lseek
+	00000519 ~~ftod
+

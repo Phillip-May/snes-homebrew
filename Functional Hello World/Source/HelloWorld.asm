@@ -6,6 +6,7 @@
 arch snes.cpu
 output "../HelloWorld.sfc", create
 
+
 macro seek(variable offset) {
   origin ((offset & $7F0000) >> 1) | (offset & $7FFF)
   base offset
@@ -58,7 +59,7 @@ InputLoop:
   Left:
     ReadJOY({JOY_LEFT}) // Test LEFT Button
     beq Right           // IF (LEFT ! Pressed) Branch Down
-    //db 0x42, 0x00
+    db 0x42, 0x00
     jsl fCLEARTERM24BITS
     //db 0x42, 0x00
 
@@ -74,7 +75,7 @@ InputLoop:
 //Print stack to console in case of crash
 iCRASHHANDLER:
   mCALLPRINTTERM24BITS(CRASHMESSAGE)
-  db 0x42, 0x00
+  //db 0x42, 0x00
 
   CRASHHANG:
   nop
@@ -167,7 +168,7 @@ db 0x00
 db 0x00 //Null byte
 
 BANK3TEXTPART3:
-db "1B{"
+db "1B"
 db 0x00
 
 BANK3TEXTPART4:

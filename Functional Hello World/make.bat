@@ -1,1 +1,1 @@
-bass Source/HelloWorld.asm
+arm9bass Source/HelloWorld.asm

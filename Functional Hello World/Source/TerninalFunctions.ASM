@@ -599,7 +599,7 @@ fPrintString24:
   //Shitty insert
   //Print 32 spaces which don't matter because the cursor will write over them anywa
   pha
-  db 0x42, 0x00
+  //db 0x42, 0x00
   ldx TermPrivate.ASCII32SPACES
   lda #0x0032
   jsl fPRINTTERM24BITS

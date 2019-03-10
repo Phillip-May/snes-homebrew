@@ -1,0 +1,16 @@
+
+Section: ORG:    ROM ORG:  SIZE:
+CODE     06A000  032000     2031H (  8241)
+KDATA    048000  020000     7771H ( 30577)
+DATA     7E2000  018000      2F5H (   757)
+UDATA    7E22F5  ------      214H (   532)
+bank0    C018000  008000      4AFH (  1199)
+bank4    058000  028000      828H (  2088)
+bank5    068000  030000      98EH (  2446)
+startup  000000  000000       5FH (    95)
+crashhoo 000500  000500       19H (    25)
+registra 007FB0  007FB0       2FH (    47)
+vectors  007FE4  007FE4       1CH (    28)
+filler   03FFFF  03FFFF        1H (     1)
+Total                       B3D4H ( 46036)
+

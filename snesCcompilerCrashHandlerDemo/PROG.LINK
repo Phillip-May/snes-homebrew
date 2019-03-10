@@ -1,0 +1,12 @@
+-Abank0=C018000,008000
+
+
+-Abank3=048000,020000
+-Abank4=058000,028000
+-Abank5=068000,030000
+-Abank6=078000,038000
+
+
+-C018000,008000 mainBankZero.obj imagedata.obj
+-C06A000,032000 CrashHandler.obj lib\kernel.obj lib\initsnes.obj vectors.obj
+-D7E2000,18000 -K048000,20000 -Lcl
