@@ -436,20 +436,15 @@ static const unsigned char BGTILESM7[16384UL + 1] = {
   0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00
 };
 
-uint16_t multiply8bit(uint8_t m, uint8_t n) {
-	uint16_t temp;
-	REG_WRMPYA = m;
-	REG_WRMPYB = n;
-	//4 cycle wait
-	asm {
-		nop
-		nop
-		nop
-		nop
-	}
-	temp = REG_RDMPY;
-	return temp;
-}
+//Globals for rendeirng
+unsigned char *tileMirrorMaster;
+unsigned char *tileMirrorRender;
+unsigned char *tileMirrorA;
+unsigned char *tileMirrorB;
+uint8_t cur_Frame = 0;
+uint8_t cur_Mirror = 0;
+uint8_t renderDone = 0;
+
 
 //X ranges from 0 to 127
 //y ranges from 0 to 127
@@ -465,9 +460,12 @@ int PlotPixelFromXY (int inp_x, int inp_y, int RGBValue) {
 	
 	//Plot x coords
 	var_A = inp_x + var_A;
-	REG_VMADD = var_A;
+	//Direct hardware acess
+	//REG_VMADD = var_A;
 	//This is either an entry into 8 bit pallete or direct colour RGB value
-	REG_VMDATAL = RGBValue;
+	//REG_VMDATAL = RGBValue;
+	//Mirror write
+	tileMirrorRender[var_A] = RGBValue;
 	
 	return 0;
 }
@@ -489,6 +487,8 @@ int PlotLineXYToXY(int x0, int y0, int x1, int y1, int RGBValue)
 	}
 	return 0;
 }
+
+char *stringa1;
 
 int mode7Init() {
 	LoadCGRam(BGPALMODE7, 0x00, 4, 0); // Load Background Palette (BG Palette Uses 256 Colors)
@@ -528,15 +528,19 @@ int mode7Init() {
 	//Enable direct colour
 	REG_CGWSEL = 0x01;
 	
+	//Setup mirror in ram
+	tileMirrorA = (unsigned char *) calloc( 0x4000,1 );
+	tileMirrorB = (unsigned char *) calloc( 0x4000,1 );
+	tileMirrorMaster = tileMirrorA;
+	tileMirrorRender = tileMirrorB;
 	
-	/*
-	PlotPixelFromXY(20,68);
-	PlotPixelFromXY(40,88);
-	PlotPixelFromXY(60,98);
-	PlotPixelFromXY(80,108);
-	PlotPixelFromXY(100,120);
-	PlotPixelFromXY(127,127);
-	*/
+	stringa1 = (char*) malloc((20+1)*sizeof(char)); /*+1 for '\0' character */
+	stringa1[0] = 'A';
+	stringa1[1] = 'A';
+	stringa1[2] = 'D';
+	stringa1[3] = 'D';
+	stringa1[4] = 'E';
+	
 	//PlotLineXYToXY(10,10,20,20,0x0F);
 	
 	return 0;
@@ -544,6 +548,8 @@ int mode7Init() {
 
 uint8_t fRendering = 0;
 uint8_t xOffset = 10;
+uint8_t yOffset = 10;
+
 
 int M7DemoMain() {
 	int8_t regRead1; //Variable for storing hardware registers
@@ -551,20 +557,27 @@ int M7DemoMain() {
 	uint8_t lastInputLo;
 	uint8_t lastInputHi;
 	
+	tileMirrorRender = tileMirrorA;
 	PlotLineXYToXY(0,0,127,127,0x0F);
+	tileMirrorRender = tileMirrorB;
+	PlotLineXYToXY(0,0,127,127,0x0F);
+	//Re init
+	tileMirrorMaster = tileMirrorA;
+	tileMirrorRender = tileMirrorB;
+	
 	
 	//This was not in the example but was in the programmers manual
 	REG_JOYWR = 0x00;
 	//Enalbe joypad and VBlank interrupts
 	REG_NMITIMEN = 0x81;
+	
 	REG_INIDISP = 0x0F;
 	
 	while(1){
-		/*
+		
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
 		} while( (regRead1 > 0));
-		*/
 		
 		//Higan specific feature!
 		do{ //Wait for RegisterReadFlag
@@ -574,10 +587,11 @@ int M7DemoMain() {
 		lastInputLo = REG_JOY1L;
 		lastInputHi = REG_JOY1H;	
 		
-		//Input processing part
 		if (lastInputHi & 0x08){
+			yOffset--;
 		}//Down
 		else if (lastInputHi & 0x04) {
+			yOffset++;
 		}//Left
 		if (lastInputHi & 0x02) {
 			xOffset--;
@@ -586,14 +600,14 @@ int M7DemoMain() {
 			xOffset++;
 		}//Idle
 		
+		
+		while (renderDone == 1) {
+		}
 		//Rendering part
-		//PlotLineXYToXY(xOffset,10,20,20,0x0F);
-		asm {
-			WAI
-		}
-		asm {
-			BYTE $42, $00
-		}
+		memset(tileMirrorRender,0x0000,0x4000); //Integers not bytes so 0x4000/2
+		PlotLineXYToXY(xOffset,yOffset,127,127,0x0F);	
+		renderDone = 1;
+	
 		
 	}
 	return 0;
@@ -602,50 +616,43 @@ int M7DemoMain() {
 int readDummy;
 
 //This will need to copy from a buffer to VRAM
-void far IRQHandler(void){
-	static int curFrame = 0;
-	//Clear interrupt flag
-	ClearLoVram(BGTILESM7, 0x0000, 16384, 0); // Clear Background Map In VRAM To Static Byte
+void far IRQHandler(void){	
 	
-	if (curFrame == 0) {
-		curFrame = 1;
+	//0x1700 twice then 1200
+	//The above is no longer true with c overhead
+	
+	if (cur_Frame == 0) {
+		LoadLoVram(tileMirrorMaster, 0x0000, 0x1600, 0);  // Load Background Tiles To VRAM
+		cur_Frame = 1;
 	}
-	else if (curFrame == 1) {
-		curFrame = 0;
+	else if (cur_Frame == 1) {
+		LoadLoVram(tileMirrorMaster+0x1600, 0x1600*2, 0x1500, 0);  // Load Background Tiles To VRAM
+		cur_Frame = 2;
 	}
-
-	readDummy = REG_TIMEUP;
-}
-
-//Don't use, this gives the wrong answer sometimes with negative numbers
-//Also a bnunch of other mode 7 restrictions apply
-// Multiply 16-bit integers using 8-bit multiplier
-int32_t multiply16bit(int m, int n)
-{
-	int32_t result;
-	int32_t result1;
-	int32_t result2;
-	int32_t result3;
-	int32_t result4;
-	int32_t result5;
-	
-	
-    uint8_t mLow = (m & 0x00FF);            // stores first 8-bits of m
-    uint8_t mHigh = (m & 0xFF00) >> 8;    // stores last 8-bits of m
- 
-    uint8_t nLow = (n & 0x00FF);            // stores first 8-bits of n
-    uint8_t nHigh = (n & 0xFF00) >> 8;    // stores last 8-bits of n
- 
-    int32_t mLow_nLow = multiply8bit(mLow, nLow);
-    int32_t mHigh_nLow = multiply8bit(mHigh, nLow);
-    int32_t mLow_nHigh = multiply8bit(mLow, nHigh);
-    int32_t mHigh_nHigh = multiply8bit(mHigh, nHigh);
- 
-    // return 32-bit result (don't forget to shift mHigh_nLow and
-    // mLow_nHigh by 1 byte and mHigh_nHigh by 2 bytes)
-	//result = mLow_nLow + ((mHigh_nLow + mLow_nHigh) << 8) + 
-    //        (mHigh_nHigh << 16);
+	else if (cur_Frame == 2) {
+		LoadLoVram(tileMirrorMaster+0x2B00, 0x2B00*2, 0x1500, 0);  // Load Background Tiles To VRAM
+		if (renderDone == 1) {
+			asm {
+				BYTE $42, $00;
+			}
+			renderDone = 0;
+			if ( (cur_Mirror == 0) ) {
+				cur_Mirror = 1;
+				tileMirrorMaster = tileMirrorA;
+				tileMirrorRender = tileMirrorB;
+			}
+			else {
+				cur_Mirror = 0;
+				tileMirrorMaster = tileMirrorB;
+				tileMirrorRender = tileMirrorA;
+			}	
+		}
 		
-    return (mLow_nLow) + (((mHigh_nLow) + (mLow_nHigh)) << 8) + 
-            ((mHigh_nHigh) << 16);
+		cur_Frame = 0;
+	}
+	
+	
+	
+	//Clear interrupt flag
+	readDummy = REG_TIMEUP;
 }
