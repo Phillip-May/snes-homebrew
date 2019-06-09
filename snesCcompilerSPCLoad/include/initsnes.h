@@ -20,5 +20,8 @@ int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize, int cChannel);
 int initOAMCopy(unsigned char *pSource);
+//SPC700
 int SPCWaitBoot(void);
+int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t size);
+
 #endif

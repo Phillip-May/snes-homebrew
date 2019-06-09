@@ -465,3 +465,48 @@ int SPCWaitBoot() {
 	}
 	return 0;
 }
+
+int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t size) {
+	uint8_t dummyRead;
+	uint16_t byteWrite;
+	uint16_t byteWriteIndex = 0;
+	
+	REG_APUIO2 = SPCDestAddr;
+	dummyRead = REG_APUIO0;
+	dummyRead += 0x22;
+	//Special case
+	if (dummyRead == 0) {
+		dummyRead++;
+	}
+	REG_APUIO1 = dummyRead;
+	REG_APUIO0 = dummyRead;
+	//Wait for Acknowledgement
+	do {
+		dummyRead = REG_APUIO0;
+	} while (dummyRead != 0);
+	
+	do {
+		byteWrite = *srcAddr;
+		srcAddr++;
+		//SPCLoadByte
+		REG_APUIO1 = byteWrite;
+		REG_APUIO0 = byteWriteIndex;
+		byteWriteIndex++;
+		//Wait for Acknowledgement
+		do {
+			dummyRead = REG_APUIO0;
+		} while (dummyRead != 0);
+	} while (byteWriteIndex != size);
+	
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+

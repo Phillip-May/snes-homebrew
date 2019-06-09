@@ -1,5 +1,4 @@
-#define MY_REGISTER (*(volatile uint32_t*)0x7E2004u)
-typedef	unsigned char byte;
+#pragma section CODE=BANK1
 //LoROM mememory map
 
 
@@ -14,31 +13,33 @@ typedef	unsigned char byte;
 #include "include\SNES.h"
 #include "include\initsnes.h"
 
-extern uint32_t SNESFONT_bin;
-extern uint32_t END_SNESFONT_bin;
+extern far unsigned char SNESFONT_bin[];
+extern far unsigned char END_SNESFONT_bin[];
+extern far unsigned char TestInsert[];
 
 void main(void){
 	//Variables
 	int8_t regRead1; //Variable for storing hardware registers
 	int8_t regRead2; //Variable for storing hardware registers
 	uint32_t regTest;
-	
+	unsigned char testChar;
+		
 	//Initialization
 	//Initialize the stack
-	initSNES(SLOWROM);	
+	initSNES(SLOWROM);		
 	termM0Init();
 	
-	REG_INIDISP = 0x0F;
-	
-	regTest = (uint32_t) SNESFONT_bin;
+	//regTest = END_SNESFONT_bin-SNESFONT_bin;
+	regTest = (uint32_t)SNESFONT_bin;
 	
 	do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
-		} while( (regRead1 > 0));
+	} while( (regRead1 > 0));
 	termM0PrintStringXY("Waiting for SPC700 to boot....",0,1);
 	SPCWaitBoot();
 	termM0PrintStringXY("SPC700 booted",0,2);
 	
+	REG_INIDISP = 0x0F;
 	
 	for (;;) {
 		do{ //Wait for Vblank
@@ -55,8 +56,11 @@ void far IRQHandler(void){
 int termM0Init(void){	
 	const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F};
 	const unsigned char BGCLEAR[] = {0x20, 0x00};
+	uint16_t transferSize;
+	transferSize = ((uint32_t)&END_SNESFONT_bin)-((uint32_t)&SNESFONT_bin);
+	transferSize = 1016;
 	LoadCGRam(BGPAL, 0x00, 4, 0); // Load BG Palette Data
-	LoadLoVram((char *)SNESFONT_bin, 0x0000,((uint16_t)SNESFONT_bin)-((uint16_t)END_SNESFONT_bin), 7);
+	LoadLoVram((char *)&SNESFONT_bin, 0x0000,(uint16_t) ((uint32_t)END_SNESFONT_bin)-((uint32_t)SNESFONT_bin), 7);
     ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
 	
 	REG_BGMODE  = 0x08;
