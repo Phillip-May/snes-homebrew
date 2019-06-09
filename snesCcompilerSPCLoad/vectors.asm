@@ -17,7 +17,6 @@ STARTUP SECTION OFFSET $000000,$008000
 	;External C function names
     .xref    ~~NmiHandler
     .xref    ~~IrqHandler
-	.xref	 ~~CrashHandler
     .xref    ~~main
 
 	XDEF  	START
@@ -96,10 +95,9 @@ START:
 		XDEF  	IRQ
 		XREF	~~IRQHandler
 IRQ:	
-	php
 	LONGA	ON
 	LONGI	ON
-	rep     #$30
+	rep	#$30
 	pha
 	phx
 	phy
@@ -107,39 +105,9 @@ IRQ:
 	ply
 	plx
 	pla
-	plp
 	rti
 
 DIRQ:
-	BYTE $42, $01
-	BYTE $42, $02
-	BYTE $42, $03
-	rti
-	
-CRASHHOOK	SECTION OFFSET $000500
-
-CRASH:
-	;BYTE	$42, $00
-	php
-	LONGA	ON
-	LONGI	ON
-	rep     #$30
-	pha
-	
-	;Push ASCII End
-	lda #$2164
-	pha
-	lda #$6e45
-	pha
-	
-	;Push the stack pointer up 0x500 bytes so that I can don't break the old stuff
-	tsc
-	pha
-	sbc #$0500
-	tcs
-		
-	
-	jmp	>~~CrashHandler	
 	rti
 	
 	XREF CONST_ZERO
@@ -191,26 +159,27 @@ CHEKSUM				BYTE	$00, $00
 ;******************************************************************************
 ;*** SNES Interrupts and Reset vector                                       ***
 ;******************************************************************************
+
 VECTORS	SECTION OFFSET $007FE4
 
-N_COP   DW   ($8000+CRASH)
-N_BRK   DW   ($8000+CRASH)
-N_ABORT DW   ($8000+CRASH)
-N_NMI   DW   ($8000+IRQ)
-N_RSRVD DW   ($8000+CRASH)
-N_IRQ   DW   ($8000+DIRQ)
+N_COP   DW   DIRQ
+N_BRK   DW   DIRQ
+N_ABORT DW   DIRQ        
+N_NMI   DW   DIRQ
+N_RSRVD DW   DIRQ
+N_IRQ   DW   IRQ
         DS   4
-E_COP   DW   ($8000+CRASH)
-E_RSRVD DW   ($8000+CRASH)
-E_ABORT DW   ($8000+CRASH)
-E_NMI   DW   ($8000+IRQ)
+E_COP   DW   DIRQ
+E_RSRVD DW   DIRQ
+E_ABORT DW   DIRQ
+E_NMI   DW   DIRQ
 E_RESET DW   $8000
-E_IRQ   DW   ($8000+DIRQ)
+E_IRQ   DW   DIRQ
 
 ;This is to inflate the file size to the nearest bank because snes9x hates
 ;Non standard roms. The actual ROM chip would have extra empty space so the binary
 ;Should as well.
-FILLER	SECTION OFFSET $03FFFF
+FILLER	SECTION OFFSET $02FFFF
 FILLERBYTE byte $00
 
 END

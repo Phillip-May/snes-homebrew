@@ -20,11 +20,5 @@ int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize, int cChannel);
 int initOAMCopy(unsigned char *pSource);
-
-int ClearLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel);
-
-int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel);			 
-			 
+int SPCWaitBoot(void);
 #endif

@@ -11,11 +11,8 @@
 void initSNES(uint8_t RomSpeed){
 
 	int i;
-	int cCONSTZERO;
-	int* pCONSTZERO;
-	cCONSTZERO = 0;
-	pCONSTZERO = &cCONSTZERO;
-	
+	int cCONSTZERO = 0;
+	int* pCONSTZERO = &cCONSTZERO;
 	REG_MEMSEL = RomSpeed;  // Access Cycle Designation (Slow ROM / Fast ROM)
 
 	REG_INIDISP = 0x8F;// Display Control 1: Brightness & Screen Enable Register ($2100)
@@ -262,7 +259,7 @@ int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination, uint16_t
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
 //Load Data into Vram, using DMA channel 0
-int LoadVram(uint32_t pSource, uint16_t pVRAMDestination,
+int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 			 uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
@@ -352,7 +349,7 @@ int LoadVram(uint32_t pSource, uint16_t pVRAMDestination,
 //      DEST: 16-Bit VRAM Destination (WORD Address)
 // SIZETILES: Size Of Tile Data (BYTE Size)
 //      CHAN: DMA Channel To Transfer Data (0..7)
-int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+int LoadLoVram(uint32_t pSource, uint16_t pVRAMDestination,
 			 uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
@@ -362,57 +359,6 @@ int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
 	REG_DMAP7 = 0x00;
-	REG_BBAD7 = 0x18;
-	REG_A1T7 = regWrite1;
-	REG_A1B7 = regWrite2;
-	REG_DAS7 = cSize;
-	REG_MDMAEN = 0x80;
-	return 0;
-}
-
-//=============================================
-// LoadHIVRAM - Load GFX Data To VRAM Hi Bytes
-//=============================================
-//  SRCTILES: 24-Bit Address Of Source Tile Data
-//      DEST: 16-Bit VRAM Destination (WORD Address)
-// SIZETILES: Size Of Tile Data (BYTE Size)
-//      CHAN: DMA Channel To Transfer Data (0..7)
-int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
-	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
-	REG_VMAIN = 0x80;
-	REG_VMADD = (pVRAMDestination >> 1);
-	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	
-	REG_DMAP7 = 0x00;
-	REG_BBAD7 = 0x19;
-	REG_A1T7 = regWrite1;
-	REG_A1B7 = regWrite2;
-	REG_DAS7 = cSize;
-	REG_MDMAEN = 0x80;
-	return 0;
-}
-
-
-//========================================
-// ClearLOVRAM - Clear VRAM Lo Fixed Byte
-//========================================
-//  SRC: 24-Bit Address Of Source Data
-// DEST: 16-Bit VRAM Destination (WORD Address)
-// SIZE: Size Of Data (BYTE Size)
-// CHAN: DMA Channel To Transfer Data (0..7)
-int ClearLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
-	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
-	REG_VMAIN = 0x00;
-	REG_VMADD = (pVRAMDestination >> 1);
-	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	
-	REG_DMAP7 = 0x08;
 	REG_BBAD7 = 0x18;
 	REG_A1T7 = regWrite1;
 	REG_A1B7 = regWrite2;
@@ -509,7 +455,6 @@ int initOAMCopy(unsigned char *pSource){
 }
 
 //SPC700 stuff
-
 int SPCWaitBoot() {
 	uint8_t reg1 = 0x00;
 	uint8_t reg2 = 0x00;
@@ -520,11 +465,3 @@ int SPCWaitBoot() {
 	}
 	return 0;
 }
-
-
-
-
-
-
-
-
