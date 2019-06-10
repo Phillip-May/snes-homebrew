@@ -15,6 +15,10 @@
 
 extern far unsigned char SNESFONT_bin[];
 extern far unsigned char END_SNESFONT_bin[];
+
+extern far unsigned char SPC700Code[];
+extern far unsigned char END_SPC700Code[];
+
 extern far unsigned char TestInsert[];
 
 void main(void){
@@ -29,6 +33,8 @@ void main(void){
 	initSNES(SLOWROM);		
 	termM0Init();
 	
+	REG_INIDISP = 0x0F;
+
 	//regTest = END_SNESFONT_bin-SNESFONT_bin;
 	regTest = (uint32_t)SNESFONT_bin;
 	
@@ -38,8 +44,16 @@ void main(void){
 	termM0PrintStringXY("Waiting for SPC700 to boot....",0,1);
 	SPCWaitBoot();
 	termM0PrintStringXY("SPC700 booted",0,2);
-	
-	REG_INIDISP = 0x0F;
+	TransferBlockSPC(SPC700Code,0x0200,(uint16_t) ((uint32_t)END_SPC700Code)-((uint32_t)SPC700Code));
+	do{ //Wait for Vblank
+		regRead1 = REG_RDNMI;
+	} while( (regRead1 > 0));
+	termM0PrintStringXY("Program transfered",0,3);
+	SPCExecute(0x0200);
+	do{ //Wait for Vblank
+		regRead1 = REG_RDNMI;
+	} while( (regRead1 > 0));
+	termM0PrintStringXY("Program started",0,4);
 	
 	for (;;) {
 		do{ //Wait for Vblank

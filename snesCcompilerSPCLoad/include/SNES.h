@@ -203,10 +203,16 @@ typedef volatile uint16_t vu16;
 #define REG_STAT78  (*(vu8*)0x213F) // fl-p vvvv, if p is 1 then PAL else NTSC
 
 //SPC700 IO
-#define REG_APUIO0  (*(vu8*)0x2140) // Always write to $2140 / $2141 with 8-bit writes
-#define REG_APUIO1  (*(vu8*)0x2141) // 
-#define REG_APUIO2  (*(vu8*)0x2142) // 
-#define REG_APUIO3  (*(vu8*)0x2143) // 
+#define REG_APUIO0BYTE  (*(vu8*)0x2140) // Always write to $2140 / $2141 with 8-bit writes
+#define REG_APUIO1BYTE  (*(vu8*)0x2141) // 
+#define REG_APUIO2BYTE  (*(vu8*)0x2142) // 
+#define REG_APUIO3BYTE  (*(vu8*)0x2143) // 
+
+#define REG_APUIO0WORD  (*(vu16*)0x2140) // Always write to $2140 / $2141 with 8-bit writes
+#define REG_APUIO1WORD  (*(vu16*)0x2141) // 
+#define REG_APUIO2WORD  (*(vu16*)0x2142) // 
+#define REG_APUIO3WORD  (*(vu16*)0x2143) // 
+
 
 //WRAM B-bus registers
 #define REG_WMDATA  (*(vu8*)0x2180) // Read/write to/from WRAM on B bus (fast access), one byte at a time

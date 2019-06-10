@@ -460,46 +460,75 @@ int SPCWaitBoot() {
 	uint8_t reg2 = 0x00;
 	
 	while ( (reg1 != 0xAA) && (reg1 != 0xBB) ) {
-		reg1 = REG_APUIO0;
-		reg2 = REG_APUIO1;
+		reg1 = REG_APUIO0BYTE;
+		reg2 = REG_APUIO1BYTE;
 	}
 	return 0;
 }
 
 int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t size) {
 	uint8_t dummyRead;
+	uint8_t dummyRead2;
 	uint16_t byteWrite;
+	uint8_t *localPointer;
+	//The counter to assure each byte was transfered correctly
+	//This lower 8 bits as a counter while the upper 16 bits are the index
 	uint16_t byteWriteIndex = 0;
 	
-	REG_APUIO2 = SPCDestAddr;
-	dummyRead = REG_APUIO0;
+	localPointer = (uint8_t *)srcAddr;
+	
+	REG_APUIO2WORD = SPCDestAddr;
+	dummyRead = REG_APUIO0BYTE;
 	dummyRead += 0x22;
 	//Special case
 	if (dummyRead == 0) {
 		dummyRead++;
 	}
-	REG_APUIO1 = dummyRead;
-	REG_APUIO0 = dummyRead;
+	REG_APUIO1BYTE = dummyRead;
+	REG_APUIO0BYTE = dummyRead;
+	
 	//Wait for Acknowledgement
 	do {
-		dummyRead = REG_APUIO0;
-	} while (dummyRead != 0);
+		dummyRead2 = REG_APUIO0BYTE;
+	} while (dummyRead2 != dummyRead);
 	
-	do {
-		byteWrite = *srcAddr;
-		srcAddr++;
+	do {		
+		byteWrite = *localPointer;
+		localPointer++;
 		//SPCLoadByte
-		REG_APUIO1 = byteWrite;
-		REG_APUIO0 = byteWriteIndex;
-		byteWriteIndex++;
+		REG_APUIO1BYTE = byteWrite;
+		REG_APUIO0BYTE = byteWriteIndex;
 		//Wait for Acknowledgement
 		do {
-			dummyRead = REG_APUIO0;
-		} while (dummyRead != 0);
-	} while (byteWriteIndex != size);
+			dummyRead2 = REG_APUIO0BYTE;
+		} while (dummyRead2 != ((uint8_t)byteWriteIndex) );
+		byteWriteIndex++;
+	} while (byteWriteIndex != size);	
 	
 	return 0;
 }
+
+int SPCExecute(uint16_t startAddr) {
+	uint16_t dummyX;
+	uint8_t dummyA;
+	uint8_t dummyRead;
+	
+	dummyX = startAddr;
+	REG_APUIO2WORD = dummyX;
+	REG_APUIO1BYTE = 0;
+	dummyA = REG_APUIO0BYTE;
+	dummyA += 0x22;
+	REG_APUIO0BYTE = dummyA;
+	//Wait for Acknowledgement
+	do {
+		dummyRead = REG_APUIO0BYTE;
+	} while (dummyA != dummyRead);
+	
+	return 0;
+}
+
+
+
 
 
 
