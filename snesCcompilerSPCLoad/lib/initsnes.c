@@ -471,6 +471,9 @@ int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t siz
 	uint8_t dummyRead2;
 	uint16_t byteWrite;
 	uint8_t *localPointer;
+	uint16_t i;
+		
+	
 	//The counter to assure each byte was transfered correctly
 	//This lower 8 bits as a counter while the upper 16 bits are the index
 	uint16_t byteWriteIndex = 0;
@@ -478,9 +481,13 @@ int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t siz
 	localPointer = (uint8_t *)srcAddr;
 	
 	REG_APUIO2WORD = SPCDestAddr;
+	
 	dummyRead = REG_APUIO0BYTE;
 	dummyRead += 0x22;
-	//Special case
+	//dummyRead = 0xCC
+	
+	//Special case, increment by 2 or more on the counter to break sequence
+	//If 0 increment 1 more as value must be non-zero
 	if (dummyRead == 0) {
 		dummyRead++;
 	}
@@ -488,22 +495,21 @@ int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t siz
 	REG_APUIO0BYTE = dummyRead;
 	
 	//Wait for Acknowledgement
-	do {
-		dummyRead2 = REG_APUIO0BYTE;
-	} while (dummyRead2 != dummyRead);
+	while (REG_APUIO0BYTE != ((uint8_t)dummyRead) ) {}
 	
-	do {		
-		byteWrite = *localPointer;
-		localPointer++;
-		//SPCLoadByte
-		REG_APUIO1BYTE = byteWrite;
-		REG_APUIO0BYTE = byteWriteIndex;
-		//Wait for Acknowledgement
-		do {
-			dummyRead2 = REG_APUIO0BYTE;
-		} while (dummyRead2 != ((uint8_t)byteWriteIndex) );
-		byteWriteIndex++;
-	} while (byteWriteIndex != size);	
+	for (i = 0; i < size; i++) {
+		//Copy byte
+		REG_APUIO1BYTE = localPointer[i];
+		//Increment counter
+		REG_APUIO0BYTE = i;	//Lower 8 bits
+		while (REG_APUIO0BYTE != ((uint8_t)i) ) {}
+		//Wait for counter to reflect back
+	}
+	
+	//The other bug mentioned in the manual about too big a delay
+	//is caused by their stupid transfer routine not exiting sometimes due
+	//to the data exit code being 0x0000. Their fault and our reverse engineering
+	//has bypassed the problem.
 	
 	return 0;
 }
@@ -513,16 +519,27 @@ int SPCExecute(uint16_t startAddr) {
 	uint8_t dummyA;
 	uint8_t dummyRead;
 	
+	uint16_t varStall = 0;
+	uint16_t debug = 0;
+	
 	dummyX = startAddr;
 	REG_APUIO2WORD = dummyX;
 	REG_APUIO1BYTE = 0;
+	//Read previous counter value
 	dummyA = REG_APUIO0BYTE;
-	dummyA += 0x22;
+	//Add more than 1
+	dummyA += 0x02;
+	
+	//Write back
 	REG_APUIO0BYTE = dummyA;
+	
+	//Wait for value to be echoed
+	//This can fail if the spc700 program modifies the port before it's read.
 	//Wait for Acknowledgement
 	do {
 		dummyRead = REG_APUIO0BYTE;
 	} while (dummyA != dummyRead);
+	
 	
 	return 0;
 }
