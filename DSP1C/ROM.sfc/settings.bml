@@ -1,0 +1,8 @@
+node: Peripheral
+  name: Super Famicom
+  attribute
+    name: location
+    value: C:/Users/Phillip/Emulation/Super Famicom/ROM.sfc/
+  attribute
+    name: name
+    value: ROM.sfc

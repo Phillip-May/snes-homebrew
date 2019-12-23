@@ -1,0 +1,10 @@
+endian lsb
+
+cmd_nop                    ;$00 $00 $00
+op24BitAdd *24         ; =a
+op16BitAdd *16         ; =a
+op8BitAdd  *08         ; =a
+
+op24BitConst #*24      ;~a
+op16BitConst #*16      ;~a
+op08BitConst #*08      ;~a
