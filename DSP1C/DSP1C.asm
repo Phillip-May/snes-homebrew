@@ -123,20 +123,22 @@ constant JRQM   = %010111110
 //I tried to use the table driven assembler and failed so I used macros
 macro writeJP(branchCmd,address) {
     variable finalOpcode = 0
+	variable realAddress
 	//Bits 23 and 22 for jump
 	finalOpcode = finalOpcode + (%10 << 22)
 	//Jump condition bits 21 to 13
 	finalOpcode = finalOpcode + ({branchCmd} << 13)
 	//Add address, check for overflow
-	if {address} > 0x1FF {
+	realAddress = {address} / 3
+	if realAddress > 0x1FF {
 		error "Address overflow"
 	}
-	finalOpcode = finalOpcode + ({address} << 2)
+	finalOpcode = finalOpcode + (realAddress << 2)
 	op24BitConst #finalOpcode
 }
 
 //I tried to use the table driven assembler and failed so I used macros
-macro writeOPRT(opcode,pSelect,ALU,ASL,DPL,DPH,RPDCR,SRC,DST) {
+macro writeOPRT(opcode,pSelect,ALU,ASL,DPL,DPH,RPDCR,DST,SRC) {
     variable finalOpcode = 0
 	//Bits 23 and 22 for OP/RT
 	finalOpcode = finalOpcode + (%00 << 22)
@@ -174,16 +176,12 @@ macro writeLD(ld_DST,ld_Data) {
 	op24BitConst #finalOpcode
 }
 
-macro writeOP(pSelect,ALU,ASL,DPL,DPH,RPDCR,SRC,DST) {
-    writeOPRT(%00,{pSelect},{ALU},{ASL},{DPL},{DPH},{RPDCR},{SRC},{DST})
+macro writeOP(pSelect,ALU,ASL,DPL,DPH,RPDCR,DST,SRC) {
+    writeOPRT(%00,{pSelect},{ALU},{ASL},{DPL},{DPH},{RPDCR},{DST},{SRC})
 }
 
-macro writeRT(pSelect,ALU,ASL,DPL,DPH,RPDCR,SRC,DST) {
-    writeOPRT(%01,{pSelect},{ALU},{ASL},{DPL},{DPH},{RPDCR},{SRC},{DST})
-}
-
-macro jrqm(address) {
-	writeJP(JRQM,{address})
+macro writeRT(pSelect,ALU,ASL,DPL,DPH,RPDCR,DST,SRC) {
+    writeOPRT(%01,{pSelect},{ALU},{ASL},{DPL},{DPH},{RPDCR},{DST},{SRC})
 }
 
 //Notes
@@ -194,8 +192,42 @@ macro jrqm(address) {
 
 origin 0x0000
 
-jrqm(0x00)
+initStall:
+writeJP(JRQM,initStall) //Wait for previous transfer to end
 writeLD(dst_SR,0x0400) //Set serial input data to 1, 8 bit transfers
-writeLD(dst_DR,0x00BC) //Set serial input data to 1, 8 bit transfers
+writeLD(dst_DR,0x0080) //Write 8 bit data to the data register for transfer
+writeLD(dst_DR,0x0080) //Write 8 bit data to the data register for transfer
+Stall2:
+writeJP(JRQM,Stall2) //Wait for previous transfer to end
+
+writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
+writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_A,src_DR)
+writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 Stall:
+writeOP(IDB,INC,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
+writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 writeJP(JMP,Stall)
+//Test commands
+//writeJP(JRQM,0x1AC) //Wait for previous transfer to end
+writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
+//writeOP(RAM,INC,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
