@@ -36,10 +36,11 @@ void main(void){
 	char displayString5[40] = "5";
 	
 	
-	uint8_t DSPCommandCode = 0x10;
-	uint16_t DSPparameter1 = 1;
-	uint16_t DSPparameter2 = 6;
-	uint16_t DSPresult = 0x11;	
+	uint8_t DSPCommandCode = 0x01;
+	uint16_t DSPparameter1 = 501;
+	uint16_t DSPparameter2 = 801;
+	uint16_t DSPresult = 0x11;
+	uint16_t DSPresult2 = 0x22;
 	uint16_t  DSPStatus = 0xAA;
 	
 
@@ -102,26 +103,30 @@ void main(void){
 	
 	DSPStatus = DSP1_SR_8;
 	DSP1_DR_8 = DSPCommandCode;
-	
-	//Pointless stall code
 	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[1] = *((&MSU_ID)+1);
-	szMSU1Check[2] = *((&MSU_ID)+2);
-	szMSU1Check[3] = *((&MSU_ID)+3);
-	szMSU1Check[4] = *((&MSU_ID)+4);
-	szMSU1Check[5] = *((&MSU_ID)+5);
-	szMSU1Check[6] = *((&MSU_ID)+6);
-	szMSU1Check[7] = 0;
+	szMSU1Check[0] = MSU_ID;
+	szMSU1Check[0] = MSU_ID;
+	DSP1_DR_16 = DSPparameter1;
+	szMSU1Check[0] = MSU_ID;
+	szMSU1Check[0] = MSU_ID;
+	szMSU1Check[0] = MSU_ID;	
+	DSP1_DR_16 = DSPparameter2;
+	//Stall
+	szMSU1Check[0] = MSU_ID;
+	szMSU1Check[0] = MSU_ID;
+	szMSU1Check[0] = MSU_ID;
+	szMSU1Check[0] = MSU_ID;
 	
-	DSPresult = DSP1_DR_16;
+	DSPresult  = DSP1_DR_16;
+	DSPresult2 = DSP1_DR_16;
 	
 	for (;;) {
 		sprintf(displayString1,"Parameter 1: 0x%4x    ",DSPparameter1);
 		sprintf(displayString2,"Parameter 2: 0x%4x    ",DSPparameter2);
 		sprintf(displayString3,"DSPCommandCode:  0x%2x    ",DSPCommandCode);
-		sprintf(displayString4,"DSPStatus:  0x%4x    ",DSPStatus);
-		DSPresult = DSP1_DR_16;
-		sprintf(displayString5,"Result:     0x%4x    ",DSPresult);
+		sprintf(displayString4,"Result1:     0x%4x    ",DSPresult);
+		//DSPresult = DSP1_DR_16;
+		sprintf(displayString5,"Result2:     0x%4x    ",DSPresult2);
 		
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;

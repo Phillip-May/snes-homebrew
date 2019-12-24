@@ -184,25 +184,82 @@ macro writeRT(pSelect,ALU,ASL,DPL,DPH,RPDCR,DST,SRC) {
     writeOPRT(%01,{pSelect},{ALU},{ASL},{DPL},{DPH},{RPDCR},{DST},{SRC})
 }
 
+//8 bit DSP command codes
+constant DSP_MUL       = 0x00
+constant DSP_MULREAL   = 0x01 //Custom, lower 16 bits of a multiplication
+constant DSP_INVERSE   = 0x10
+constant DSP_Triangle  = 0x04
+
+
 //Notes
 //Page 13 of datasheet has table of usefull status register flags
 //RQM = 0 on external write, reset by internal write
 //Page 37 for the start of the serial interface explenation
-
+//ALU NOP requires RAM on p select
+//Use TR and TRB as temporary registers
+//M and N registers are also possible temporary registers
+//CMP dosen't exist but you can do any ALU operation and just trash the result
+//RQM resets to 0 when data is available and gets set to 1 by reading the data
+//Writting data to DR while a transfer is in progress causes the input data to be spit back out.
+//Snes dev manual timings imply the dsp is clocked at 7.56MHZ
+variable rqmPointer
 
 origin 0x0000
 
-initStall:
-writeJP(JRQM,initStall) //Wait for previous transfer to end
-writeLD(dst_SR,0x0400) //Set serial input data to 1, 8 bit transfers
-writeLD(dst_DR,0x0080) //Write 8 bit data to the data register for transfer
-writeLD(dst_DR,0x0080) //Write 8 bit data to the data register for transfer
-Stall2:
-writeJP(JRQM,Stall2) //Wait for previous transfer to end
-
+init:
+writeLD(dst_DR,0x1280)  //Write initial data to snes serial bus, read as 0x8080 on boot from snes side
+receiveCMD:
+writeLD(dst_SR,0x0400)  //Set serial input data to 1, 8 bit transfers
+rqmStall000:; writeJP(JRQM,rqmStall000) //Wait to receive 8 bit command
 writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
-writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_A,src_DR)
-writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+
+//Figure out which command happened
+writeLD(dst_A,DSP_MULREAL)  //Set a to cmp value
+writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR) //Load the parameter to temporary reg1
+writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR) //CMP A with TR
+writeJP(JNZA,CMD_MUL_REAL) //Jump zero A, to Code for command MUL
+
+case1:
+writeLD(dst_DR,0x000F)  //
+writeJP(JMP,end)
+
+case2:
+writeLD(dst_DR,0x00FF)  //
+
+end:
+writeJP(JMP,end)
+
+
+
+//SUBROUTINE Real MUL
+//Multiplier uses K and L registers as input
+//Output to M and N, which are dumped in little edian 16 bit chunks on the data bus.
+//Internal multiplier result is 31 bit shifted 1 right so the result is shifted left before returning
+CMD_MUL_REAL:
+	//Stall for data
+	rqmStall001:; writeJP(JRQM,rqmStall001)
+	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
+	rqmStall002:; writeJP(JRQM,rqmStall002)
+	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
+	writeLD(dst_A,0x0000)
+	writeOP(REGN,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
+	writeOP(IDB,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
+	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	rqmStall008:; writeJP(JRQM,rqmStall008)
+	
+	writeLD(dst_A,0x0000)
+	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
+	writeOP(IDB,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
+	rqmStall003:; writeJP(JRQM,rqmStall003)
+	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	//Receive next cmd
+	writeJP(JMP,end)
+
+
+
+//Old code
+
+writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A) //Echo back
 
 
 mainLoop:
@@ -223,9 +280,8 @@ writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
 //writeOP(RAM,INC,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 
 
-
-
-
+//As a speed up use the data rom to store a look up table of the values and
+//increment through them while comparing against the accumulator
 
 
 
