@@ -203,13 +203,17 @@ constant DSP_Triangle  = 0x04
 //RQM resets to 0 when data is available and gets set to 1 by reading the data
 //Writting data to DR while a transfer is in progress causes the input data to be spit back out.
 //Snes dev manual timings imply the dsp is clocked at 7.56MHZ
+//If an 8 bit value is received in the DR register, the previous upper 8 bits are preserverd
+//From the last transmitted value
 variable rqmPointer
 
 origin 0x0000
 
 init:
-writeLD(dst_DR,0x1280)  //Write initial data to snes serial bus, read as 0x8080 on boot from snes side
 receiveCMD:
+//If the upper 8 bits are not zeroed here it breaks my switching code
+writeLD(dst_DR,0x0080)  //Write initial data to snes serial bus, read as 0x8080 on boot from snes side
+
 writeLD(dst_SR,0x0400)  //Set serial input data to 1, 8 bit transfers
 rqmStall000:; writeJP(JRQM,rqmStall000) //Wait to receive 8 bit command
 writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
@@ -218,14 +222,15 @@ writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
 writeLD(dst_A,DSP_MULREAL)  //Set a to cmp value
 writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR) //Load the parameter to temporary reg1
 writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR) //CMP A with TR
-writeJP(JNZA,CMD_MUL_REAL) //Jump zero A, to Code for command MUL
+writeJP(JZA,CMD_MUL_REAL) //Jump zero A, to Code for command MUL
 
 case1:
 writeLD(dst_DR,0x000F)  //
-writeJP(JMP,end)
+writeJP(JMP,case1)
 
 case2:
 writeLD(dst_DR,0x00FF)  //
+writeJP(JMP,case2)
 
 end:
 writeJP(JMP,end)
@@ -240,18 +245,20 @@ CMD_MUL_REAL:
 	//Stall for data
 	rqmStall001:; writeJP(JRQM,rqmStall001)
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
+
 	rqmStall002:; writeJP(JRQM,rqmStall002)
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
 	writeLD(dst_A,0x0000)
-	writeOP(REGN,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(REGN,ADD,ACCA,DPNOP,0x0,RPNOP,dst_B,src_A) //Zero B with the contents of A
 	writeOP(PSELNONE,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
-	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)
+
 	rqmStall008:; writeJP(JRQM,rqmStall008)
-	writeLD(dst_A,0x0000)
-	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
-	writeOP(PSELNONE,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(REGM,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(PSELNONE,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+
 	rqmStall003:; writeJP(JRQM,rqmStall003)
-	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_B)
 	//Receive next cmd
 	writeJP(JMP,end)
 
