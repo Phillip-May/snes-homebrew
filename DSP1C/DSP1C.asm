@@ -203,10 +203,20 @@ writeJP(JRQM,Stall2) //Wait for previous transfer to end
 writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
 writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_A,src_DR)
 writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
-Stall:
+
+
+mainLoop:
 writeOP(IDB,INC,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
 writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
-writeJP(JMP,Stall)
+
+//Stall until overflow code, uses the B register
+writeLD(dst_B,0x0000) //Set serial input data to 1, 8 bit transfers
+skipLoop:
+writeOP(IDB,INC,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_B)
+writeJP(JNOVB0,skipLoop)
+
+
+writeJP(JMP,mainLoop)
 //Test commands
 //writeJP(JRQM,0x1AC) //Wait for previous transfer to end
 writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
