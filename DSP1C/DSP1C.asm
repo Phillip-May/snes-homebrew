@@ -6,10 +6,11 @@ origin 0x17F0-3
 cmd_nop
 
 //P select constants
-constant RAM =  %00
-constant IDB =  %01
-constant REGM = %10
-constant REGN = %11
+constant PSELNONE =  %11
+constant RAM      =  %00
+constant IDB      =  %01
+constant REGM     = %10
+constant REGN     = %11
 
 //ALU field constants
 constant NOP  =  %0000
@@ -238,20 +239,19 @@ writeJP(JMP,end)
 CMD_MUL_REAL:
 	//Stall for data
 	rqmStall001:; writeJP(JRQM,rqmStall001)
-	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
 	rqmStall002:; writeJP(JRQM,rqmStall002)
-	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
 	writeLD(dst_A,0x0000)
-	writeOP(REGN,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
-	writeOP(IDB,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
-	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	writeOP(REGN,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(PSELNONE,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 	rqmStall008:; writeJP(JRQM,rqmStall008)
-	
 	writeLD(dst_A,0x0000)
-	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
-	writeOP(IDB,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_A)
+	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(PSELNONE,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
 	rqmStall003:; writeJP(JRQM,rqmStall003)
-	writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 	//Receive next cmd
 	writeJP(JMP,end)
 
