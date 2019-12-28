@@ -36,10 +36,15 @@ Section CODE:
 
 Section KDATA:
 	00048000 _BEG_KDATA
-	000480f9 _END_KDATA
+	0004817c _END_KDATA
 
 Section DATA:
 	007e2000 _BEG_DATA
+	007e2000 ~~displayString1
+	007e2028 ~~displayString2
+	007e2050 ~~displayString3
+	007e2078 ~~displayString4
+	007e20a0 ~~displayString5
 	007e20c8 ~~heap_start
 	007e20cc ~~heap_end
 	007e20d0 ~~far_heap_start
@@ -70,11 +75,13 @@ Section SPCROM:
 
 Section BANK1:
 	00018000 _BEG_BANK1
-	00018000 ~~main
-	000183b2 ~~IRQHandler
-	000183b3 ~~termM0Init
-	00018495 ~~termM0PrintStringXY
-	000184f0 _END_BANK1
+	00018000 ~~testDSP1Mul
+	0001819c ~~testDSP1Norm
+	00018333 ~~main
+	000184e2 ~~IRQHandler
+	000184e3 ~~termM0Init
+	000185c5 ~~termM0PrintStringXY
+	00018620 _END_BANK1
 
 Section startup:
 	00000000 _BEG_STARTUP

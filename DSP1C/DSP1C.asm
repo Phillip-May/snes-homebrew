@@ -312,7 +312,7 @@ CMD_MUL:
 	JRQMStall()
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
 	writeLD(dst_A,0x0000)
-	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON) //Put contents of N in A
+	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON) //Put contents of M in A
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 	//Receive next cmd
 	writeJP(JMP,init)
@@ -321,6 +321,9 @@ CMD_MUL:
 //Actual math is 1/(a*(2^B)) = A*2^B
 //Needs to handle division by zero
 //Implementation based on overlords doc
+//C in TR
+//E in TRB
+//K and L store Coeficient and exponent
 CMD_DSP_INVERSE:
 	JRQMStall()
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR)
@@ -328,25 +331,109 @@ CMD_DSP_INVERSE:
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TRB,src_DR)
 
 	
-	writeLD(dst_A,0x0012)
-	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)
-	JRQMStall()
-	writeLD(dst_A,0x0034)
-	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)	
-	
-	
-	writeJP(JMP,receiveCMD)
-	
 	//if (c == 0)
     writeLD(dst_A,0x0000)  //Set a to cmp value
     writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
-    writeJP(JZA,DSP_INVERSE_ELSE) //Jump zero 
-	
+    writeJP(JNZA,DSP_INVERSE_ELSE) //Jump zero 
+
+	writeLD(dst_A,INT_MAX_DSP)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	JRQMStall()
+	writeLD(dst_A,0x002F)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)	
+	writeJP(JMP,receiveCMD)	//Return
 	
 	DSP_INVERSE_ELSE:
+	//while (c < 0x4000)
+	writeLD(dst_A,0x4000)
+	writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+	writeJP(JCA,DSP_INVERSE_WHILE_EXIT) //branch if c is equal or greater than 0x4000
+	//While Loop code
+	//Coefficient <<= 1;
+	writeLD(dst_B,0x0000)
+	writeOP(IDB,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+	writeOP(IDB,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_TR,src_B)
+	//Exponent--;
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_B,src_TRB)
+	writeOP(IDB,DEC,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_TRB,src_B)
+	writeJP(JMP,DSP_INVERSE_ELSE) //}
 	
+	DSP_INVERSE_WHILE_EXIT:
+	//if (Coefficient == 0x4000)		
+	writeLD(dst_A,0x4000)
+	writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+	writeJP(JZA,AJKGAKJSH) //
 	
-	writeJP(JMP,receiveCMD)
+	//Exponent--;
+	writeLD(dst_A,0x0001)
+	writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TRB) //*iCoefficient = 1 - exponent
+	writeOP(RAM,DEC,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	//*iCoefficient =  0x7fff;
+	writeLD(dst_B,0x7FFF)       //*iCoefficient =  0x7fff;
+	writeJP(JMP,DSP_INVERSE_EXIT) //
+	
+	AJKGAKJSH:
+	//Else
+	//int16_t	i = DSP1ROM[((Coefficient - 0x4000) >> 7) + 0x0065];
+	writeLD(dst_B, ((-0x4000)&0xFFFF) ) //((-0x4000)&0xFFFF)=0xC000
+	writeOP(IDB,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON) //7 times
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeOP(RAM,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
+	writeLD(dst_A, 0x0065)
+	writeOP(IDB,ADD,ACCB,DPNOP,0x0,RPNOP,dst_RP,src_A)
+	
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_RP,src_B)
+	//i = (i + (-i * (Coefficient * i >> 15) >> 15)) << 1;
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_K,src_RO)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_L,src_TR)
+	writeLD(dst_A,0x0000)
+	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON) //(Coefficient * i >> 15)
+	//-i * (prev) >> 15
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_L,src_A)
+	writeLD(dst_B,0x0000)
+	writeOP(IDB,SUB,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_RO)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_K,src_B)
+	writeLD(dst_B,0x0000)
+	writeOP(REGM,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON) //B = -i * (prev) >> 15
+	writeOP(IDB,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_RO) //i + (prev)
+	writeOP(RAM,SHL1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON) //B = i = (i + (-i * (Coefficient * i >> 15) >> 15)) << 1;
+	
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_A,src_B)
+	//Second time
+    writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_K,src_A)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_L,src_TR)
+    writeLD(dst_B,0x0000)
+	writeOP(REGM,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON) //(Coefficient * i >> 15)
+	//-i * (prev) >> 15
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_L,src_B)
+	writeLD(dst_B,0x0000)
+	writeOP(IDB,SUB,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_A)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_K,src_B)
+	writeLD(dst_B,0x0000)
+	writeOP(REGM,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON) //B = -i * (prev) >> 15
+	writeOP(IDB,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_A) //i + (prev)
+	writeOP(RAM,SHL1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON) //B = i = (i + (-i * (Coefficient * i >> 15) >> 15)) << 1;
+	
+	//*iCoefficient = i * Sign;
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_K,src_B)
+	//Do the * -1 if needed
+
+	writeLD(dst_B,0x0001)
+	writeOP(IDB,SUB,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_TRB) //*iCoefficient = 1 - exponent
+	
+	DSP_INVERSE_EXIT:
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_B)
+	JRQMStall()
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)	
+	writeJP(JMP,receiveCMD)	
+
 	
 //SUBROUTINE Real MUL
 //Multiplier uses K and L registers as input

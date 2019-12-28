@@ -21,6 +21,136 @@ extern far unsigned char END_SPC700Code[];
 
 extern far unsigned char TestInsert[];
 
+
+char displayString1[40] = "1";
+char displayString2[40] = "2";
+char displayString3[40] = "3";
+char displayString4[40] = "4";
+char displayString5[40] = "5";
+
+void testDSP1Mul(void) {
+	int8_t regRead1; //Variable for storing hardware registers
+	int8_t regRead2; //Variable for storing hardware registers	
+	
+	uint8_t DSPCommandCode = 0x00;
+	uint16_t DSPparameter1 = 501;
+	uint16_t DSPparameter2 = 801;
+	uint16_t DSPresult = 0x11;
+	uint16_t DSPresult2 = 0x22;
+	uint16_t  DSPStatus = 0xAA;
+	
+
+	uint8_t lastInputLo = 0;
+	uint8_t lastInputHi = 0;	
+	
+	DSPStatus = DSP1_SR_8;
+	DSP1_DR_8 = DSPCommandCode;
+	DSP1_DR_16 = DSPparameter1;	
+	DSP1_DR_16 = DSPparameter2;	
+	DSPresult  = DSP1_DR_16;
+	DSPresult2 = DSP1_DR_16;
+	
+	while ( (lastInputLo+lastInputHi) == 0) {
+		sprintf(displayString1,"Parameter 1: 0x%4x    ",DSPparameter1);
+		sprintf(displayString2,"Parameter 2: 0x%4x    ",DSPparameter2);
+		sprintf(displayString3,"DSPCommandCode:  0x%2x    ",DSPCommandCode);
+		sprintf(displayString4,"Result1:     0x%4x    ",DSPresult);
+		//DSPresult = DSP1_DR_16;
+		sprintf(displayString5,"Result2:     0x%4x    ",DSPresult2);
+		
+		do{ //Wait for Vblank
+			regRead1 = REG_RDNMI;
+		} while( (regRead1 > 0));
+		
+		//Higan specific feature!
+		do{ //Wait for RegisterReadFlag
+			regRead1 = REG_HVBJOY;
+		} while( ( (regRead1 & 0x01) != 0));
+		
+		lastInputLo = REG_JOY1L;
+		lastInputHi = REG_JOY1H;	
+
+		termM0PrintStringXY(displayString1,0,10);
+		termM0PrintStringXY(displayString2,0,11);
+		termM0PrintStringXY(displayString3,0,12);
+		termM0PrintStringXY(displayString4,0,13);
+		termM0PrintStringXY(displayString5,0,14);		
+	}
+	return;
+}
+
+void testDSP1Norm(void) {
+	int8_t regRead1 = 0; //Variable for storing hardware registers
+	int8_t regRead2; //Variable for storing hardware registers
+
+	int i;	
+	
+	uint8_t DSPCommandCode = 0x10;
+	uint16_t DSPparameter1 = 0x4000; //499
+	uint16_t DSPparameter2 = 0xF234;//0xC8
+	uint16_t DSPresult = 0x11;
+	uint16_t DSPresult2 = 0x22;
+	uint16_t  DSPStatus = 0xAA;
+	
+
+	uint8_t lastInputLo = 0;
+	uint8_t lastInputHi = 0;	
+	
+	DSPStatus = DSP1_SR_8;
+	DSP1_DR_8 = DSPCommandCode;
+	DSP1_DR_16 = DSPparameter1;	
+	DSP1_DR_16 = DSPparameter2;
+	
+	//You actually read a different value if you read too quickly
+	//Having only 1 increment here produces different results across emulators
+	regRead1++;	
+	regRead1++;
+	
+	regRead1++;	
+	regRead1++;	
+	
+	regRead1++;	
+	regRead1++;	
+	/*
+	regRead1++;	
+	regRead1++;	
+	regRead1++;	
+	regRead1++;	
+	regRead1++;	
+	regRead1++;	
+	*/
+	DSPresult  = DSP1_DR_16;
+	DSPresult2 = DSP1_DR_16;
+	
+	for (;;) {
+		sprintf(displayString1,"Parameter 1: 0x%4x    ",DSPparameter1);
+		sprintf(displayString2,"Parameter 2: 0x%4x    ",DSPparameter2);
+		sprintf(displayString3,"DSPCommandCode:  0x%2x    ",DSPCommandCode);
+		sprintf(displayString4,"Result1:     0x%4x    ",DSPresult);
+		//DSPresult = DSP1_DR_16;
+		sprintf(displayString5,"Result2:     0x%4x    ",DSPresult2);
+		
+		do{ //Wait for Vblank
+			regRead1 = REG_RDNMI;
+		} while( (regRead1 > 0));
+		
+		//Higan specific feature!
+		do{ //Wait for RegisterReadFlag
+			regRead1 = REG_HVBJOY;
+		} while( ( (regRead1 & 0x01) != 0));
+		
+		lastInputLo = REG_JOY1L;
+		lastInputHi = REG_JOY1H;	
+
+		termM0PrintStringXY(displayString1,0,10);
+		termM0PrintStringXY(displayString2,0,11);
+		termM0PrintStringXY(displayString3,0,12);
+		termM0PrintStringXY(displayString4,0,13);
+		termM0PrintStringXY(displayString5,0,14);		
+	}
+	return;
+}
+
 void main(void){
 	//Variables
 	int8_t regRead1; //Variable for storing hardware registers
@@ -29,23 +159,10 @@ void main(void){
 	unsigned char testChar;
 	char szMSU1Check[10];
 	const char szMSU1CheckRef[10] = "S-MSU1";
-	char displayString1[40] = "1";
-	char displayString2[40] = "2";
-	char displayString3[40] = "3";
-	char displayString4[40] = "4";
-	char displayString5[40] = "5";
 	
 	
-	uint8_t DSPCommandCode = 0x01;
-	uint16_t DSPparameter1 = 501;
-	uint16_t DSPparameter2 = 801;
-	uint16_t DSPresult = 0x11;
-	uint16_t DSPresult2 = 0x22;
-	uint16_t  DSPStatus = 0xAA;
 	
-
-	uint8_t lastInputLo;
-	uint8_t lastInputHi;
+	uint8_t exitVar = 0;
 	
 	
 		
@@ -92,8 +209,8 @@ void main(void){
 	szMSU1Check[7] = 0;
 	
 	//Display if the expansion chip was detected
-	DSPStatus = DSP1_SR_16;
-	if ((DSPStatus & 0x8000) == 0)
+	//DSPStatus = DSP1_SR_16;
+	if ((DSP1_SR_16 & 0x8000) == 0)
 	{
 		termM0PrintStringXY("DSP1 not detected!",0,5);
 	}
@@ -101,62 +218,17 @@ void main(void){
 		termM0PrintStringXY("DSP1 detected!",0,5);
 	}
 	
-	DSPStatus = DSP1_SR_8;
-	DSP1_DR_8 = DSPCommandCode;
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;
-	DSP1_DR_16 = DSPparameter1;
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;	
-	DSP1_DR_16 = DSPparameter2;
-	//Stall
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;
-	szMSU1Check[0] = MSU_ID;
-	
-	DSPresult  = DSP1_DR_16;
-	DSPresult2 = DSP1_DR_16;
+	testDSP1Mul();
+	testDSP1Norm();
 	
 	for (;;) {
-		sprintf(displayString1,"Parameter 1: 0x%4x    ",DSPparameter1);
-		sprintf(displayString2,"Parameter 2: 0x%4x    ",DSPparameter2);
-		sprintf(displayString3,"DSPCommandCode:  0x%2x    ",DSPCommandCode);
-		sprintf(displayString4,"Result1:     0x%4x    ",DSPresult);
-		//DSPresult = DSP1_DR_16;
-		sprintf(displayString5,"Result2:     0x%4x    ",DSPresult2);
+		sprintf(displayString1,"Done       ");
 		
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
 		} while( (regRead1 > 0));
-		termM0PrintStringXY(displayString1,0,10);
-		termM0PrintStringXY(displayString2,0,11);
-		termM0PrintStringXY(displayString3,0,12);
-		termM0PrintStringXY(displayString4,0,13);
-		termM0PrintStringXY(displayString5,0,14);
-		
-		//Higan specific feature!
-		do{ //Wait for RegisterReadFlag
-			regRead1 = REG_HVBJOY;
-		} while( ( (regRead1 & 0x01) != 0));
-		
-		lastInputLo = REG_JOY1L;
-		lastInputHi = REG_JOY1H;	
-		
-		//Up
-		if (lastInputHi & 0x08){
-
-		}//Down
-		else if (lastInputHi & 0x04) {
-		}//Left
-		if (lastInputHi & 0x02) {
-		}//Right
-		else if (lastInputHi & 0x01) {
-		}
-			
-		
+		termM0PrintStringXY(displayString1,0,8);
+				
 	}
 	
 }
