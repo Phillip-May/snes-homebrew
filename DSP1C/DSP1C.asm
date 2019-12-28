@@ -190,6 +190,11 @@ macro JRQMStall() {
 	writeJP(JRQM,pc())
 }
 
+constant INT_MAX_DSP = 0x7FFF
+constant INT_MIN_DSP = 0x1000
+
+
+
 //8 bit DSP command codes
 constant DSP_MUL                 = 0x00
 constant DSP_MULREAL             = 0x05 //Custom, lower 16 bits of a multiplication
@@ -241,6 +246,7 @@ constant DSP_3D_ROTATE           = 0x14
 //Snes dev manual timings imply the dsp is clocked at 7.56MHZ
 //If an 8 bit value is received in the DR register, the previous upper 8 bits are preserverd
 //From the last transmitted value
+//Sometimes the dsp receives a bad command 0x80 which should be ignored
 variable rqmPointer
 
 origin 0x0000
@@ -255,6 +261,7 @@ writeLD(dst_K,0x0000)
 writeLD(dst_L,0x0000)
 receiveCMD:
 JRQMStall() //Wait for final data segment to send
+receiveCMDSkipStall:
 //If the upper 8 bits are not zeroed here it breaks my switching code
 //Because they get appended to the 8 bit command code
 writeLD(dst_DR,0x0080)  //Write initial data to snes serial bus, read as 0x8080 on boot from snes side
@@ -266,16 +273,28 @@ writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
 //Figure out which command happened
 //Since there is no cmp I use sub and and reload A every time
 //In the future use a data rom table iterate through that.
-writeLD(dst_A,DSP_MUL)  //Set a to cmp value
+
+//Check if it's a bad a cmd
+writeLD(dst_A,0x80)  //Set a to cmp value
 writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR)
+writeJP(JZA,receiveCMDSkipStall) //Jump zero A, to Code for command MUL
+
+writeLD(dst_A,DSP_MUL)  //Set a to cmp value
+writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
 writeJP(JZA,CMD_MUL) //Jump zero A, to Code for command MUL
 
 writeLD(dst_A,DSP_MULREAL)  //Set a to cmp value
 writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
 writeJP(JZA,CMD_MUL_REAL) //Jump zero A, to Code for command MUL
 
+writeLD(dst_A,DSP_INVERSE)  //Set a to cmp value
+writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+writeJP(JZA,CMD_DSP_INVERSE) //Jump zero A, to Code for command MUL
+
+
 case1:
-writeLD(dst_DR,0x000F)  //
+//writeLD(dst_DR,0x001F)  //
+writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_TR)	
 writeJP(JMP,case1)
 
 case2:
@@ -296,6 +315,37 @@ CMD_MUL:
 	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON) //Put contents of N in A
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
 	//Receive next cmd
+	writeJP(JMP,init)
+
+//Inverse subroutine, takes 2 paramterers and outputs 2 results
+//Actual math is 1/(a*(2^B)) = A*2^B
+//Needs to handle division by zero
+//Implementation based on overlords doc
+CMD_DSP_INVERSE:
+	JRQMStall()
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR)
+	JRQMStall()
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TRB,src_DR)
+
+	
+	writeLD(dst_A,0x0012)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	JRQMStall()
+	writeLD(dst_A,0x0034)
+	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)	
+	
+	
+	writeJP(JMP,receiveCMD)
+	
+	//if (c == 0)
+    writeLD(dst_A,0x0000)  //Set a to cmp value
+    writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
+    writeJP(JZA,DSP_INVERSE_ELSE) //Jump zero 
+	
+	
+	DSP_INVERSE_ELSE:
+	
+	
 	writeJP(JMP,receiveCMD)
 	
 //SUBROUTINE Real MUL
@@ -321,7 +371,7 @@ CMD_MUL_REAL:
 	JRQMStall()
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_B)
 	//Receive next cmd
-	writeJP(JMP,end)
+	writeJP(JMP,receiveCMD)
 	
 	
 
