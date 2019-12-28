@@ -185,11 +185,47 @@ macro writeRT(pSelect,ALU,ASL,DPL,DPH,RPDCR,DST,SRC) {
     writeOPRT(%01,{pSelect},{ALU},{ASL},{DPL},{DPH},{RPDCR},{DST},{SRC})
 }
 
+//Waits for JRQM to go low, jumps in place until it does
+macro JRQMStall() {
+	writeJP(JRQM,pc())
+}
+
 //8 bit DSP command codes
-constant DSP_MUL       = 0x00
-constant DSP_MULREAL   = 0x01 //Custom, lower 16 bits of a multiplication
-constant DSP_INVERSE   = 0x10
-constant DSP_Triangle  = 0x04
+constant DSP_MUL                 = 0x00
+constant DSP_MULREAL             = 0x05 //Custom, lower 16 bits of a multiplication
+constant DSP_INVERSE             = 0x10
+constant DSP_Triangle            = 0x04
+//Vector math
+constant DSP_RADIUS              = 0x08
+constant DSP_RANGE               = 0x18
+constant DSP_DISTANCE            = 0x28
+//Coordinate math
+constant DSP_ROTATE              = 0x0C
+constant DSP_POLAR               = 0x1C
+//Projection math
+constant DSP_PROJ_PARAM          = 0x02
+constant DSP_RASTER_DATA         = 0x0A
+constant DSP_RASTER_CALC         = 0x1A
+constant DSP_OBJ_PROJECT         = 0x06
+constant DSP_COORD_CALC          = 0x0E
+//Attitude control
+constant DSP_SET_ATTITUDE1       = 0x01
+constant DSP_SET_ATTITUDE2       = 0x11
+constant DSP_SET_ATTITUDE3       = 0x21
+
+constant DSP_CONV_OBJ_TO_GLOBAL1 = 0x0D
+constant DSP_CONV_OBJ_TO_GLOBAL2 = 0x1D
+constant DSP_CONV_OBJ_TO_GLOBAL3 = 0x2D
+
+constant DSP_CONV_GLOBAL_TO_OBJ1 = 0x03
+constant DSP_CONV_GLOBAL_TO_OBJ2 = 0x13
+constant DSP_CONV_GLOBAL_TO_OBJ3 = 0x23
+
+constant DSP_SCALAR_CALC1        = 0x0B
+constant DSP_SCALAR_CALC2        = 0x1B
+constant DSP_SCALAR_CALC3        = 0x2B
+//New angle math
+constant DSP_3D_ROTATE           = 0x14
 
 
 //Notes
@@ -210,18 +246,32 @@ variable rqmPointer
 origin 0x0000
 
 init:
+//Zero all the registers
+writeLD(dst_A,0x0000)
+writeLD(dst_B,0x0000)
+writeLD(dst_TR,0x0000)
+writeLD(dst_TRB,0x0000)
+writeLD(dst_K,0x0000)
+writeLD(dst_L,0x0000)
 receiveCMD:
+JRQMStall() //Wait for final data segment to send
 //If the upper 8 bits are not zeroed here it breaks my switching code
+//Because they get appended to the 8 bit command code
 writeLD(dst_DR,0x0080)  //Write initial data to snes serial bus, read as 0x8080 on boot from snes side
 
 writeLD(dst_SR,0x0400)  //Set serial input data to 1, 8 bit transfers
-rqmStall000:; writeJP(JRQM,rqmStall000) //Wait to receive 8 bit command
+JRQMStall() //Wait to receive 8 bit command
 writeLD(dst_SR,0x0000) //Set serial input data to 0, 16 bit transfers
 
 //Figure out which command happened
+//Since there is no cmp I use sub and and reload A every time
+//In the future use a data rom table iterate through that.
+writeLD(dst_A,DSP_MUL)  //Set a to cmp value
+writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR)
+writeJP(JZA,CMD_MUL) //Jump zero A, to Code for command MUL
+
 writeLD(dst_A,DSP_MULREAL)  //Set a to cmp value
-writeOP(RAM,NOP,ACCA,DPNOP,0x0,RPNOP,dst_TR,src_DR) //Load the parameter to temporary reg1
-writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR) //CMP A with TR
+writeOP(IDB,SUB,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_TR)
 writeJP(JZA,CMD_MUL_REAL) //Jump zero A, to Code for command MUL
 
 case1:
@@ -235,34 +285,45 @@ writeJP(JMP,case2)
 end:
 writeJP(JMP,end)
 
-
-
+//MUL subroutine, based on the snes dev manual's "half integer" description,
+//This function just returns the upper 16 bits from the hardware multiplication
+CMD_MUL:
+	JRQMStall()
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
+	JRQMStall()
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
+	writeLD(dst_A,0x0000)
+	writeOP(REGM,ADD,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON) //Put contents of N in A
+	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_A)
+	//Receive next cmd
+	writeJP(JMP,receiveCMD)
+	
 //SUBROUTINE Real MUL
 //Multiplier uses K and L registers as input
 //Output to M and N, which are dumped in little edian 16 bit chunks on the data bus.
 //Internal multiplier result is 31 bit shifted 1 right so the result is shifted left before returning
 CMD_MUL_REAL:
 	//Stall for data
-	rqmStall001:; writeJP(JRQM,rqmStall001)
+	JRQMStall()
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_K,src_DR)
 
-	rqmStall002:; writeJP(JRQM,rqmStall002)
+	JRQMStall()
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_L,src_DR)
 	writeLD(dst_A,0x0000)
 	writeOP(REGN,ADD,ACCA,DPNOP,0x0,RPNOP,dst_B,src_A) //Zero B with the contents of A
 	writeOP(PSELNONE,SHR1,ACCA,DPNOP,0x0,RPNOP,dst_NON,src_NON)
 	writeOP(PSELNONE,NOP,ACCB,DPNOP,0x0,RPNOP,dst_DR,src_A)
 
-	rqmStall008:; writeJP(JRQM,rqmStall008)
+	JRQMStall()
 	writeOP(REGM,ADD,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
 	writeOP(PSELNONE,SHR1,ACCB,DPNOP,0x0,RPNOP,dst_NON,src_NON)
 
-	rqmStall003:; writeJP(JRQM,rqmStall003)
+	JRQMStall()
 	writeOP(PSELNONE,NOP,ACCA,DPNOP,0x0,RPNOP,dst_DR,src_B)
 	//Receive next cmd
 	writeJP(JMP,end)
-
-
+	
+	
 
 //Old code
 
