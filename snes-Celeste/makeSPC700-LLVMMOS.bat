@@ -1,0 +1,1 @@
+mos-common-clang -nostdlib -mcpu=spc700 -o main.spc -Os main.c

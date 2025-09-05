@@ -1,0 +1,7 @@
+-C008100,000100 src\mainBankZero.obj lib\initsnes.obj src\port\wdc816cc\kernel.obj src\celesteSimple.obj  src\port\wdc816cc\vectors.obj -Lml -Lcl
+-ACEL_K_00=018000,08000
+-ACEL_K_01=028000,10000
+-ACEL_K_02=038000,18000
+-D7E2000,20000
+-K058000,28000
+-AFIXEDMATH=068000,30000

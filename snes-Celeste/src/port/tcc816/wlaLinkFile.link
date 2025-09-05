@@ -1,0 +1,7 @@
+[objects]
+example.obj
+hdr.obj
+c:\pvsneslib\pvsneslib\lib\LoROM_SlowROM/crt0_snes.obj
+c:\pvsneslib\pvsneslib\lib\LoROM_SlowROM/libc.obj
+c:\pvsneslib\pvsneslib\lib\LoROM_SlowROM/libm.obj
+c:\pvsneslib\pvsneslib\lib\LoROM_SlowROM/libtcc.obj
