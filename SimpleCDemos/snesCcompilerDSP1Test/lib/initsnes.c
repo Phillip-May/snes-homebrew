@@ -1,6 +1,5 @@
-#include "SNES.h"
-#include "initsnes.h"
-
+#include "include\SNES.h"
+#include <STDINT.H>
 
 //Based on the init snes macro by peter Lemons.
 //Takes 8 bit unsigned integer RomSpeed, 0 means Slow ROM, 1 means Fast ROM
@@ -9,12 +8,12 @@
 //I am aware a switch is not ideal here, you could just add a constant to the
 //registers offset but I chose to use a switch anyway in the hope it's
 //optimised out.
-void initSNES(uint8_t ROMSPEED){
+void initSNES(uint8_t RomSpeed){
 
 	int i;
 	int cCONSTZERO = 0;
 	int* pCONSTZERO = &cCONSTZERO;
-	REG_MEMSEL = ROMSPEED;  // Access Cycle Designation (Slow ROM / Fast ROM)
+	REG_MEMSEL = RomSpeed;  // Access Cycle Designation (Slow ROM / Fast ROM)
 
 	REG_INIDISP = 0x8F;// Display Control 1: Brightness & Screen Enable Register ($2100)
 
@@ -81,7 +80,7 @@ void initSNES(uint8_t ROMSPEED){
 	
 	REG_JOYWR = 0x00; // Joypad Output = 0 ($4016)
 	
-	REG_NMITIMEN = 0x01; // Interrupt Enable & Joypad Request: Reset VBlank, Interrupt, Joypad ($4200)
+	REG_NMITIMEN = 0x00; // Interrupt Enable & Joypad Request: Reset VBlank, Interrupt, Joypad ($4200)
 	
 	REG_WRIO = 0xFF; // Programmable I/O Port (Open-Collector Output) = $FF ($4201)
 	
@@ -109,14 +108,48 @@ void initSNES(uint8_t ROMSPEED){
 		REG_OAMDATA = 0x00;
 	}
 	
+	// Clear WRAM
+	//REG_WMADDL = 0x00;// WRAM Address (Lower  8-Bit): Transfer To $7E:0000 ($2181)
+	//REG_WMADDM = 0x00;// WRAM Address (Lower  8-Bit): Transfer To $7E:0000 ($2181)
+	//REG_WMADDH = 0x00; // WRAM Address (Upper  1-Bit): Select 1st WRAM Bank = $7E ($2183)
 
-	//Clear CGRAM with a loop
+	//REG_DMAP0 = 0x8008;// DMA0 DMA/HDMA Parameters ($4300)
+	//REG_DAS0L = 0x00;// DMA0 DMA Count / Indirect HDMA Address: Transfer 64KB ($4305)
+	//Clear CGRAM with DMA0
 	REG_CGADD = 0x0000;
-	for(i = 0; i < 0x200; i++) {
-		REG_CGDATA = 0x0000;
-	}
-
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x22;
+	REG_A1T0 = 0x0000;
+	REG_A1B0 = 0x00;
+	REG_DAS0 = 0x01FF;
+	REG_MDMAEN = 0x01;	
 	
+	REG_WMADD = 0x0000;
+	REG_WMADDH = 0x00;
+	REG_DMAP0 = 0x08;
+	
+	REG_A1T0 = 0xFF00;
+
+	REG_A1B0 = 0x00;
+	
+  	REG_DAS0L = 0x00;// DMA0 DMA Count / Indirect HDMA Address: Transfer 64KB ($4305)
+	
+	REG_MDMAEN = 0x01;// Select General Purpose DMA Channels & Start Transfer ($420B)
+    asm{
+		NOP
+	} //delay, the c compiler is probably doing this on its own though
+	REG_MDMAEN = 0x01; // Select General Purpose DMA Channels & Start Transfer: $2181..$2183 & $4305 Wrap Appropriately ($420B)	
+
+	// VRAM
+	REG_VMAIN = 0x80;
+	REG_VMADD = 0x0000;
+	REG_DAS0L = 0x00;
+	REG_DAS0H = 0x00;
+	
+	REG_DMAP0 = 0x09;
+	REG_BBAD0 = 0x18;
+	
+	REG_MDMAEN = 0x01;
 	
     // CGRAM
 	REG_CGADD = 0x00;
@@ -135,7 +168,7 @@ void initSNES(uint8_t ROMSPEED){
 // SIZE: Size Of Data (# Of Colours To Copy) in sets of two
 // CHAN: DMA Channel To Transfer Data (0..7) This takes an int to prevent a 
 // compiler warning.
-FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination, uint16_t cSize,
+int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination, uint16_t cSize,
 				int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
@@ -150,8 +183,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD0 = 0x22;
 			REG_A1T0 = regWrite1;
 			REG_A1B0 = regWrite2;
-			REG_DAS0L = (uint8_t)(cSize & 0xFF);
-			REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS0 = cSize;
 			REG_MDMAEN = 0x01;
 			break;
 		case 1:
@@ -159,8 +191,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD1 = 0x22;
 			REG_A1T1 = regWrite1;
 			REG_A1B1 = regWrite2;
-			REG_DAS1L = (uint8_t)(cSize & 0xFF);
-			REG_DAS1H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS1 = cSize;
 			REG_MDMAEN = 0x02;
 			break;
 		case 2:
@@ -168,8 +199,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD2 = 0x22;
 			REG_A1T2 = regWrite1;
 			REG_A1B2 = regWrite2;
-			REG_DAS2L = (uint8_t)(cSize & 0xFF);
-			REG_DAS2H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS2 = cSize;
 			REG_MDMAEN = 0x04;
 			break;
 		case 3:
@@ -177,8 +207,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD3 = 0x22;
 			REG_A1T3 = regWrite1;
 			REG_A1B3 = regWrite2;
-			REG_DAS3L = (uint8_t)(cSize & 0xFF);
-			REG_DAS3H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS3 = cSize;
 			REG_MDMAEN = 0x08;
 			break;
 		case 4:
@@ -186,8 +215,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD4 = 0x22;
 			REG_A1T4 = regWrite1;
 			REG_A1B4 = regWrite2;
-			REG_DAS4L = (uint8_t)(cSize & 0xFF);
-			REG_DAS4H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS4 = cSize;
 			REG_MDMAEN = 0x10;
 			break;
 		case 5:
@@ -195,8 +223,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD5 = 0x22;
 			REG_A1T5 = regWrite1;
 			REG_A1B5 = regWrite2;
-			REG_DAS5L = (uint8_t)(cSize & 0xFF);
-			REG_DAS5H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS5 = cSize;
 			REG_MDMAEN = 0x20;
 			break;
 		case 6:
@@ -204,8 +231,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD6 = 0x22;
 			REG_A1T6 = regWrite1;
 			REG_A1B6 = regWrite2;
-			REG_DAS6L = (uint8_t)(cSize & 0xFF);
-			REG_DAS6H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS6 = cSize;
 			REG_MDMAEN = 0x40;
 			break;
 		case 7:
@@ -213,8 +239,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 			REG_BBAD7 = 0x22;
 			REG_A1T7 = regWrite1;
 			REG_A1B7 = regWrite2;
-			REG_DAS7L = (uint8_t)(cSize & 0xFF);
-			REG_DAS7H = (uint8_t)((cSize >> 8) & 0xFF);
+			REG_DAS7 = cSize;
 			REG_MDMAEN = 0x80;
 			break;
 		default:
@@ -234,7 +259,7 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
 //Load Data into Vram, using DMA channel 0
-FUNCTIONATR int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 			 uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
@@ -242,6 +267,7 @@ FUNCTIONATR int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination
 	REG_VMADD = (pVRAMDestination >> 1);
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
+	
 	switch(cChannel){
 		case 0:
 			REG_DMAP0 = 0x01;
@@ -323,12 +349,12 @@ FUNCTIONATR int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination
 //      DEST: 16-Bit VRAM Destination (WORD Address)
 // SIZETILES: Size Of Tile Data (BYTE Size)
 //      CHAN: DMA Channel To Transfer Data (0..7)
-FUNCTIONATR int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+int LoadLoVram(uint32_t pSource, uint16_t pVRAMDestination,
 			 uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x00;
-	REG_VMADD = (pVRAMDestination >> 1);	
+	REG_VMADD = (pVRAMDestination >> 1);
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
@@ -341,27 +367,6 @@ FUNCTIONATR int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 	return 0;
 }
 
-FUNCTIONATR int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
-	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
-	REG_VMAIN = 0x80;
-	REG_VMADD = (pVRAMDestination >> 1);
-	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	
-	REG_DMAP7 = 0x00;
-	REG_BBAD7 = 0x19;
-	REG_A1T7 = regWrite1;
-	REG_A1B7 = regWrite2;
-	REG_DAS7L = (uint8_t)(cSize & 0xFF);
-	REG_DAS7H = (uint8_t)((cSize >> 8) & 0xFF);
-	REG_MDMAEN = 0x80;
-	return 0;
-}
-
-
-
 //===================================
 // ClearVRAM - Clear VRAM Fixed Word 
 //===================================
@@ -369,7 +374,7 @@ FUNCTIONATR int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 // DEST: 16-Bit VRAM Destination (WORD Address)
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
-FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
 			 uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
@@ -411,93 +416,23 @@ FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinatio
 // DEST: 16-Bit OAM Destination (WORD Address)
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
-FUNCTIONATR int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
-				uint16_t cSize, int cChannel) {
+int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize, int cChannel){
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	cChannel = 0;
-	switch(cChannel) {
-		case 0:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS0 = cSize;
-			REG_DMAP0 = 0x02;
-			REG_BBAD0 = 0x04; //0x2104
-			REG_A1T0 = regWrite1;
-			REG_A1B0 = regWrite2;
-			REG_MDMAEN = 0x01;
-			break;
-		case 1:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS1 = cSize;
-			REG_DMAP1 = 0x02;
-			REG_BBAD1 = 0x04; //0x2104
-			REG_A1T1 = regWrite1;
-			REG_A1B1 = regWrite2;
-			REG_MDMAEN = 0x02;
-			break;
-		case 2:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS2 = cSize;
-			REG_DMAP2 = 0x02;
-			REG_BBAD2 = 0x04; //0x2104
-			REG_A1T2 = regWrite1;
-			REG_A1B2 = regWrite2;
-			REG_MDMAEN = 0x04;
-			break;
-		case 3:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS3 = cSize;
-			REG_DMAP3 = 0x02;
-			REG_BBAD3 = 0x04; //0x2104
-			REG_A1T3 = regWrite1;
-			REG_A1B3 = regWrite2;
-			REG_MDMAEN = 0x08;
-			break;
-		case 4:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS4 = cSize;
-			REG_DMAP4 = 0x02;
-			REG_BBAD4 = 0x04; //0x2104
-			REG_A1T4 = regWrite1;
-			REG_A1B4 = regWrite2;
-			REG_MDMAEN = 0x10;
-			break;
-		case 5:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS5 = cSize;
-			REG_DMAP5 = 0x02;
-			REG_BBAD5 = 0x04; //0x2104
-			REG_A1T5 = regWrite1;
-			REG_A1B5 = regWrite2;
-			REG_MDMAEN = 0x20;
-			break;
-		case 6:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS6 = cSize;
-			REG_DMAP6 = 0x02;
-			REG_BBAD6 = 0x04; //0x2104
-			REG_A1T6 = regWrite1;
-			REG_A1B6 = regWrite2;
-			REG_MDMAEN = 0x40;
-			break;
-		case 7:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS7 = cSize;
-			REG_DMAP7 = 0x02;
-			REG_BBAD7 = 0x04; //0x2104
-			REG_A1T7 = regWrite1;
-			REG_A1B7 = regWrite2;
-			REG_MDMAEN = 0x80;
-			break;
-		default:
-			break;
-	}
 	
+	REG_OAMADD = pVRAMDestination;
+	REG_DAS0 = cSize;
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x04;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;	
+	
+	REG_MDMAEN = 0x01;
 	return 0;
 }
-
 
 int initOAMCopy(unsigned char *pSource){
 	uint16_t i;
@@ -514,6 +449,110 @@ int initOAMCopy(unsigned char *pSource){
 	for(i = 0; i < 32; i++){
 		*pSource = 0x55;
 		pSource++;
-	}	
+	}
+	
 	return 0;
 }
+
+//SPC700 stuff
+int SPCWaitBoot() {
+	uint8_t reg1 = 0x00;
+	uint8_t reg2 = 0x00;
+	
+	while ( (reg1 != 0xAA) && (reg1 != 0xBB) ) {
+		reg1 = REG_APUIO0BYTE;
+		reg2 = REG_APUIO1BYTE;
+	}
+	return 0;
+}
+
+int TransferBlockSPC (unsigned char *srcAddr, uint16_t SPCDestAddr, uint16_t size) {
+	uint8_t dummyRead;
+	uint8_t dummyRead2;
+	uint16_t byteWrite;
+	uint8_t *localPointer;
+	uint16_t i;
+		
+	
+	//The counter to assure each byte was transfered correctly
+	//This lower 8 bits as a counter while the upper 16 bits are the index
+	uint16_t byteWriteIndex = 0;
+	
+	localPointer = (uint8_t *)srcAddr;
+	
+	REG_APUIO2WORD = SPCDestAddr;
+	
+	dummyRead = REG_APUIO0BYTE;
+	dummyRead += 0x22;
+	//dummyRead = 0xCC
+	
+	//Special case, increment by 2 or more on the counter to break sequence
+	//If 0 increment 1 more as value must be non-zero
+	if (dummyRead == 0) {
+		dummyRead++;
+	}
+	REG_APUIO1BYTE = dummyRead;
+	REG_APUIO0BYTE = dummyRead;
+	
+	//Wait for Acknowledgement
+	while (REG_APUIO0BYTE != ((uint8_t)dummyRead) ) {}
+	
+	for (i = 0; i < size; i++) {
+		//Copy byte
+		REG_APUIO1BYTE = localPointer[i];
+		//Increment counter
+		REG_APUIO0BYTE = i;	//Lower 8 bits
+		while (REG_APUIO0BYTE != ((uint8_t)i) ) {}
+		//Wait for counter to reflect back
+	}
+	
+	//The other bug mentioned in the manual about too big a delay
+	//is caused by their stupid transfer routine not exiting sometimes due
+	//to the data exit code being 0x0000. Their fault and our reverse engineering
+	//has bypassed the problem.
+	
+	return 0;
+}
+
+int SPCExecute(uint16_t startAddr) {
+	uint16_t dummyX;
+	uint8_t dummyA;
+	uint8_t dummyRead;
+	
+	uint16_t varStall = 0;
+	uint16_t debug = 0;
+	
+	dummyX = startAddr;
+	REG_APUIO2WORD = dummyX;
+	REG_APUIO1BYTE = 0;
+	//Read previous counter value
+	dummyA = REG_APUIO0BYTE;
+	//Add more than 1
+	dummyA += 0x02;
+	
+	//Write back
+	REG_APUIO0BYTE = dummyA;
+	
+	//Wait for value to be echoed
+	//This can fail if the spc700 program modifies the port before it's read.
+	//Wait for Acknowledgement
+	do {
+		dummyRead = REG_APUIO0BYTE;
+	} while (dummyA != dummyRead);
+	
+	
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

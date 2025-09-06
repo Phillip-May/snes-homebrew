@@ -1,5 +1,0 @@
--Abank3=848000,020000
--Abank4=858000,028000
--C818000,008000 mainBankZero.obj vectors.obj
--C828000,010000 lib\kernel.obj lib\initsnes.obj 
--D7E2000,018000 -K048000,20000 -Lcl

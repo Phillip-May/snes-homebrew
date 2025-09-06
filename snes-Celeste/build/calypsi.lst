@@ -1,0 +1,2433 @@
+###############################################################################
+#                                                                             #
+# Calypsi ISO C compiler for 65816                               version 5.11 #
+#                                                       06/Sep/2025  14:19:24 #
+# Command line: --core=65816 -O2 --speed --code-model=large                   #
+#               --data-model=large --list-file=build/calypsi.lst -o           #
+#               build/fix16.o src/libfixmath/fix16.c                          #
+#                                                                             #
+###############################################################################
+
+    \ 000000                      .rtmodel version,"1"
+    \ 000000                      .rtmodel codeModel,"large"
+    \ 000000                      .rtmodel dataModel,"large"
+    \ 000000                      .rtmodel core,"65816"
+    \ 000000                      .rtmodel huge,"0"
+    \ 000000                      .rtmodel doubleSize,"32"
+    \ 000000                      .extern _Dp
+    \ 000000                      .extern _Mul16
+    \ 000000                      .extern _Mul32
+    \ 000000                      .extern _UDivMod32
+    \ 000000                      .extern _Vfp
+0001                  #include "defines.h"
+0002                  #include "fix16.h"
+0003                  #include "int64.h"
+0004                  
+0005                  /* Subtraction and addition with overflow detection.
+0006                   * The versions without overflow detection are inlined in the header.
+0007                   */
+0008                  #ifndef FIXMATH_NO_OVERFLOW
+0009                  fix16_t fix16_add(fix16_t a, fix16_t b)
+0010                  {
+0011                    // Use unsigned integers because overflow with signed integers is
+0012                    // an undefined operation (http://www.airs.com/blog/archives/120).
+0013                    uint32_t _a = a, _b = b;
+0014                    uint32_t sum = _a + _b;
+0015                  
+0016                    // Overflow can only happen if sign of a == sign of b, and then
+0017                    // it causes sign of sum != sign of a.
+0018                    if (!((_a ^ _b) & 0x80000000) && ((_a ^ sum) & 0x80000000))
+0019                      return fix16_overflow;
+0020                    
+0021                    return sum;
+0022                  }
+0023                  
+0024                  fix16_t fix16_sub(fix16_t a, fix16_t b)
+0025                  {
+0026                    uint32_t _a = a, _b = b;
+0027                    uint32_t diff = _a - _b;
+0028                  
+0029                    // Overflow can only happen if sign of a != sign of b, and then
+0030                    // it causes sign of diff != sign of a.
+0031                    if (((_a ^ _b) & 0x80000000) && ((_a ^ diff) & 0x80000000))
+0032                      return fix16_overflow;
+0033                    
+0034                    return diff;
+0035                  }
+0036                  
+0037                  /* Saturating arithmetic */
+0038                  fix16_t fix16_sadd(fix16_t a, fix16_t b)
+0039                  {
+0040                    fix16_t result = fix16_add(a, b);
+0041                  
+0042                    if (result == fix16_overflow)
+0043                      return (a > 0) ? fix16_max : fix16_min;
+0044                  
+0045                    return result;
+0046                  }  
+0047                  
+0048                  fix16_t fix16_ssub(fix16_t a, fix16_t b)
+0049                  {
+0050                    fix16_t result = fix16_sub(a, b);
+0051                  
+0052                    if (result == fix16_overflow)
+0053                      return (a > 0) ? fix16_max : fix16_min;
+0054                  
+0055                    return result;
+0056                  }
+0057                  #endif
+0058                  
+0059                  
+0060                  
+0061                  /* 64-bit implementation for fix16_mul. Fastest version for e.g. ARM Cortex M3.
+0062                   * Performs a 32*32 -> 64bit multiplication. The middle 32 bits are the result,
+0063                   * bottom 16 bits are used for rounding, and upper 16 bits are used for overflow
+0064                   * detection.
+0065                   */
+0066                   
+0067                  #if !defined(FIXMATH_NO_64BIT) && !defined(FIXMATH_OPTIMIZE_8BIT)
+0068                  fix16_t fix16_mul(fix16_t inArg0, fix16_t inArg1)
+0069                  {
+0070                    int64_t product = (int64_t)inArg0 * inArg1;
+0071                    
+0072                    #ifndef FIXMATH_NO_OVERFLOW
+0073                    // The upper 17 bits should all be the same (the sign).
+0074                    uint32_t upper = (product >> 47);
+0075                    #endif
+0076                    
+0077                    if (product < 0)
+0078                    {
+0079                      #ifndef FIXMATH_NO_OVERFLOW
+0080                      if (~upper)
+0081                          return fix16_overflow;
+0082                      #endif
+0083                      
+0084                      #ifndef FIXMATH_NO_ROUNDING
+0085                      // This adjustment is required in order to round -1/2 correctly
+0086                      product--;
+0087                      #endif
+0088                    }
+0089                    else
+0090                    {
+0091                      #ifndef FIXMATH_NO_OVERFLOW
+0092                      if (upper)
+0093                          return fix16_overflow;
+0094                      #endif
+0095                    }
+0096                    
+0097                    #ifdef FIXMATH_NO_ROUNDING
+0098                    return product >> 16;
+0099                    #else
+0100                    fix16_t result = product >> 16;
+0101                    result += (product & 0x8000) >> 15;
+0102                    
+0103                    return result;
+0104                    #endif
+0105                  }
+0106                  #endif
+0107                  
+0108                  /* 32-bit implementation of fix16_mul. Potentially fast on 16-bit processors,
+0109                   * and this is a relatively good compromise for compilers that do not support
+0110                   * uint64_t. Uses 16*16->32bit multiplications.
+0111                   */
+0112                  #if defined(FIXMATH_NO_64BIT) && !defined(FIXMATH_OPTIMIZE_8BIT)
+0113                  fix16_t fix16_mul(fix16_t inArg0, fix16_t inArg1)
+0114                  {
+    \ 000000                      .public fix16_mul
+0115                    // Each argument is divided to 16-bit parts.
+0116                    //          AB
+0117                    //      *   CD
+0118                    // -----------
+0119                    //          BD  16 * 16 -> 32 bit products
+0120                    //         CB
+0121                    //         AD
+0122                    //        AC
+0123                    //       |----| 64 bit product
+0124                    uint32_t product_lo_tmp;
+0125                    fix16_t result;
+0126                    int32_t A = (inArg0 >> 16), C = (inArg1 >> 16);
+0127                    uint32_t B = (inArg0 & 0xFFFF), D = (inArg1 & 0xFFFF);
+0128                    
+0129                    int32_t AC = A*C;
+0130                    int32_t AD_CB = A*D + C*B;
+0131                    uint32_t BD = B*D;
+0132                    
+0133                    int32_t product_hi = AC + (AD_CB >> 16);
+0134                    
+0135                    // Handle carry from lower 32 bits to upper part of result.
+0136                    uint32_t ad_cb_temp = AD_CB << 16;
+0137                    uint32_t product_lo = BD + ad_cb_temp;
+0138                    if (product_lo < BD)
+0139                      product_hi++;
+0140                    
+0141                  #ifndef FIXMATH_NO_OVERFLOW
+0142                    // The upper 17 bits should all be the same (the sign).
+0143                    if (product_hi >> 31 != product_hi >> 15)
+0144                      return fix16_overflow;
+0145                  #endif
+0146                    
+0147                  #ifdef FIXMATH_NO_ROUNDING
+0148                    return (product_hi << 16) | (product_lo >> 16);
+0149                  #else
+0150                    // Subtracting 0x8000 (= 0.5) and then using signed right shift
+0151                    // achieves proper rounding to result-1, except in the corner
+0152                    // case of negative numbers and lowest word = 0x8000.
+0153                    // To handle that, we also have to subtract 1 for negative numbers.
+0154                    product_lo_tmp = product_lo;
+0155                    product_lo -= 0x8000;
+0156                    product_lo -= (uint32_t)product_hi >> 31;
+0157                    if (product_lo > product_lo_tmp)
+0158                      product_hi--;
+0159                    
+0160                    // Discard the lowest 16 bits. Note that this is not exactly the same
+0161                    // as dividing by 0x10000. For example if product = -1, result will
+0162                    // also be -1 and not 0. This is compensated by adding +1 to the result
+0163                    // and compensating this in turn in the rounding above.
+0164                    result = (product_hi << 16) | (product_lo >> 16);
+0165                    result += 1;
+0166                    return result;
+0167                  #endif
+0168                  }
+0169                  #endif
+0170                  
+0171                  /* 8-bit implementation of fix16_mul. Fastest on e.g. Atmel AVR.
+0172                   * Uses 8*8->16bit multiplications, and also skips any bytes that
+0173                   * are zero.
+0174                   */
+0175                  #if defined(FIXMATH_OPTIMIZE_8BIT)
+0176                  fix16_t fix16_mul(fix16_t inArg0, fix16_t inArg1)
+0177                  {
+0178                    fix16_t result;
+0179                    uint32_t _a = (inArg0 >= 0) ? inArg0 : (-inArg0);
+0180                    uint32_t _b = (inArg1 >= 0) ? inArg1 : (-inArg1);
+0181                    
+0182                    uint8_t va[4];
+0183                    uint8_t vb[4];  
+0184                    uint32_t low = 0;
+0185                    uint32_t mid = 0;
+0186                  
+0187                    va[0] = _a;
+0188                    va[1] = (_a >> 8);
+0189                    va[2] = (_a >> 16);
+0190                    va[3] = (_a >> 24);
+0191                    vb[0] = _b;
+0192                    vb[1] = (_b >> 8);
+0193                    vb[2] = (_b >> 16);
+0194                    vb[3] = (_b >> 24);
+0195                  
+0196                    // Result column i depends on va[0..i] and vb[i..0]
+0197                  
+0198                    #ifndef FIXMATH_NO_OVERFLOW
+0199                    // i = 6
+0200                    if (va[3] && vb[3]) return fix16_overflow;
+0201                    #endif
+0202                    
+0203                    // i = 5
+0204                    if (va[2] && vb[3]) mid += (uint16_t)va[2] * vb[3];
+0205                    if (va[3] && vb[2]) mid += (uint16_t)va[3] * vb[2];
+0206                    mid <<= 8;
+0207                    
+0208                    // i = 4
+0209                    if (va[1] && vb[3]) mid += (uint16_t)va[1] * vb[3];
+0210                    if (va[2] && vb[2]) mid += (uint16_t)va[2] * vb[2];
+0211                    if (va[3] && vb[1]) mid += (uint16_t)va[3] * vb[1];
+0212                    
+0213                    #ifndef FIXMATH_NO_OVERFLOW
+0214                    if (mid & 0xFF000000) return fix16_overflow;
+0215                    #endif
+0216                    mid <<= 8;
+0217                    
+0218                    // i = 3
+0219                    if (va[0] && vb[3]) mid += (uint16_t)va[0] * vb[3];
+0220                    if (va[1] && vb[2]) mid += (uint16_t)va[1] * vb[2];
+0221                    if (va[2] && vb[1]) mid += (uint16_t)va[2] * vb[1];
+0222                    if (va[3] && vb[0]) mid += (uint16_t)va[3] * vb[0];
+0223                    
+0224                    #ifndef FIXMATH_NO_OVERFLOW
+0225                    if (mid & 0xFF000000) return fix16_overflow;
+0226                    #endif
+0227                    mid <<= 8;
+0228                    
+0229                    // i = 2
+0230                    if (va[0] && vb[2]) mid += (uint16_t)va[0] * vb[2];
+0231                    if (va[1] && vb[1]) mid += (uint16_t)va[1] * vb[1];
+0232                    if (va[2] && vb[0]) mid += (uint16_t)va[2] * vb[0];    
+0233                    
+0234                    // i = 1
+0235                    if (va[0] && vb[1]) low += (uint16_t)va[0] * vb[1];
+0236                    if (va[1] && vb[0]) low += (uint16_t)va[1] * vb[0];
+0237                    low <<= 8;
+0238                    
+0239                    // i = 0
+0240                    if (va[0] && vb[0]) low += (uint16_t)va[0] * vb[0];
+0241                    
+0242                    #ifndef FIXMATH_NO_ROUNDING
+0243                    low += 0x8000;
+0244                    #endif
+0245                    mid += (low >> 16);
+0246                    
+0247                    #ifndef FIXMATH_NO_OVERFLOW
+0248                    if (mid & 0x80000000)
+0249                      return fix16_overflow;
+0250                    #endif
+0251                    
+0252                    result = mid;
+0253                    
+0254                    /* Figure out the sign of result */
+0255                    if ((inArg0 >= 0) != (inArg1 >= 0))
+0256                    {
+0257                      result = -result;
+0258                    }
+0259                    
+0260                    return result;
+0261                  }
+0262                  #endif
+0263                  
+0264                  #ifndef FIXMATH_NO_OVERFLOW
+0265                  /* Wrapper around fix16_mul to add saturating arithmetic. */
+0266                  fix16_t fix16_smul(fix16_t inArg0, fix16_t inArg1) {
+0267                    fix16_t result = fix16_mul(inArg0, inArg1);
+0268                    
+0269                    if (result == fix16_overflow)
+0270                    {
+0271                      if ((inArg0 >= 0) == (inArg1 >= 0))
+0272                        return fix16_max;
+0273                      else
+0274                        return fix16_min;
+0275                    }
+0276                    
+0277                    return result;
+0278                  }
+0279                  #endif
+0280                  
+0281                  /* 32-bit implementation of fix16_div. Fastest version for e.g. ARM Cortex M3.
+0282                   * Performs 32-bit divisions repeatedly to reduce the remainder. For this to
+0283                   * be efficient, the processor has to have 32-bit hardware division.
+0284                   */
+0285                  #if !defined(FIXMATH_OPTIMIZE_8BIT)
+0286                  #ifdef __GNUC__
+0287                  // Count leading zeros, using processor-specific instruction if available.
+0288                  #define clz(x) __builtin_clzl(x)
+0289                  #else
+0290                  static uint8_t clz(uint32_t x)
+0291                  {
+0292                    uint8_t result = 0;
+0293                    if (x == 0) return 32;
+0294                    while (!(x & 0xF0000000)) { result += 4; x <<= 4; }
+0295                    while (!(x & 0x80000000)) { result += 1; x <<= 1; }
+0296                    return result;
+0297                  }
+0298                  #endif
+0299                  
+0300                  fix16_t fix16_div(fix16_t a, fix16_t b)
+0301                  {
+    \ 000000                      .public fix16_div
+0302                    // This uses a hardware 32/32 bit division multiple times, until we have
+0303                    // computed all the bits in (a<<17)/b. Usually this takes 1-3 iterations.
+0304                    fix16_t result;
+0305                    uint32_t remainder;
+0306                    uint32_t divider;
+0307                    uint32_t quotient;
+0308                    int32_t bit_pos;
+0309                    
+0310                    if (b == 0)
+0311                        return fix16_min;
+0312                    
+0313                    remainder = (a >= 0) ? a : (-a);
+0314                    divider = (b >= 0) ? b : (-b);
+0315                    quotient = 0;
+0316                    bit_pos = 17;
+0317                    
+0318                    // Kick-start the division a bit.
+0319                    // This improves speed in the worst-case scenarios where N and D are large
+0320                    // It gets a lower estimate for the result by N/(D >> 17 + 1).
+0321                    if (divider & 0xFFF00000ul)
+0322                    {
+0323                      uint32_t shifted_div = ((divider >> 17) + 1);
+0324                      _int64_t temp;
+0325                      quotient = remainder / shifted_div;
+0326                      temp = int64_mul_i64_i32(int64_from_int32(quotient), divider);
+0327                      remainder -= int64_hi(int64_shift(temp, -17));
+0328                    }
+0329                    
+0330                    // If the divider is divisible by 2^n, take advantage of it.
+0331                    while (!(divider & 0xF) && bit_pos >= 4)
+0332                    {
+0333                      divider >>= 4;
+0334                      bit_pos -= 4;
+0335                    }
+0336                    
+0337                    while (remainder && bit_pos >= 0)
+0338                    {
+0339                      // Shift remainder as much as we can without overflowing
+0340                      uint32_t div;
+0341                      int32_t shift = clz(remainder);
+0342                      if (shift > bit_pos) shift = bit_pos;
+0343                      remainder <<= shift;
+0344                      bit_pos -= shift;
+0345                      
+0346                      div = remainder / divider;
+0347                      remainder = remainder % divider;
+0348                      quotient += div << bit_pos;
+0349                  
+0350                      #ifndef FIXMATH_NO_OVERFLOW
+0351                      if (div & ~(0xFFFFFFFF >> bit_pos))
+0352                          return fix16_overflow;
+0353                      #endif
+0354                      
+0355                      remainder <<= 1;
+0356                      bit_pos--;
+0357                    }
+0358                    
+0359                    #ifndef FIXMATH_NO_ROUNDING
+0360                    // Quotient is always positive so rounding is easy
+0361                    quotient++;
+0362                    #endif
+0363                    
+0364                    result = quotient >> 1;
+0365                    
+0366                    // Figure out the sign of the result
+0367                    if ((a ^ b) & 0x80000000ul)
+0368                    {
+0369                      #ifndef FIXMATH_NO_OVERFLOW
+0370                      if (result == fix16_min)
+0371                          return fix16_overflow;
+0372                      #endif
+0373                      
+0374                      result = -result;
+0375                    }
+0376                    
+0377                    return result;
+0378                  }
+0379                  #endif
+0380                  
+0381                  /* Alternative 32-bit implementation of fix16_div. Fastest on e.g. Atmel AVR.
+0382                   * This does the division manually, and is therefore good for processors that
+0383                   * do not have hardware division.
+0384                   */
+0385                  #if defined(FIXMATH_OPTIMIZE_8BIT)
+0386                  fix16_t fix16_div(fix16_t a, fix16_t b)
+0387                  {
+0388                    uint32_t remainder, divider, quotient, bit;
+0389                    fix16_t result;
+0390                    
+0391                    // This uses the basic binary restoring division algorithm.
+0392                    // It appears to be faster to do the whole division manually than
+0393                    // trying to compose a 64-bit divide out of 32-bit divisions on
+0394                    // platforms without hardware divide.
+0395                    
+0396                    if (b == 0)
+0397                      return fix16_min;
+0398                    
+0399                    remainder = (a >= 0) ? a : (-a);
+0400                    divider = (b >= 0) ? b : (-b);
+0401                    quotient = 0;
+0402                    bit = 0x10000;
+0403                    
+0404                    /* The algorithm requires D >= R */
+0405                    while (divider < remainder)
+0406                    {
+0407                      divider <<= 1;
+0408                      bit <<= 1;
+0409                    }
+0410                    
+0411                    #ifndef FIXMATH_NO_OVERFLOW
+0412                    if (!bit)
+0413                      return fix16_overflow;
+0414                    #endif
+0415                    
+0416                    if (divider & 0x80000000)
+0417                    {
+0418                      // Perform one step manually to avoid overflows later.
+0419                      // We know that divider's bottom bit is 0 here.
+0420                      if (remainder >= divider)
+0421                      {
+0422                          quotient |= bit;
+0423                          remainder -= divider;
+0424                      }
+0425                      divider >>= 1;
+0426                      bit >>= 1;
+0427                    }
+0428                    
+0429                    /* Main division loop */
+0430                    while (bit && remainder)
+0431                    {
+0432                      if (remainder >= divider)
+0433                      {
+0434                          quotient |= bit;
+0435                          remainder -= divider;
+0436                      }
+0437                      
+0438                      remainder <<= 1;
+0439                      bit >>= 1;
+0440                    }   
+0441                        
+0442                    #ifndef FIXMATH_NO_ROUNDING
+0443                    if (remainder >= divider)
+0444                    {
+0445                      quotient++;
+0446                    }
+0447                    #endif
+0448                    
+0449                    result = quotient;
+0450                    
+0451                    /* Figure out the sign of result */
+0452                    if ((a ^ b) & 0x80000000)
+0453                    {
+0454                      #ifndef FIXMATH_NO_OVERFLOW
+0455                      if (result == fix16_min)
+0456                          return fix16_overflow;
+0457                      #endif
+0458                      
+0459                      result = -result;
+0460                    }
+0461                    
+0462                    return result;
+0463                  }
+0464                  #endif
+0465                  
+0466                  #ifndef FIXMATH_NO_OVERFLOW
+0467                  /* Wrapper around fix16_div to add saturating arithmetic. */
+0468                  fix16_t fix16_sdiv(fix16_t inArg0, fix16_t inArg1) {
+0469                    fix16_t result = fix16_div(inArg0, inArg1);
+0470                    
+0471                    if (result == fix16_overflow)
+0472                    {
+0473                      if ((inArg0 >= 0) == (inArg1 >= 0))
+0474                        return fix16_max;
+0475                      else
+0476                        return fix16_min;
+0477                    }
+0478                    
+0479                    return result;
+0480                  }
+0481                  #endif
+0482                  
+0483                  fix16_t fix16_lerp8(fix16_t inArg0, fix16_t inArg1, uint8_t inFract) {
+    \ 000000                      .public fix16_lerp8
+0484                  	int64_t tempOut = int64_mul_i32_i32(inArg0, ((int32_t)1 << 8) - inFract);
+0485                  	tempOut = int64_add(tempOut, int64_mul_i32_i32(inArg1, inFract));
+0486                  	tempOut = int64_shift(tempOut, -8);
+0487                  	return (fix16_t)int64_lo(tempOut);
+0488                  }
+0489                  
+0490                  fix16_t fix16_lerp16(fix16_t inArg0, fix16_t inArg1, uint16_t inFract) {
+    \ 000000                      .public fix16_lerp16
+    \ 000000                      .section cfar,rodata
+    \ 000000          FOUR_DIV_PI:
+    \ 000000 f3450100             .long   0x145f3
+    \ 000000                      .section cfar,rodata
+    \ 000000          _FOUR_DIV_PI2:
+    \ 000000 4098ffff             .long   -26560
+    \ 000000                      .section cfar,rodata
+    \ 000000          X4_CORRECTION_COMPONENT:
+    \ 000000 9a390000             .long   0x399a
+    \ 000000                      .section cfar,rodata
+    \ 000000 0fc90000 PI_DIV_4:   .long   0xc90f
+    \ 000000                      .section cfar,rodata
+    \ 000000          THREE_PI_DIV_4:
+    \ 000000 2f5b0200             .long   0x25b2f
+    \ 000000                      .section cfar,rodata
+    \ 000000 ffffff7f fix16_max:  .long   0x7fffffff
+    \ 000000                      .section cfar,rodata
+    \ 000000 00000080 fix16_min:  .long   -2147483648
+    \ 000000                      .section cfar,rodata
+    \ 000000          fix16_overflow:
+    \ 000000 00000080             .long   -2147483648
+    \ 000000                      .section cfar,rodata
+    \ 000000 3f240300 fix16_pi:   .long   0x3243f
+    \ 000000                      .section cfar,rodata
+    \ 000000 e1b70200 fix16_e:    .long   0x2b7e1
+    \ 000000                      .section cfar,rodata
+    \ 000000 00000100 fix16_one:  .long   0x10000
+    \ 000000                      .section farcode,text
+    \ 000000          int64_const:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 5a                   phy
+    \ 000005 5a                   phy
+    \ 000006 5a                   phy
+    \ 000007 5a                   phy
+    \ 000008 86..                 stx     dp:.tiny (_Dp+10)
+    \ 00000a 85..                 sta     dp:.tiny (_Dp+8)
+    \ 00000c a5..                 lda     dp:.tiny (_Dp+8)
+    \ 00000e 8301                 sta     1,s
+    \ 000010 a5..                 lda     dp:.tiny (_Dp+10)
+    \ 000012 8303                 sta     3,s
+    \ 000014 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 000016 8305                 sta     5,s
+    \ 000018 a5..                 lda     dp:.tiny (_Dp+6)
+    \ 00001a 8307                 sta     7,s
+    \ 00001c a00600               ldy     ##6
+    \ 00001f 97..                 sta     [.tiny _Dp],y
+    \ 000021 a305                 lda     5,s
+    \ 000023 a00400               ldy     ##4
+    \ 000026 97..                 sta     [.tiny _Dp],y
+    \ 000028 a303                 lda     3,s
+    \ 00002a a00200               ldy     ##2
+    \ 00002d 97..                 sta     [.tiny _Dp],y
+    \ 00002f a301                 lda     1,s
+    \ 000031 22......             jsl     long:`?L465`
+    \ 000035 7a                   ply
+    \ 000036 7a                   ply
+    \ 000037 7a                   ply
+    \ 000038 7a                   ply
+    \ 000039 7a                   ply
+    \ 00003a 84..                 sty     dp:.tiny (_Dp+10)
+    \ 00003c 7a                   ply
+    \ 00003d 84..                 sty     dp:.tiny (_Dp+8)
+    \ 00003f 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          int64_from_int32:
+    \ 000000 a8                   tay
+    \ 000001 3b                   tsc
+    \ 000002 38                   sec
+    \ 000003 e90a00               sbc     ##10
+    \ 000006 1b                   tcs
+    \ 000007 98                   tya
+    \ 000008 86..                 stx     dp:.tiny (_Dp+6)
+    \ 00000a 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00000c a5..                 lda     dp:.tiny (_Dp+6)
+    \ 00000e 3007                 bmi     `?L208`
+    \ 000010 a90000               lda     ##0
+    \ 000013 8301                 sta     1,s
+    \ 000015 8005                 bra     `?L209`
+    \ 000017 a9ffff   `?L208`:    lda     ##-1
+    \ 00001a 8301                 sta     1,s
+    \ 00001c a301     `?L209`:    lda     1,s
+    \ 00001e a20000               ldx     ##0
+    \ 000021 a8                   tay
+    \ 000022 1001                 bpl     `?L280`
+    \ 000024 ca                   dex
+    \ 000025 8303     `?L280`:    sta     3,s
+    \ 000027 8a                   txa
+    \ 000028 8305                 sta     5,s
+    \ 00002a a5..                 lda     dp:.tiny (_Dp+4)
+    \ 00002c 8307                 sta     7,s
+    \ 00002e a5..                 lda     dp:.tiny (_Dp+6)
+    \ 000030 8309                 sta     9,s
+    \ 000032 a00600               ldy     ##6
+    \ 000035 97..                 sta     [.tiny _Dp],y
+    \ 000037 a307                 lda     7,s
+    \ 000039 a00400               ldy     ##4
+    \ 00003c 97..                 sta     [.tiny _Dp],y
+    \ 00003e a305                 lda     5,s
+    \ 000040 a00200               ldy     ##2
+    \ 000043 97..                 sta     [.tiny _Dp],y
+    \ 000045 a303                 lda     3,s
+    \ 000047 22......             jsl     long:`?L465`
+    \ 00004b a8                   tay
+    \ 00004c 3b                   tsc
+    \ 00004d 18                   clc
+    \ 00004e 690a00               adc     ##10
+    \ 000051 1b                   tcs
+    \ 000052 98                   tya
+    \ 000053 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000 a306     int64_hi:   lda     6,s
+    \ 000002 aa                   tax
+    \ 000003 a304                 lda     4,s
+    \ 000005 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000 a30a     int64_lo:   lda     10,s
+    \ 000002 aa                   tax
+    \ 000003 a308                 lda     8,s
+    \ 000005 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000 5a       int64_add:  phy
+    \ 000001 5a                   phy
+    \ 000002 5a                   phy
+    \ 000003 5a                   phy
+    \ 000004 18                   clc
+    \ 000005 a30c                 lda     12,s
+    \ 000007 6314                 adc     20,s
+    \ 000009 48                   pha
+    \ 00000a a310                 lda     16,s
+    \ 00000c 6318                 adc     24,s
+    \ 00000e aa                   tax
+    \ 00000f 68                   pla
+    \ 000010 8301                 sta     1,s
+    \ 000012 8a                   txa
+    \ 000013 8303                 sta     3,s
+    \ 000015 18                   clc
+    \ 000016 a310                 lda     16,s
+    \ 000018 6318                 adc     24,s
+    \ 00001a 48                   pha
+    \ 00001b a314                 lda     20,s
+    \ 00001d 631c                 adc     28,s
+    \ 00001f aa                   tax
+    \ 000020 68                   pla
+    \ 000021 8305                 sta     5,s
+    \ 000023 8a                   txa
+    \ 000024 8307                 sta     7,s
+    \ 000026 a305                 lda     5,s
+    \ 000028 c310                 cmp     16,s
+    \ 00002a a307                 lda     7,s
+    \ 00002c e312                 sbc     18,s
+    \ 00002e 900a                 bcc     `?L82`
+    \ 000030 a305                 lda     5,s
+    \ 000032 c318                 cmp     24,s
+    \ 000034 a307                 lda     7,s
+    \ 000036 e31a                 sbc     26,s
+    \ 000038 b00f                 bcs     `?L81`
+    \ 00003a 18       `?L82`:     clc
+    \ 00003b a301                 lda     1,s
+    \ 00003d 690100               adc     ##1
+    \ 000040 8301                 sta     1,s
+    \ 000042 a303                 lda     3,s
+    \ 000044 690000               adc     ##0
+    \ 000047 8303                 sta     3,s
+    \ 000049 a307     `?L81`:     lda     7,s
+    \ 00004b a00600               ldy     ##6
+    \ 00004e 97..                 sta     [.tiny _Dp],y
+    \ 000050 a305                 lda     5,s
+    \ 000052 a00400               ldy     ##4
+    \ 000055 97..                 sta     [.tiny _Dp],y
+    \ 000057 a303                 lda     3,s
+    \ 000059 a00200               ldy     ##2
+    \ 00005c 97..                 sta     [.tiny _Dp],y
+    \ 00005e a301                 lda     1,s
+    \ 000060 22......             jsl     long:`?L465`
+    \ 000064 5c......             jmp     long:`?L86`
+    \ 000000                      .section farcode,text
+    \ 000000 5a       int64_neg:  phy
+    \ 000001 5a                   phy
+    \ 000002 5a                   phy
+    \ 000003 5a                   phy
+    \ 000004 a30e                 lda     14,s
+    \ 000006 49ffff               eor     ##-1
+    \ 000009 48                   pha
+    \ 00000a a30e                 lda     14,s
+    \ 00000c 49ffff               eor     ##-1
+    \ 00000f 8303                 sta     3,s
+    \ 000011 68                   pla
+    \ 000012 8303                 sta     3,s
+    \ 000014 a312                 lda     18,s
+    \ 000016 49ffff               eor     ##-1
+    \ 000019 aa                   tax
+    \ 00001a a310                 lda     16,s
+    \ 00001c 49ffff               eor     ##-1
+    \ 00001f 1a                   inc     a
+    \ 000020 d001                 bne     `?L282`
+    \ 000022 e8                   inx
+    \ 000023 8305     `?L282`:    sta     5,s
+    \ 000025 8a                   txa
+    \ 000026 8307                 sta     7,s
+    \ 000028 a305                 lda     5,s
+    \ 00002a 0307                 ora     7,s
+    \ 00002c d00f                 bne     `?L88`
+    \ 00002e 18                   clc
+    \ 00002f a301                 lda     1,s
+    \ 000031 690100               adc     ##1
+    \ 000034 8301                 sta     1,s
+    \ 000036 a303                 lda     3,s
+    \ 000038 690000               adc     ##0
+    \ 00003b 8303                 sta     3,s
+    \ 00003d a307     `?L88`:     lda     7,s
+    \ 00003f a00600               ldy     ##6
+    \ 000042 97..                 sta     [.tiny _Dp],y
+    \ 000044 a305                 lda     5,s
+    \ 000046 a00400               ldy     ##4
+    \ 000049 97..                 sta     [.tiny _Dp],y
+    \ 00004b a303                 lda     3,s
+    \ 00004d a00200               ldy     ##2
+    \ 000050 97..                 sta     [.tiny _Dp],y
+    \ 000052 a301                 lda     1,s
+    \ 000054 22......             jsl     long:`?L465`
+    \ 000058 7a       `?L86`:     ply
+    \ 000059 7a                   ply
+    \ 00005a 7a                   ply
+    \ 00005b 7a                   ply
+    \ 00005c 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          int64_shift:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 3b                   tsc
+    \ 000005 38                   sec
+    \ 000006 e90a00               sbc     ##10
+    \ 000009 1b                   tcs
+    \ 00000a a90000               lda     ##0
+    \ 00000d 8303                 sta     3,s
+    \ 00000f 8305                 sta     5,s
+    \ 000011 8307                 sta     7,s
+    \ 000013 8309                 sta     9,s
+    \ 000015 a31a                 lda     26,s
+    \ 000017 e220                 sep     #32
+    \ 000019 38                   sec
+    \ 00001a e940                 sbc     #64
+    \ 00001c 5002                 bvc     `?L284`
+    \ 00001e 4980                 eor     #-128
+    \ 000020 c220     `?L284`:    rep     #32
+    \ 000022 3003                 bmi     `?L520`
+    \ 000024 4c....               jmp     .kbank `?L103`
+    \ 000027 a9c000   `?L520`:    lda     ##192
+    \ 00002a e220                 sep     #32
+    \ 00002c 38                   sec
+    \ 00002d e31a                 sbc     26,s
+    \ 00002f 5002                 bvc     `?L286`
+    \ 000031 4980                 eor     #-128
+    \ 000033 c220     `?L286`:    rep     #32
+    \ 000035 3003                 bmi     `?L521`
+    \ 000037 4c....               jmp     .kbank `?L103`
+    \ 00003a a31a     `?L521`:    lda     26,s
+    \ 00003c e220                 sep     #32
+    \ 00003e 38                   sec
+    \ 00003f e920                 sbc     #32
+    \ 000041 5002                 bvc     `?L288`
+    \ 000043 4980                 eor     #-128
+    \ 000045 c220     `?L288`:    rep     #32
+    \ 000047 301e                 bmi     `?L102`
+    \ 000049 22......             jsl     long:`?L454`
+    \ 00004d 38                   sec
+    \ 00004e e92000               sbc     ##32
+    \ 000051 22......             jsl     long:`?L458`
+    \ 000055 f006                 beq     `?L290`
+    \ 000057 0a       `?L291`:    asl     a
+    \ 000058 26..                 rol     dp:.tiny (_Dp+4)
+    \ 00005a 88                   dey
+    \ 00005b d0fa                 bne     `?L291`
+    \ 00005d          `?L290`:
+    \ 00005d a6..                 ldx     dp:.tiny (_Dp+4)
+    \ 00005f 8303                 sta     3,s
+    \ 000061 8a                   txa
+    \ 000062 8305                 sta     5,s
+    \ 000064 4c....               jmp     .kbank `?L103`
+    \ 000067 a90000   `?L102`:    lda     ##0
+    \ 00006a e220                 sep     #32
+    \ 00006c 38                   sec
+    \ 00006d e31a                 sbc     26,s
+    \ 00006f 5002                 bvc     `?L294`
+    \ 000071 4980                 eor     #-128
+    \ 000073 c220     `?L294`:    rep     #32
+    \ 000075 1060                 bpl     `?L105`
+    \ 000077 22......             jsl     long:`?L454`
+    \ 00007b 22......             jsl     long:`?L466`
+    \ 00007f 86..                 stx     dp:.tiny (_Dp+4)
+    \ 000081 c8                   iny
+    \ 000082 88                   dey
+    \ 000083 f006                 beq     `?L296`
+    \ 000085 0a       `?L297`:    asl     a
+    \ 000086 26..                 rol     dp:.tiny (_Dp+4)
+    \ 000088 88                   dey
+    \ 000089 d0fa                 bne     `?L297`
+    \ 00008b          `?L296`:
+    \ 00008b a6..                 ldx     dp:.tiny (_Dp+4)
+    \ 00008d 86..                 stx     dp:.tiny (_Dp+6)
+    \ 00008f 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000091 22......             jsl     long:`?L454`
+    \ 000095 85..                 sta     dp:.tiny (_Dp+8)
+    \ 000097 a92000               lda     ##32
+    \ 00009a 38                   sec
+    \ 00009b e5..                 sbc     dp:.tiny (_Dp+8)
+    \ 00009d a8                   tay
+    \ 00009e a318                 lda     24,s
+    \ 0000a0 aa                   tax
+    \ 0000a1 a316                 lda     22,s
+    \ 0000a3 86..                 stx     dp:.tiny (_Dp+8)
+    \ 0000a5 c8                   iny
+    \ 0000a6 88                   dey
+    \ 0000a7 f006                 beq     `?L300`
+    \ 0000a9          `?L301`:
+    \ 0000a9 46..                 lsr     dp:.tiny (_Dp+8)
+    \ 0000ab 6a                   ror     a
+    \ 0000ac 88                   dey
+    \ 0000ad d0fa                 bne     `?L301`
+    \ 0000af          `?L300`:
+    \ 0000af 22......             jsl     long:`?L467`
+    \ 0000b3 48                   pha
+    \ 0000b4 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 0000b6 05..                 ora     dp:.tiny (_Dp+4)
+    \ 0000b8 8305                 sta     5,s
+    \ 0000ba 68                   pla
+    \ 0000bb 8305                 sta     5,s
+    \ 0000bd 22......             jsl     long:`?L454`
+    \ 0000c1 22......             jsl     long:`?L458`
+    \ 0000c5 f006                 beq     `?L304`
+    \ 0000c7 0a       `?L305`:    asl     a
+    \ 0000c8 26..                 rol     dp:.tiny (_Dp+4)
+    \ 0000ca 88                   dey
+    \ 0000cb d0fa                 bne     `?L305`
+    \ 0000cd          `?L304`:
+    \ 0000cd a6..                 ldx     dp:.tiny (_Dp+4)
+    \ 0000cf 8307                 sta     7,s
+    \ 0000d1 8a                   txa
+    \ 0000d2 8309                 sta     9,s
+    \ 0000d4 4c....               jmp     .kbank `?L103`
+    \ 0000d7 a31a     `?L105`:    lda     26,s
+    \ 0000d9 49ffff               eor     ##-1
+    \ 0000dc 1a                   inc     a
+    \ 0000dd e220                 sep     #32
+    \ 0000df 8301                 sta     1,s
+    \ 0000e1 c220                 rep     #32
+    \ 0000e3 a301                 lda     1,s
+    \ 0000e5 e220                 sep     #32
+    \ 0000e7 38                   sec
+    \ 0000e8 e920                 sbc     #32
+    \ 0000ea 5002                 bvc     `?L308`
+    \ 0000ec 4980                 eor     #-128
+    \ 0000ee c220     `?L308`:    rep     #32
+    \ 0000f0 303d                 bmi     `?L108`
+    \ 0000f2 22......             jsl     long:`?L453`
+    \ 0000f6 38                   sec
+    \ 0000f7 e92000               sbc     ##32
+    \ 0000fa 22......             jsl     long:`?L466`
+    \ 0000fe c8                   iny
+    \ 0000ff 88                   dey
+    \ 000100 f00d                 beq     `?L310`
+    \ 000102 86..                 stx     dp:.tiny (_Dp+4)
+    \ 000104 e00080   `?L311`:    cpx     ##-32768
+    \ 000107 66..                 ror     dp:.tiny (_Dp+4)
+    \ 000109 6a                   ror     a
+    \ 00010a 88                   dey
+    \ 00010b d0f7                 bne     `?L311`
+    \ 00010d a6..                 ldx     dp:.tiny (_Dp+4)
+    \ 00010f 8307     `?L310`:    sta     7,s
+    \ 000111 8a                   txa
+    \ 000112 8309                 sta     9,s
+    \ 000114 a314                 lda     20,s
+    \ 000116 3007                 bmi     `?L241`
+    \ 000118 a90000               lda     ##0
+    \ 00011b 8301                 sta     1,s
+    \ 00011d 8005                 bra     `?L242`
+    \ 00011f a9ffff   `?L241`:    lda     ##-1
+    \ 000122 8301                 sta     1,s
+    \ 000124 a301     `?L242`:    lda     1,s
+    \ 000126 a20000               ldx     ##0
+    \ 000129 a8                   tay
+    \ 00012a 105c                 bpl     `?L324`
+    \ 00012c ca                   dex
+    \ 00012d 8059                 bra     `?L324`
+    \ 00012f          `?L108`:
+    \ 00012f 22......             jsl     long:`?L453`
+    \ 000133 22......             jsl     long:`?L458`
+    \ 000137 f006                 beq     `?L316`
+    \ 000139          `?L317`:
+    \ 000139 46..                 lsr     dp:.tiny (_Dp+4)
+    \ 00013b 6a                   ror     a
+    \ 00013c 88                   dey
+    \ 00013d d0fa                 bne     `?L317`
+    \ 00013f          `?L316`:
+    \ 00013f a6..                 ldx     dp:.tiny (_Dp+4)
+    \ 000141 86..                 stx     dp:.tiny (_Dp+6)
+    \ 000143 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000145 22......             jsl     long:`?L453`
+    \ 000149 85..                 sta     dp:.tiny (_Dp+8)
+    \ 00014b a92000               lda     ##32
+    \ 00014e 38                   sec
+    \ 00014f e5..                 sbc     dp:.tiny (_Dp+8)
+    \ 000151 22......             jsl     long:`?L466`
+    \ 000155 86..                 stx     dp:.tiny (_Dp+8)
+    \ 000157 c8                   iny
+    \ 000158 88                   dey
+    \ 000159 f006                 beq     `?L320`
+    \ 00015b 0a       `?L321`:    asl     a
+    \ 00015c 26..                 rol     dp:.tiny (_Dp+8)
+    \ 00015e 88                   dey
+    \ 00015f d0fa                 bne     `?L321`
+    \ 000161          `?L320`:
+    \ 000161 22......             jsl     long:`?L467`
+    \ 000165 48                   pha
+    \ 000166 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 000168 05..                 ora     dp:.tiny (_Dp+4)
+    \ 00016a 8309                 sta     9,s
+    \ 00016c 68                   pla
+    \ 00016d 8309                 sta     9,s
+    \ 00016f 22......             jsl     long:`?L453`
+    \ 000173 22......             jsl     long:`?L466`
+    \ 000177 c8                   iny
+    \ 000178 88                   dey
+    \ 000179 f00d                 beq     `?L324`
+    \ 00017b 86..                 stx     dp:.tiny (_Dp+4)
+    \ 00017d e00080   `?L325`:    cpx     ##-32768
+    \ 000180 66..                 ror     dp:.tiny (_Dp+4)
+    \ 000182 6a                   ror     a
+    \ 000183 88                   dey
+    \ 000184 d0f7                 bne     `?L325`
+    \ 000186 a6..                 ldx     dp:.tiny (_Dp+4)
+    \ 000188 8303     `?L324`:    sta     3,s
+    \ 00018a 8a                   txa
+    \ 00018b 8305                 sta     5,s
+    \ 00018d a309     `?L103`:    lda     9,s
+    \ 00018f a00600               ldy     ##6
+    \ 000192 97..                 sta     [.tiny _Dp],y
+    \ 000194 a307                 lda     7,s
+    \ 000196 a00400               ldy     ##4
+    \ 000199 97..                 sta     [.tiny _Dp],y
+    \ 00019b a305                 lda     5,s
+    \ 00019d a00200               ldy     ##2
+    \ 0001a0 97..                 sta     [.tiny _Dp],y
+    \ 0001a2 a303                 lda     3,s
+    \ 0001a4 22......             jsl     long:`?L465`
+    \ 0001a8 a8                   tay
+    \ 0001a9 3b                   tsc
+    \ 0001aa 18                   clc
+    \ 0001ab 690a00               adc     ##10
+    \ 0001ae 1b                   tcs
+    \ 0001af 98                   tya
+    \ 0001b0          `?L448`:
+0491                  	int64_t tempOut = int64_mul_i32_i32(inArg0, ((int32_t)1 << 16) - inFract);
+0492                  	tempOut = int64_add(tempOut, int64_mul_i32_i32(inArg1, inFract));
+0493                  	tempOut = int64_shift(tempOut, -16);
+0494                  	return (fix16_t)int64_lo(tempOut);
+0495                  }
+    \ 0001b0 7a                   ply
+    \ 0001b1 84..                 sty     dp:.tiny (_Dp+10)
+    \ 0001b3 7a                   ply
+    \ 0001b4 84..                 sty     dp:.tiny (_Dp+8)
+    \ 0001b6 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          int64_mul_i32_i32:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 d4..                 pei     dp:.tiny (_Dp+12)
+    \ 000006 d4..                 pei     dp:.tiny (_Dp+14)
+    \ 000008 a8                   tay
+    \ 000009 3b                   tsc
+    \ 00000a 38                   sec
+    \ 00000b e91800               sbc     ##24
+    \ 00000e 1b                   tcs
+    \ 00000f 98                   tya
+    \ 000010 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000012 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000014 22......             jsl     long:`?L455`
+    \ 000018 a5..                 lda     dp:.tiny (_Dp+14)
+    \ 00001a 8311                 sta     17,s
+    \ 00001c a5..                 lda     dp:.tiny (_Dp+6)
+    \ 00001e 8313                 sta     19,s
+    \ 000020 a5..                 lda     dp:.tiny (_Dp+12)
+    \ 000022 8315                 sta     21,s
+    \ 000024 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 000026 8317                 sta     23,s
+    \ 000028 a311                 lda     17,s
+    \ 00002a aa                   tax
+    \ 00002b a313                 lda     19,s
+    \ 00002d 22......             jsl     long:_Mul16
+    \ 000031 a20000               ldx     ##0
+    \ 000034 a8                   tay
+    \ 000035 1001                 bpl     `?L329`
+    \ 000037 ca                   dex
+    \ 000038          `?L329`:
+    \ 000038 86..                 stx     dp:.tiny (_Dp+2)
+    \ 00003a 85..                 sta     dp:.tiny _Dp
+    \ 00003c a311                 lda     17,s
+    \ 00003e aa                   tax
+    \ 00003f a317                 lda     23,s
+    \ 000041 22......             jsl     long:_Mul16
+    \ 000045 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000047 a313                 lda     19,s
+    \ 000049 aa                   tax
+    \ 00004a a315                 lda     21,s
+    \ 00004c 22......             jsl     long:_Mul16
+    \ 000050 18                   clc
+    \ 000051 65..                 adc     dp:.tiny (_Dp+4)
+    \ 000053 22......             jsl     long:`?L460`
+    \ 000057 a315                 lda     21,s
+    \ 000059 aa                   tax
+    \ 00005a a317                 lda     23,s
+    \ 00005c 22......             jsl     long:_Mul16
+    \ 000060 a20000               ldx     ##0
+    \ 000063 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000065 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000067 a5..                 lda     dp:.tiny _Dp
+    \ 000069 8301                 sta     1,s
+    \ 00006b a5..                 lda     dp:.tiny (_Dp+2)
+    \ 00006d 8303                 sta     3,s
+    \ 00006f a5..                 lda     dp:.tiny (_Dp+12)
+    \ 000071 8305                 sta     5,s
+    \ 000073 a5..                 lda     dp:.tiny (_Dp+14)
+    \ 000075 8307                 sta     7,s
+    \ 000077 a91000               lda     ##16
+    \ 00007a 48                   pha
+    \ 00007b 3b                   tsc
+    \ 00007c 18                   clc
+    \ 00007d 690b00               adc     ##11
+    \ 000080 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000082 85..                 sta     dp:.tiny _Dp
+    \ 000084 a6..                 ldx     dp:.tiny (_Dp+6)
+    \ 000086 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 000088 22......             jsl     long:int64_from_int32
+    \ 00008c 22......             jsl     long:`?L451`
+    \ 000090          `?L335`:
+    \ 000090 b7..                 lda     [.tiny _Dp],y
+    \ 000092 48                   pha
+    \ 000093 88                   dey
+    \ 000094 88                   dey
+    \ 000095 10f9                 bpl     `?L335`
+    \ 000097 3b                   tsc
+    \ 000098 18                   clc
+    \ 000099 691300               adc     ##19
+    \ 00009c a20000               ldx     ##0
+    \ 00009f 22......             jsl     long:`?L457`
+    \ 0000a3 3b                   tsc
+    \ 0000a4 18                   clc
+    \ 0000a5 691300               adc     ##19
+    \ 0000a8 22......             jsl     long:`?L450`
+    \ 0000ac          `?L338`:
+    \ 0000ac b7..                 lda     [.tiny _Dp],y
+    \ 0000ae 48                   pha
+    \ 0000af 88                   dey
+    \ 0000b0 88                   dey
+    \ 0000b1 10f9                 bpl     `?L338`
+    \ 0000b3 3b                   tsc
+    \ 0000b4 18                   clc
+    \ 0000b5 691300               adc     ##19
+    \ 0000b8 22......             jsl     long:`?L451`
+    \ 0000bc          `?L340`:
+    \ 0000bc b7..                 lda     [.tiny _Dp],y
+    \ 0000be 48                   pha
+    \ 0000bf 88                   dey
+    \ 0000c0 88                   dey
+    \ 0000c1 10f9                 bpl     `?L340`
+    \ 0000c3 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 0000c5 85..                 sta     dp:.tiny _Dp
+    \ 0000c7 a5..                 lda     dp:.tiny (_Dp+10)
+    \ 0000c9 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0000cb 22......             jsl     long:int64_add
+    \ 0000cf 3b                   tsc
+    \ 0000d0 18                   clc
+    \ 0000d1 691a00               adc     ##26
+    \ 0000d4 1b                   tcs
+    \ 0000d5 a6..                 ldx     dp:.tiny (_Dp+10)
+    \ 0000d7 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 0000d9 a8                   tay
+    \ 0000da 3b                   tsc
+    \ 0000db 18                   clc
+    \ 0000dc 691800               adc     ##24
+    \ 0000df 5c......             jmp     long:`?L449`
+    \ 000000                      .section farcode,text
+    \ 000000          int64_mul_i64_i32:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 d4..                 pei     dp:.tiny (_Dp+12)
+    \ 000006 d4..                 pei     dp:.tiny (_Dp+14)
+    \ 000008 3b                   tsc
+    \ 000009 38                   sec
+    \ 00000a e93e00               sbc     ##62
+    \ 00000d 1b                   tcs
+    \ 00000e 22......             jsl     long:`?L455`
+    \ 000012 a354                 lda     84,s
+    \ 000014 85..                 sta     dp:.tiny (_Dp+14)
+    \ 000016 a352                 lda     82,s
+    \ 000018 85..                 sta     dp:.tiny (_Dp+12)
+    \ 00001a a34c                 lda     76,s
+    \ 00001c 45..                 eor     dp:.tiny (_Dp+14)
+    \ 00001e aa                   tax
+    \ 00001f a34a                 lda     74,s
+    \ 000021 45..                 eor     dp:.tiny (_Dp+12)
+    \ 000023 9b                   txy
+    \ 000024 3005                 bmi     `?L244`
+    \ 000026 a90000               lda     ##0
+    \ 000029 8003                 bra     `?L245`
+    \ 00002b a90100   `?L244`:    lda     ##1
+    \ 00002e 8301     `?L245`:    sta     1,s
+    \ 000030 a34c                 lda     76,s
+    \ 000032 1021                 bpl     `?L120`
+    \ 000034 3b                   tsc
+    \ 000035 18                   clc
+    \ 000036 694a00               adc     ##74
+    \ 000039 22......             jsl     long:`?L450`
+    \ 00003d          `?L343`:
+    \ 00003d b7..                 lda     [.tiny _Dp],y
+    \ 00003f 48                   pha
+    \ 000040 88                   dey
+    \ 000041 88                   dey
+    \ 000042 10f9                 bpl     `?L343`
+    \ 000044 3b                   tsc
+    \ 000045 18                   clc
+    \ 000046 695200               adc     ##82
+    \ 000049 86..                 stx     dp:.tiny (_Dp+2)
+    \ 00004b 85..                 sta     dp:.tiny _Dp
+    \ 00004d 22......             jsl     long:int64_neg
+    \ 000051 68                   pla
+    \ 000052 68                   pla
+    \ 000053 68                   pla
+    \ 000054 68                   pla
+    \ 000055          `?L120`:
+    \ 000055 a5..                 lda     dp:.tiny (_Dp+14)
+    \ 000057 1011                 bpl     `?L248`
+    \ 000059 38                   sec
+    \ 00005a a20000               ldx     ##0
+    \ 00005d 8a                   txa
+    \ 00005e e5..                 sbc     dp:.tiny (_Dp+12)
+    \ 000060 a8                   tay
+    \ 000061 8a                   txa
+    \ 000062 e5..                 sbc     dp:.tiny (_Dp+14)
+    \ 000064 aa                   tax
+    \ 000065 98                   tya
+    \ 000066 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000068 85..                 sta     dp:.tiny (_Dp+12)
+    \ 00006a a90000   `?L248`:    lda     ##0
+    \ 00006d 2350                 and     80,s
+    \ 00006f 48                   pha
+    \ 000070 a9ffff               lda     ##0xffff
+    \ 000073 2350                 and     80,s
+    \ 000075 8321                 sta     33,s
+    \ 000077 68                   pla
+    \ 000078 8321                 sta     33,s
+    \ 00007a a350                 lda     80,s
+    \ 00007c aa                   tax
+    \ 00007d 8a                   txa
+    \ 00007e a20000               ldx     ##0
+    \ 000081 8323                 sta     35,s
+    \ 000083 8a                   txa
+    \ 000084 8325                 sta     37,s
+    \ 000086 234c                 and     76,s
+    \ 000088 48                   pha
+    \ 000089 a9ffff               lda     ##0xffff
+    \ 00008c 234c                 and     76,s
+    \ 00008e 8329                 sta     41,s
+    \ 000090 68                   pla
+    \ 000091 8329                 sta     41,s
+    \ 000093 a34c                 lda     76,s
+    \ 000095 aa                   tax
+    \ 000096 a00000               ldy     ##0
+    \ 000099 8a                   txa
+    \ 00009a 1001                 bpl     `?L346`
+    \ 00009c 88                   dey
+    \ 00009d bb       `?L346`:    tyx
+    \ 00009e 832b                 sta     43,s
+    \ 0000a0 8a                   txa
+    \ 0000a1 832d                 sta     45,s
+    \ 0000a3 a90000               lda     ##0
+    \ 0000a6 25..                 and     dp:.tiny (_Dp+14)
+    \ 0000a8 48                   pha
+    \ 0000a9 a9ffff               lda     ##0xffff
+    \ 0000ac 25..                 and     dp:.tiny (_Dp+12)
+    \ 0000ae 8319                 sta     25,s
+    \ 0000b0 68                   pla
+    \ 0000b1 8319                 sta     25,s
+    \ 0000b3 a6..                 ldx     dp:.tiny (_Dp+14)
+    \ 0000b5 8a                   txa
+    \ 0000b6 a20000               ldx     ##0
+    \ 0000b9 831b                 sta     27,s
+    \ 0000bb 8a                   txa
+    \ 0000bc 831d                 sta     29,s
+    \ 0000be a321                 lda     33,s
+    \ 0000c0 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0000c2 a31f                 lda     31,s
+    \ 0000c4 22......             jsl     long:`?L452`
+    \ 0000c8 832f                 sta     47,s
+    \ 0000ca 8a                   txa
+    \ 0000cb 8331                 sta     49,s
+    \ 0000cd a325                 lda     37,s
+    \ 0000cf 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0000d1 a323                 lda     35,s
+    \ 0000d3 22......             jsl     long:`?L452`
+    \ 0000d7 8333                 sta     51,s
+    \ 0000d9 8a                   txa
+    \ 0000da 8335                 sta     53,s
+    \ 0000dc a333                 lda     51,s
+    \ 0000de 8303                 sta     3,s
+    \ 0000e0 a335                 lda     53,s
+    \ 0000e2 8305                 sta     5,s
+    \ 0000e4 a321                 lda     33,s
+    \ 0000e6 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0000e8 a31f                 lda     31,s
+    \ 0000ea 22......             jsl     long:`?L456`
+    \ 0000ee 86..                 stx     dp:.tiny (_Dp+2)
+    \ 0000f0 85..                 sta     dp:.tiny _Dp
+    \ 0000f2 18                   clc
+    \ 0000f3 a333                 lda     51,s
+    \ 0000f5 65..                 adc     dp:.tiny _Dp
+    \ 0000f7 8333                 sta     51,s
+    \ 0000f9 a335                 lda     53,s
+    \ 0000fb 65..                 adc     dp:.tiny (_Dp+2)
+    \ 0000fd 8335                 sta     53,s
+    \ 0000ff a329                 lda     41,s
+    \ 000101 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000103 a327                 lda     39,s
+    \ 000105 22......             jsl     long:`?L452`
+    \ 000109 86..                 stx     dp:.tiny (_Dp+14)
+    \ 00010b 85..                 sta     dp:.tiny (_Dp+12)
+    \ 00010d a325                 lda     37,s
+    \ 00010f 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000111 a323                 lda     35,s
+    \ 000113 22......             jsl     long:`?L456`
+    \ 000117 18                   clc
+    \ 000118 65..                 adc     dp:.tiny (_Dp+12)
+    \ 00011a 48                   pha
+    \ 00011b 8a                   txa
+    \ 00011c 65..                 adc     dp:.tiny (_Dp+14)
+    \ 00011e aa                   tax
+    \ 00011f 68                   pla
+    \ 000120 8337                 sta     55,s
+    \ 000122 8a                   txa
+    \ 000123 8339                 sta     57,s
+    \ 000125 a32d                 lda     45,s
+    \ 000127 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000129 a32b                 lda     43,s
+    \ 00012b 22......             jsl     long:`?L452`
+    \ 00012f 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000131 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000133 a329                 lda     41,s
+    \ 000135 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000137 a327                 lda     39,s
+    \ 000139 22......             jsl     long:`?L456`
+    \ 00013d 18                   clc
+    \ 00013e 65..                 adc     dp:.tiny (_Dp+12)
+    \ 000140 48                   pha
+    \ 000141 8a                   txa
+    \ 000142 65..                 adc     dp:.tiny (_Dp+14)
+    \ 000144 aa                   tax
+    \ 000145 68                   pla
+    \ 000146 833b                 sta     59,s
+    \ 000148 8a                   txa
+    \ 000149 833d                 sta     61,s
+    \ 00014b a333                 lda     51,s
+    \ 00014d c303                 cmp     3,s
+    \ 00014f a335                 lda     53,s
+    \ 000151 e305                 sbc     5,s
+    \ 000153 b00f                 bcs     `?L123`
+    \ 000155 18                   clc
+    \ 000156 a33b                 lda     59,s
+    \ 000158 690100               adc     ##1
+    \ 00015b 833b                 sta     59,s
+    \ 00015d a33d                 lda     61,s
+    \ 00015f 690000               adc     ##0
+    \ 000162 833d                 sta     61,s
+    \ 000164 a91000   `?L123`:    lda     ##16
+    \ 000167 48                   pha
+    \ 000168 a337                 lda     55,s
+    \ 00016a 85..                 sta     dp:.tiny (_Dp+6)
+    \ 00016c a335                 lda     53,s
+    \ 00016e 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000170 3b                   tsc
+    \ 000171 18                   clc
+    \ 000172 690900               adc     ##9
+    \ 000175 a20000               ldx     ##0
+    \ 000178 86..                 stx     dp:.tiny (_Dp+2)
+    \ 00017a 85..                 sta     dp:.tiny _Dp
+    \ 00017c 8a                   txa
+    \ 00017d 22......             jsl     long:int64_const
+    \ 000181 22......             jsl     long:`?L451`
+    \ 000185          `?L356`:
+    \ 000185 b7..                 lda     [.tiny _Dp],y
+    \ 000187 48                   pha
+    \ 000188 88                   dey
+    \ 000189 88                   dey
+    \ 00018a 10f9                 bpl     `?L356`
+    \ 00018c 3b                   tsc
+    \ 00018d 18                   clc
+    \ 00018e 691100               adc     ##17
+    \ 000191 a20000               ldx     ##0
+    \ 000194 22......             jsl     long:`?L457`
+    \ 000198 a339                 lda     57,s
+    \ 00019a 831d                 sta     29,s
+    \ 00019c a33b                 lda     59,s
+    \ 00019e 831f                 sta     31,s
+    \ 0001a0 a345                 lda     69,s
+    \ 0001a2 aa                   tax
+    \ 0001a3 a90000               lda     ##0
+    \ 0001a6 18                   clc
+    \ 0001a7 6341                 adc     65,s
+    \ 0001a9 48                   pha
+    \ 0001aa 8a                   txa
+    \ 0001ab 6345                 adc     69,s
+    \ 0001ad aa                   tax
+    \ 0001ae 68                   pla
+    \ 0001af 8319                 sta     25,s
+    \ 0001b1 8a                   txa
+    \ 0001b2 831b                 sta     27,s
+    \ 0001b4 3b                   tsc
+    \ 0001b5 18                   clc
+    \ 0001b6 691100               adc     ##17
+    \ 0001b9 22......             jsl     long:`?L450`
+    \ 0001bd          `?L359`:
+    \ 0001bd b7..                 lda     [.tiny _Dp],y
+    \ 0001bf 48                   pha
+    \ 0001c0 88                   dey
+    \ 0001c1 88                   dey
+    \ 0001c2 10f9                 bpl     `?L359`
+    \ 0001c4 3b                   tsc
+    \ 0001c5 18                   clc
+    \ 0001c6 692100               adc     ##33
+    \ 0001c9 22......             jsl     long:`?L451`
+    \ 0001cd          `?L361`:
+    \ 0001cd b7..                 lda     [.tiny _Dp],y
+    \ 0001cf 48                   pha
+    \ 0001d0 88                   dey
+    \ 0001d1 88                   dey
+    \ 0001d2 10f9                 bpl     `?L361`
+    \ 0001d4 3b                   tsc
+    \ 0001d5 18                   clc
+    \ 0001d6 692900               adc     ##41
+    \ 0001d9 22......             jsl     long:`?L463`
+    \ 0001dd 3b                   tsc
+    \ 0001de 18                   clc
+    \ 0001df 691a00               adc     ##26
+    \ 0001e2 1b                   tcs
+    \ 0001e3 a301                 lda     1,s
+    \ 0001e5 d010                 bne     `?L250`
+    \ 0001e7 a315                 lda     21,s
+    \ 0001e9 830d                 sta     13,s
+    \ 0001eb a313                 lda     19,s
+    \ 0001ed 830b                 sta     11,s
+    \ 0001ef a311                 lda     17,s
+    \ 0001f1 8309                 sta     9,s
+    \ 0001f3 a30f                 lda     15,s
+    \ 0001f5 802f                 bra     `?L444`
+    \ 0001f7 3b       `?L250`:    tsc
+    \ 0001f8 18                   clc
+    \ 0001f9 690f00               adc     ##15
+    \ 0001fc 22......             jsl     long:`?L450`
+    \ 000200          `?L364`:
+    \ 000200 b7..                 lda     [.tiny _Dp],y
+    \ 000202 48                   pha
+    \ 000203 88                   dey
+    \ 000204 88                   dey
+    \ 000205 10f9                 bpl     `?L364`
+    \ 000207 3b                   tsc
+    \ 000208 18                   clc
+    \ 000209 691700               adc     ##23
+    \ 00020c 86..                 stx     dp:.tiny (_Dp+2)
+    \ 00020e 85..                 sta     dp:.tiny _Dp
+    \ 000210 22......             jsl     long:int64_neg
+    \ 000214 68                   pla
+    \ 000215 68                   pla
+    \ 000216 68                   pla
+    \ 000217 68                   pla
+    \ 000218 a315                 lda     21,s
+    \ 00021a 830d                 sta     13,s
+    \ 00021c a313                 lda     19,s
+    \ 00021e 830b                 sta     11,s
+    \ 000220 a311                 lda     17,s
+    \ 000222 8309                 sta     9,s
+    \ 000224 a30f                 lda     15,s
+    \ 000226 8307     `?L444`:    sta     7,s
+    \ 000228 a30d                 lda     13,s
+    \ 00022a a00600               ldy     ##6
+    \ 00022d 97..                 sta     [.tiny (_Dp+8)],y
+    \ 00022f a30b                 lda     11,s
+    \ 000231 a00400               ldy     ##4
+    \ 000234 97..                 sta     [.tiny (_Dp+8)],y
+    \ 000236 a309                 lda     9,s
+    \ 000238 a00200               ldy     ##2
+    \ 00023b 97..                 sta     [.tiny (_Dp+8)],y
+    \ 00023d a307                 lda     7,s
+    \ 00023f 87..                 sta     [.tiny (_Dp+8)]
+    \ 000241 a6..                 ldx     dp:.tiny (_Dp+10)
+    \ 000243 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 000245 a8                   tay
+    \ 000246 3b                   tsc
+    \ 000247 18                   clc
+    \ 000248 693e00               adc     ##62
+    \ 00024b 5c......             jmp     long:`?L449`
+    \ 000000                      .section farcode,text
+    \ 000000          fix16_mul:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 d4..                 pei     dp:.tiny (_Dp+12)
+    \ 000006 d4..                 pei     dp:.tiny (_Dp+14)
+    \ 000008 a8                   tay
+    \ 000009 3b                   tsc
+    \ 00000a 38                   sec
+    \ 00000b e91000               sbc     ##16
+    \ 00000e 1b                   tcs
+    \ 00000f 98                   tya
+    \ 000010 8301                 sta     1,s
+    \ 000012 8a                   txa
+    \ 000013 8303                 sta     3,s
+    \ 000015 a303                 lda     3,s
+    \ 000017 aa                   tax
+    \ 000018 a00000               ldy     ##0
+    \ 00001b 8a                   txa
+    \ 00001c 1001                 bpl     `?L367`
+    \ 00001e 88                   dey
+    \ 00001f bb       `?L367`:    tyx
+    \ 000020 8305                 sta     5,s
+    \ 000022 8a                   txa
+    \ 000023 8307                 sta     7,s
+    \ 000025 a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 000027 a00000               ldy     ##0
+    \ 00002a 8a                   txa
+    \ 00002b 1001                 bpl     `?L369`
+    \ 00002d 88                   dey
+    \ 00002e bb       `?L369`:    tyx
+    \ 00002f 8309                 sta     9,s
+    \ 000031 8a                   txa
+    \ 000032 830b                 sta     11,s
+    \ 000034 a90000               lda     ##0
+    \ 000037 2303                 and     3,s
+    \ 000039 48                   pha
+    \ 00003a a9ffff               lda     ##0xffff
+    \ 00003d 2303                 and     3,s
+    \ 00003f 830f                 sta     15,s
+    \ 000041 68                   pla
+    \ 000042 830f                 sta     15,s
+    \ 000044 a90000               lda     ##0
+    \ 000047 aa                   tax
+    \ 000048 a5..                 lda     dp:.tiny _Dp
+    \ 00004a 86..                 stx     dp:.tiny (_Dp+10)
+    \ 00004c 85..                 sta     dp:.tiny (_Dp+8)
+    \ 00004e a307                 lda     7,s
+    \ 000050 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000052 a305                 lda     5,s
+    \ 000054 85..                 sta     dp:.tiny _Dp
+    \ 000056 a30b                 lda     11,s
+    \ 000058 85..                 sta     dp:.tiny (_Dp+6)
+    \ 00005a a309                 lda     9,s
+    \ 00005c 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00005e 22......             jsl     long:_Mul32
+    \ 000062 8301                 sta     1,s
+    \ 000064 8a                   txa
+    \ 000065 8303                 sta     3,s
+    \ 000067 a307                 lda     7,s
+    \ 000069 85..                 sta     dp:.tiny (_Dp+2)
+    \ 00006b a305                 lda     5,s
+    \ 00006d 22......             jsl     long:`?L461`
+    \ 000071 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000073 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000075 a30b                 lda     11,s
+    \ 000077 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000079 a309                 lda     9,s
+    \ 00007b 85..                 sta     dp:.tiny _Dp
+    \ 00007d a30f                 lda     15,s
+    \ 00007f 85..                 sta     dp:.tiny (_Dp+6)
+    \ 000081 a30d                 lda     13,s
+    \ 000083 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000085 22......             jsl     long:_Mul32
+    \ 000089 18                   clc
+    \ 00008a 65..                 adc     dp:.tiny (_Dp+12)
+    \ 00008c 48                   pha
+    \ 00008d 8a                   txa
+    \ 00008e 65..                 adc     dp:.tiny (_Dp+14)
+    \ 000090 aa                   tax
+    \ 000091 68                   pla
+    \ 000092 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000094 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000096 a30f                 lda     15,s
+    \ 000098 85..                 sta     dp:.tiny (_Dp+2)
+    \ 00009a a30d                 lda     13,s
+    \ 00009c 22......             jsl     long:`?L461`
+    \ 0000a0 86..                 stx     dp:.tiny (_Dp+10)
+    \ 0000a2 85..                 sta     dp:.tiny (_Dp+8)
+    \ 0000a4 a6..                 ldx     dp:.tiny (_Dp+14)
+    \ 0000a6 a00000               ldy     ##0
+    \ 0000a9 8a                   txa
+    \ 0000aa 1001                 bpl     `?L375`
+    \ 0000ac 88                   dey
+    \ 0000ad bb       `?L375`:    tyx
+    \ 0000ae 18                   clc
+    \ 0000af 6301                 adc     1,s
+    \ 0000b1 48                   pha
+    \ 0000b2 8a                   txa
+    \ 0000b3 6305                 adc     5,s
+    \ 0000b5 aa                   tax
+    \ 0000b6 68                   pla
+    \ 0000b7 86..                 stx     dp:.tiny (_Dp+2)
+    \ 0000b9 85..                 sta     dp:.tiny _Dp
+    \ 0000bb a5..                 lda     dp:.tiny (_Dp+12)
+    \ 0000bd aa                   tax
+    \ 0000be a90000               lda     ##0
+    \ 0000c1 86..                 stx     dp:.tiny (_Dp+6)
+    \ 0000c3 85..                 sta     dp:.tiny (_Dp+4)
+    \ 0000c5 a6..                 ldx     dp:.tiny (_Dp+6)
+    \ 0000c7 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 0000c9 18                   clc
+    \ 0000ca 65..                 adc     dp:.tiny (_Dp+8)
+    \ 0000cc 48                   pha
+    \ 0000cd 8a                   txa
+    \ 0000ce 65..                 adc     dp:.tiny (_Dp+10)
+    \ 0000d0 aa                   tax
+    \ 0000d1 68                   pla
+    \ 0000d2 86..                 stx     dp:.tiny (_Dp+6)
+    \ 0000d4 85..                 sta     dp:.tiny (_Dp+4)
+    \ 0000d6 c5..                 cmp     dp:.tiny (_Dp+8)
+    \ 0000d8 a5..                 lda     dp:.tiny (_Dp+6)
+    \ 0000da e5..                 sbc     dp:.tiny (_Dp+10)
+    \ 0000dc b00e                 bcs     `?L149`
+    \ 0000de a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 0000e0 a5..                 lda     dp:.tiny _Dp
+    \ 0000e2 1a                   inc     a
+    \ 0000e3 d001                 bne     `?L377`
+    \ 0000e5 e8                   inx
+    \ 0000e6          `?L377`:
+    \ 0000e6 86..                 stx     dp:.tiny (_Dp+10)
+    \ 0000e8 85..                 sta     dp:.tiny (_Dp+8)
+    \ 0000ea 8004                 bra     `?L150`
+    \ 0000ec          `?L149`:
+    \ 0000ec 22......             jsl     long:`?L455`
+    \ 0000f0          `?L150`:
+    \ 0000f0 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 0000f2 85..                 sta     dp:.tiny _Dp
+    \ 0000f4 a5..                 lda     dp:.tiny (_Dp+6)
+    \ 0000f6 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0000f8 a6..                 ldx     dp:.tiny (_Dp+6)
+    \ 0000fa a5..                 lda     dp:.tiny (_Dp+4)
+    \ 0000fc 38                   sec
+    \ 0000fd e90080               sbc     ##0x8000
+    \ 000100 b001                 bcs     `?L379`
+    \ 000102 ca                   dex
+    \ 000103          `?L379`:
+    \ 000103 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000105 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000107 a6..                 ldx     dp:.tiny (_Dp+10)
+    \ 000109 8a                   txa
+    \ 00010a 0a                   asl     a
+    \ 00010b a90000               lda     ##0
+    \ 00010e 2a                   rol     a
+    \ 00010f 22......             jsl     long:`?L460`
+    \ 000113 a6..                 ldx     dp:.tiny (_Dp+14)
+    \ 000115 a5..                 lda     dp:.tiny (_Dp+12)
+    \ 000117 38                   sec
+    \ 000118 e5..                 sbc     dp:.tiny (_Dp+4)
+    \ 00011a 48                   pha
+    \ 00011b 8a                   txa
+    \ 00011c e5..                 sbc     dp:.tiny (_Dp+6)
+    \ 00011e aa                   tax
+    \ 00011f 68                   pla
+    \ 000120 86..                 stx     dp:.tiny (_Dp+6)
+    \ 000122 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000124 a5..                 lda     dp:.tiny _Dp
+    \ 000126 c5..                 cmp     dp:.tiny (_Dp+4)
+    \ 000128 a5..                 lda     dp:.tiny (_Dp+2)
+    \ 00012a e5..                 sbc     dp:.tiny (_Dp+6)
+    \ 00012c b00d                 bcs     `?L153`
+    \ 00012e a5..                 lda     dp:.tiny (_Dp+10)
+    \ 000130 aa                   tax
+    \ 000131 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 000133 d001                 bne     `?L381`
+    \ 000135 ca                   dex
+    \ 000136 3a       `?L381`:    dec     a
+    \ 000137 86..                 stx     dp:.tiny (_Dp+10)
+    \ 000139 85..                 sta     dp:.tiny (_Dp+8)
+    \ 00013b          `?L153`:
+    \ 00013b a5..                 lda     dp:.tiny (_Dp+8)
+    \ 00013d aa                   tax
+    \ 00013e a90000               lda     ##0
+    \ 000141 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000143 85..                 sta     dp:.tiny _Dp
+    \ 000145 a6..                 ldx     dp:.tiny (_Dp+6)
+    \ 000147 8a                   txa
+    \ 000148 22......             jsl     long:`?L460`
+    \ 00014c a5..                 lda     dp:.tiny (_Dp+2)
+    \ 00014e 05..                 ora     dp:.tiny (_Dp+6)
+    \ 000150 aa                   tax
+    \ 000151 a5..                 lda     dp:.tiny _Dp
+    \ 000153 05..                 ora     dp:.tiny (_Dp+4)
+    \ 000155 1a                   inc     a
+    \ 000156 d001                 bne     `?L148`
+    \ 000158 e8                   inx
+    \ 000159 a8       `?L148`:    tay
+    \ 00015a 3b                   tsc
+    \ 00015b 18                   clc
+    \ 00015c 691000               adc     ##16
+    \ 00015f 5c......             jmp     long:`?L449`
+    \ 000000                      .section farcode,text
+    \ 000000          fix16_div:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 d4..                 pei     dp:.tiny (_Dp+12)
+    \ 000006 d4..                 pei     dp:.tiny (_Dp+14)
+    \ 000008 a8                   tay
+    \ 000009 3b                   tsc
+    \ 00000a 38                   sec
+    \ 00000b e92000               sbc     ##32
+    \ 00000e 1b                   tcs
+    \ 00000f 98                   tya
+    \ 000010 8319                 sta     25,s
+    \ 000012 8a                   txa
+    \ 000013 831b                 sta     27,s
+    \ 000015 22......             jsl     long:`?L455`
+    \ 000019 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 00001b 05..                 ora     dp:.tiny (_Dp+10)
+    \ 00001d d00c                 bne     `?L174`
+    \ 00001f af......             lda     long:fix16_min+2
+    \ 000023 aa                   tax
+    \ 000024 af......             lda     long:fix16_min
+    \ 000028 4c....               jmp     .kbank `?L172`
+    \ 00002b a31b     `?L174`:    lda     27,s
+    \ 00002d 1012                 bpl     `?L259`
+    \ 00002f 38                   sec
+    \ 000030 a20000               ldx     ##0
+    \ 000033 8a                   txa
+    \ 000034 e319                 sbc     25,s
+    \ 000036 a8                   tay
+    \ 000037 8a                   txa
+    \ 000038 e31b                 sbc     27,s
+    \ 00003a aa                   tax
+    \ 00003b 98                   tya
+    \ 00003c 8301                 sta     1,s
+    \ 00003e 8a                   txa
+    \ 00003f 800a                 bra     `?L447`
+    \ 000041          `?L259`:
+    \ 000041 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000043 a319                 lda     25,s
+    \ 000045 85..                 sta     dp:.tiny _Dp
+    \ 000047 8301                 sta     1,s
+    \ 000049 a5..                 lda     dp:.tiny (_Dp+2)
+    \ 00004b 8303     `?L447`:    sta     3,s
+    \ 00004d a301                 lda     1,s
+    \ 00004f 8309                 sta     9,s
+    \ 000051 a303                 lda     3,s
+    \ 000053 830b                 sta     11,s
+    \ 000055 a5..                 lda     dp:.tiny (_Dp+10)
+    \ 000057 100f                 bpl     `?L262`
+    \ 000059 38                   sec
+    \ 00005a a20000               ldx     ##0
+    \ 00005d 8a                   txa
+    \ 00005e e5..                 sbc     dp:.tiny (_Dp+8)
+    \ 000060 a8                   tay
+    \ 000061 8a                   txa
+    \ 000062 e5..                 sbc     dp:.tiny (_Dp+10)
+    \ 000064 aa                   tax
+    \ 000065 98                   tya
+    \ 000066 8004                 bra     `?L446`
+    \ 000068          `?L262`:
+    \ 000068 a6..                 ldx     dp:.tiny (_Dp+10)
+    \ 00006a a5..                 lda     dp:.tiny (_Dp+8)
+    \ 00006c 8301     `?L446`:    sta     1,s
+    \ 00006e 8a                   txa
+    \ 00006f 8303                 sta     3,s
+    \ 000071 a301                 lda     1,s
+    \ 000073 831d                 sta     29,s
+    \ 000075 a303                 lda     3,s
+    \ 000077 831f                 sta     31,s
+    \ 000079 a90000               lda     ##0
+    \ 00007c 8301                 sta     1,s
+    \ 00007e 8303                 sta     3,s
+    \ 000080 a91100               lda     ##17
+    \ 000083 8305                 sta     5,s
+    \ 000085 a90000               lda     ##0
+    \ 000088 8307                 sta     7,s
+    \ 00008a a31f                 lda     31,s
+    \ 00008c 29f0ff               and     ##0xfff0
+    \ 00008f aa                   tax
+    \ 000090 a90000               lda     ##0
+    \ 000093 86..                 stx     dp:.tiny _Dp
+    \ 000095 05..                 ora     dp:.tiny _Dp
+    \ 000097 d003                 bne     `?L522`
+    \ 000099 4c....               jmp     .kbank `?L177`
+    \ 00009c a31f     `?L522`:    lda     31,s
+    \ 00009e 48                   pha
+    \ 00009f a31f                 lda     31,s
+    \ 0000a1 68                   pla
+    \ 0000a2 a00000               ldy     ##0
+    \ 0000a5 5a                   phy
+    \ 0000a6 4a                   lsr     a
+    \ 0000a7 8303                 sta     3,s
+    \ 0000a9 68                   pla
+    \ 0000aa 8303                 sta     3,s
+    \ 0000ac 18                   clc
+    \ 0000ad a301                 lda     1,s
+    \ 0000af 690100               adc     ##1
+    \ 0000b2 8301                 sta     1,s
+    \ 0000b4 a303                 lda     3,s
+    \ 0000b6 690000               adc     ##0
+    \ 0000b9 8303                 sta     3,s
+    \ 0000bb a30b                 lda     11,s
+    \ 0000bd 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0000bf a309                 lda     9,s
+    \ 0000c1 85..                 sta     dp:.tiny _Dp
+    \ 0000c3 a303                 lda     3,s
+    \ 0000c5 85..                 sta     dp:.tiny (_Dp+6)
+    \ 0000c7 a301                 lda     1,s
+    \ 0000c9 85..                 sta     dp:.tiny (_Dp+4)
+    \ 0000cb 22......             jsl     long:_UDivMod32
+    \ 0000cf 830d                 sta     13,s
+    \ 0000d1 8a                   txa
+    \ 0000d2 830f                 sta     15,s
+    \ 0000d4 a31f                 lda     31,s
+    \ 0000d6 48                   pha
+    \ 0000d7 a31f                 lda     31,s
+    \ 0000d9 48                   pha
+    \ 0000da 3b                   tsc
+    \ 0000db 18                   clc
+    \ 0000dc 691500               adc     ##21
+    \ 0000df a20000               ldx     ##0
+    \ 0000e2 86..                 stx     dp:.tiny (_Dp+2)
+    \ 0000e4 85..                 sta     dp:.tiny _Dp
+    \ 0000e6 a313                 lda     19,s
+    \ 0000e8 aa                   tax
+    \ 0000e9 a311                 lda     17,s
+    \ 0000eb 22......             jsl     long:int64_from_int32
+    \ 0000ef 22......             jsl     long:`?L451`
+    \ 0000f3          `?L387`:
+    \ 0000f3 b7..                 lda     [.tiny _Dp],y
+    \ 0000f5 48                   pha
+    \ 0000f6 88                   dey
+    \ 0000f7 88                   dey
+    \ 0000f8 10f9                 bpl     `?L387`
+    \ 0000fa 3b                   tsc
+    \ 0000fb 18                   clc
+    \ 0000fc 691d00               adc     ##29
+    \ 0000ff a20000               ldx     ##0
+    \ 000102 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000104 85..                 sta     dp:.tiny _Dp
+    \ 000106 22......             jsl     long:int64_mul_i64_i32
+    \ 00010a a9ef00               lda     ##239
+    \ 00010d 48                   pha
+    \ 00010e 3b                   tsc
+    \ 00010f 18                   clc
+    \ 000110 691f00               adc     ##31
+    \ 000113 22......             jsl     long:`?L450`
+    \ 000117          `?L390`:
+    \ 000117 b7..                 lda     [.tiny _Dp],y
+    \ 000119 48                   pha
+    \ 00011a 88                   dey
+    \ 00011b 88                   dey
+    \ 00011c 10f9                 bpl     `?L390`
+    \ 00011e 3b                   tsc
+    \ 00011f 18                   clc
+    \ 000120 692700               adc     ##39
+    \ 000123 22......             jsl     long:`?L457`
+    \ 000127 3b                   tsc
+    \ 000128 18                   clc
+    \ 000129 691600               adc     ##22
+    \ 00012c 1b                   tcs
+    \ 00012d 3b                   tsc
+    \ 00012e 18                   clc
+    \ 00012f 691100               adc     ##17
+    \ 000132 22......             jsl     long:`?L450`
+    \ 000136          `?L393`:
+    \ 000136 b7..                 lda     [.tiny _Dp],y
+    \ 000138 48                   pha
+    \ 000139 88                   dey
+    \ 00013a 88                   dey
+    \ 00013b 10f9                 bpl     `?L393`
+    \ 00013d 22......             jsl     long:int64_hi
+    \ 000141 8309                 sta     9,s
+    \ 000143 8a                   txa
+    \ 000144 830b                 sta     11,s
+    \ 000146 68                   pla
+    \ 000147 68                   pla
+    \ 000148 68                   pla
+    \ 000149 68                   pla
+    \ 00014a 38                   sec
+    \ 00014b a309                 lda     9,s
+    \ 00014d e301                 sbc     1,s
+    \ 00014f 48                   pha
+    \ 000150 a30d                 lda     13,s
+    \ 000152 e305                 sbc     5,s
+    \ 000154 aa                   tax
+    \ 000155 68                   pla
+    \ 000156 8309                 sta     9,s
+    \ 000158 8a                   txa
+    \ 000159 830b                 sta     11,s
+    \ 00015b a30d                 lda     13,s
+    \ 00015d 8301                 sta     1,s
+    \ 00015f a30f                 lda     15,s
+    \ 000161 8303                 sta     3,s
+    \ 000163 8002                 bra     `?L178`
+    \ 000165 a303     `?L177`:    lda     3,s
+    \ 000167 a31f     `?L178`:    lda     31,s
+    \ 000169 85..                 sta     dp:.tiny (_Dp+6)
+    \ 00016b a31d                 lda     29,s
+    \ 00016d 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00016f a305                 lda     5,s
+    \ 000171 830d                 sta     13,s
+    \ 000173 a307                 lda     7,s
+    \ 000175 830f                 sta     15,s
+    \ 000177          `?L180`:
+    \ 000177 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 000179 290f00               and     ##15
+    \ 00017c d044                 bne     `?L181`
+    \ 00017e a30d                 lda     13,s
+    \ 000180 c90400               cmp     ##4
+    \ 000183 a30f                 lda     15,s
+    \ 000185 e90000               sbc     ##0
+    \ 000188 5003                 bvc     `?L396`
+    \ 00018a 490080               eor     ##-32768
+    \ 00018d 3033     `?L396`:    bmi     `?L181`
+    \ 00018f 46..                 lsr     dp:.tiny (_Dp+6)
+    \ 000191 66..                 ror     dp:.tiny (_Dp+4)
+    \ 000193 46..                 lsr     dp:.tiny (_Dp+6)
+    \ 000195 66..                 ror     dp:.tiny (_Dp+4)
+    \ 000197 46..                 lsr     dp:.tiny (_Dp+6)
+    \ 000199 66..                 ror     dp:.tiny (_Dp+4)
+    \ 00019b 46..                 lsr     dp:.tiny (_Dp+6)
+    \ 00019d 66..                 ror     dp:.tiny (_Dp+4)
+    \ 00019f a5..                 lda     dp:.tiny (_Dp+4)
+    \ 0001a1 8305                 sta     5,s
+    \ 0001a3 a5..                 lda     dp:.tiny (_Dp+6)
+    \ 0001a5 8307                 sta     7,s
+    \ 0001a7 38                   sec
+    \ 0001a8 a30d                 lda     13,s
+    \ 0001aa e90400               sbc     ##4
+    \ 0001ad 830d                 sta     13,s
+    \ 0001af a30f                 lda     15,s
+    \ 0001b1 e90000               sbc     ##0
+    \ 0001b4 830f                 sta     15,s
+    \ 0001b6 a307                 lda     7,s
+    \ 0001b8 85..                 sta     dp:.tiny (_Dp+6)
+    \ 0001ba a305                 lda     5,s
+    \ 0001bc 85..                 sta     dp:.tiny (_Dp+4)
+    \ 0001be a30f                 lda     15,s
+    \ 0001c0 80b5                 bra     `?L180`
+    \ 0001c2 a309     `?L181`:    lda     9,s
+    \ 0001c4 8311                 sta     17,s
+    \ 0001c6 a30b                 lda     11,s
+    \ 0001c8 8313                 sta     19,s
+    \ 0001ca a301                 lda     1,s
+    \ 0001cc 8309                 sta     9,s
+    \ 0001ce a303                 lda     3,s
+    \ 0001d0 830b                 sta     11,s
+    \ 0001d2 a30f                 lda     15,s
+    \ 0001d4 85..                 sta     dp:.tiny (_Dp+2)
+    \ 0001d6 a30d                 lda     13,s
+    \ 0001d8 85..                 sta     dp:.tiny _Dp
+    \ 0001da a311     `?L183`:    lda     17,s
+    \ 0001dc 0313                 ora     19,s
+    \ 0001de d003                 bne     `?L523`
+    \ 0001e0 4c....               jmp     .kbank `?L184`
+    \ 0001e3          `?L523`:
+    \ 0001e3 a5..                 lda     dp:.tiny (_Dp+2)
+    \ 0001e5 1003                 bpl     `?L524`
+    \ 0001e7 4c....               jmp     .kbank `?L184`
+    \ 0001ea a311     `?L524`:    lda     17,s
+    \ 0001ec 8305                 sta     5,s
+    \ 0001ee a313                 lda     19,s
+    \ 0001f0 8307                 sta     7,s
+    \ 0001f2 e220                 sep     #32
+    \ 0001f4 a900                 lda     #0
+    \ 0001f6 8301                 sta     1,s
+    \ 0001f8 c220                 rep     #32
+    \ 0001fa a305                 lda     5,s
+    \ 0001fc 0307                 ora     7,s
+    \ 0001fe d009                 bne     `?L270`
+    \ 000200 a92000               lda     ##32
+    \ 000203 e220                 sep     #32
+    \ 000205 8301                 sta     1,s
+    \ 000207 8068                 bra     `?L445`
+    \ 000209 a307     `?L270`:    lda     7,s
+    \ 00020b a307     `?L273`:    lda     7,s
+    \ 00020d 2900f0               and     ##0xf000
+    \ 000210 aa                   tax
+    \ 000211 a90000               lda     ##0
+    \ 000214 86..                 stx     dp:.tiny (_Dp+12)
+    \ 000216 05..                 ora     dp:.tiny (_Dp+12)
+    \ 000218 d02e                 bne     `?L274`
+    \ 00021a a90400               lda     ##4
+    \ 00021d 18                   clc
+    \ 00021e 6301                 adc     1,s
+    \ 000220 e220                 sep     #32
+    \ 000222 8301                 sta     1,s
+    \ 000224 c220                 rep     #32
+    \ 000226 a307                 lda     7,s
+    \ 000228 85..                 sta     dp:.tiny (_Dp+14)
+    \ 00022a a305                 lda     5,s
+    \ 00022c 85..                 sta     dp:.tiny (_Dp+12)
+    \ 00022e 06..                 asl     dp:.tiny (_Dp+12)
+    \ 000230 26..                 rol     dp:.tiny (_Dp+14)
+    \ 000232 06..                 asl     dp:.tiny (_Dp+12)
+    \ 000234 26..                 rol     dp:.tiny (_Dp+14)
+    \ 000236 06..                 asl     dp:.tiny (_Dp+12)
+    \ 000238 26..                 rol     dp:.tiny (_Dp+14)
+    \ 00023a 06..                 asl     dp:.tiny (_Dp+12)
+    \ 00023c 26..                 rol     dp:.tiny (_Dp+14)
+    \ 00023e a5..                 lda     dp:.tiny (_Dp+12)
+    \ 000240 8305                 sta     5,s
+    \ 000242 a5..                 lda     dp:.tiny (_Dp+14)
+    \ 000244 8307                 sta     7,s
+    \ 000246 80c3                 bra     `?L273`
+    \ 000248 a307     `?L274`:    lda     7,s
+    \ 00024a a307     `?L276`:    lda     7,s
+    \ 00024c 301f                 bmi     `?L277`
+    \ 00024e a301                 lda     1,s
+    \ 000250 1a                   inc     a
+    \ 000251 e220                 sep     #32
+    \ 000253 8301                 sta     1,s
+    \ 000255 c220                 rep     #32
+    \ 000257 a307                 lda     7,s
+    \ 000259 85..                 sta     dp:.tiny (_Dp+14)
+    \ 00025b a305                 lda     5,s
+    \ 00025d 85..                 sta     dp:.tiny (_Dp+12)
+    \ 00025f 06..                 asl     dp:.tiny (_Dp+12)
+    \ 000261 26..                 rol     dp:.tiny (_Dp+14)
+    \ 000263 a5..                 lda     dp:.tiny (_Dp+12)
+    \ 000265 8305                 sta     5,s
+    \ 000267 a5..                 lda     dp:.tiny (_Dp+14)
+    \ 000269 8307                 sta     7,s
+    \ 00026b 80dd                 bra     `?L276`
+    \ 00026d e220     `?L277`:    sep     #32
+    \ 00026f a301                 lda     1,s
+    \ 000271 c220     `?L445`:    rep     #32
+    \ 000273 a301                 lda     1,s
+    \ 000275 29ff00               and     ##255
+    \ 000278 8301                 sta     1,s
+    \ 00027a a90000               lda     ##0
+    \ 00027d 8303                 sta     3,s
+    \ 00027f a5..                 lda     dp:.tiny _Dp
+    \ 000281 c301                 cmp     1,s
+    \ 000283 a5..                 lda     dp:.tiny (_Dp+2)
+    \ 000285 e303                 sbc     3,s
+    \ 000287 5003                 bvc     `?L398`
+    \ 000289 490080               eor     ##-32768
+    \ 00028c 100b     `?L398`:    bpl     `?L186`
+    \ 00028e a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 000290 a5..                 lda     dp:.tiny _Dp
+    \ 000292 8301                 sta     1,s
+    \ 000294 8a                   txa
+    \ 000295 8303                 sta     3,s
+    \ 000297 8002                 bra     `?L187`
+    \ 000299 a303     `?L186`:    lda     3,s
+    \ 00029b a301     `?L187`:    lda     1,s
+    \ 00029d a8                   tay
+    \ 00029e a313                 lda     19,s
+    \ 0002a0 aa                   tax
+    \ 0002a1 a311                 lda     17,s
+    \ 0002a3 86..                 stx     dp:.tiny (_Dp+12)
+    \ 0002a5 c8                   iny
+    \ 0002a6 88                   dey
+    \ 0002a7 f006                 beq     `?L400`
+    \ 0002a9 0a       `?L401`:    asl     a
+    \ 0002aa 26..                 rol     dp:.tiny (_Dp+12)
+    \ 0002ac 88                   dey
+    \ 0002ad d0fa                 bne     `?L401`
+    \ 0002af          `?L400`:
+    \ 0002af a6..                 ldx     dp:.tiny (_Dp+12)
+    \ 0002b1 8305                 sta     5,s
+    \ 0002b3 8a                   txa
+    \ 0002b4 8307                 sta     7,s
+    \ 0002b6 a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 0002b8 a5..                 lda     dp:.tiny _Dp
+    \ 0002ba 38                   sec
+    \ 0002bb e301                 sbc     1,s
+    \ 0002bd 48                   pha
+    \ 0002be 8a                   txa
+    \ 0002bf e305                 sbc     5,s
+    \ 0002c1 aa                   tax
+    \ 0002c2 68                   pla
+    \ 0002c3 830d                 sta     13,s
+    \ 0002c5 8a                   txa
+    \ 0002c6 830f                 sta     15,s
+    \ 0002c8 22......             jsl     long:`?L464`
+    \ 0002cc 8301                 sta     1,s
+    \ 0002ce 8a                   txa
+    \ 0002cf 8303                 sta     3,s
+    \ 0002d1 22......             jsl     long:`?L464`
+    \ 0002d5 a5..                 lda     dp:.tiny _Dp
+    \ 0002d7 8305                 sta     5,s
+    \ 0002d9 a5..                 lda     dp:.tiny (_Dp+2)
+    \ 0002db 8307                 sta     7,s
+    \ 0002dd a30d                 lda     13,s
+    \ 0002df a8                   tay
+    \ 0002e0 a303                 lda     3,s
+    \ 0002e2 aa                   tax
+    \ 0002e3 a301                 lda     1,s
+    \ 0002e5 86..                 stx     dp:.tiny _Dp
+    \ 0002e7 c8                   iny
+    \ 0002e8 88                   dey
+    \ 0002e9 f006                 beq     `?L406`
+    \ 0002eb 0a       `?L407`:    asl     a
+    \ 0002ec 26..                 rol     dp:.tiny _Dp
+    \ 0002ee 88                   dey
+    \ 0002ef d0fa                 bne     `?L407`
+    \ 0002f1          `?L406`:
+    \ 0002f1 a6..                 ldx     dp:.tiny _Dp
+    \ 0002f3 8301                 sta     1,s
+    \ 0002f5 8a                   txa
+    \ 0002f6 8303                 sta     3,s
+    \ 0002f8 18                   clc
+    \ 0002f9 a309                 lda     9,s
+    \ 0002fb 6301                 adc     1,s
+    \ 0002fd 48                   pha
+    \ 0002fe a30d                 lda     13,s
+    \ 000300 6305                 adc     5,s
+    \ 000302 aa                   tax
+    \ 000303 68                   pla
+    \ 000304 8301                 sta     1,s
+    \ 000306 8a                   txa
+    \ 000307 8303                 sta     3,s
+    \ 000309 a307                 lda     7,s
+    \ 00030b 85..                 sta     dp:.tiny (_Dp+14)
+    \ 00030d a305                 lda     5,s
+    \ 00030f 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000311 06..                 asl     dp:.tiny (_Dp+12)
+    \ 000313 26..                 rol     dp:.tiny (_Dp+14)
+    \ 000315 a30f                 lda     15,s
+    \ 000317 aa                   tax
+    \ 000318 a30d                 lda     13,s
+    \ 00031a d001                 bne     `?L410`
+    \ 00031c ca                   dex
+    \ 00031d 3a       `?L410`:    dec     a
+    \ 00031e 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000320 85..                 sta     dp:.tiny _Dp
+    \ 000322 a5..                 lda     dp:.tiny (_Dp+12)
+    \ 000324 8311                 sta     17,s
+    \ 000326 a5..                 lda     dp:.tiny (_Dp+14)
+    \ 000328 8313                 sta     19,s
+    \ 00032a a301                 lda     1,s
+    \ 00032c 8309                 sta     9,s
+    \ 00032e a303                 lda     3,s
+    \ 000330 830b                 sta     11,s
+    \ 000332 4c....               jmp     .kbank `?L183`
+    \ 000335 a30b     `?L184`:    lda     11,s
+    \ 000337 aa                   tax
+    \ 000338 a309                 lda     9,s
+    \ 00033a 1a                   inc     a
+    \ 00033b d001                 bne     `?L412`
+    \ 00033d e8                   inx
+    \ 00033e          `?L412`:
+    \ 00033e 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000340 85..                 sta     dp:.tiny _Dp
+    \ 000342 46..                 lsr     dp:.tiny (_Dp+2)
+    \ 000344 66..                 ror     dp:.tiny _Dp
+    \ 000346 a31b                 lda     27,s
+    \ 000348 45..                 eor     dp:.tiny (_Dp+10)
+    \ 00034a aa                   tax
+    \ 00034b a319                 lda     25,s
+    \ 00034d 45..                 eor     dp:.tiny (_Dp+8)
+    \ 00034f 9b                   txy
+    \ 000350 1011                 bpl     `?L190`
+    \ 000352 38                   sec
+    \ 000353 a20000               ldx     ##0
+    \ 000356 8a                   txa
+    \ 000357 e5..                 sbc     dp:.tiny _Dp
+    \ 000359 a8                   tay
+    \ 00035a 8a                   txa
+    \ 00035b e5..                 sbc     dp:.tiny (_Dp+2)
+    \ 00035d aa                   tax
+    \ 00035e 98                   tya
+    \ 00035f 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000361 85..                 sta     dp:.tiny _Dp
+    \ 000363          `?L190`:
+    \ 000363 a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 000365 a5..                 lda     dp:.tiny _Dp
+    \ 000367 a8       `?L172`:    tay
+    \ 000368 3b                   tsc
+    \ 000369 18                   clc
+    \ 00036a 692000               adc     ##32
+    \ 00036d 5c......             jmp     long:`?L449`
+    \ 000000                      .section farcode,text
+    \ 000000          fix16_lerp8:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 d4..                 pei     dp:.tiny (_Dp+12)
+    \ 000006 d4..                 pei     dp:.tiny (_Dp+14)
+    \ 000008 a8                   tay
+    \ 000009 3b                   tsc
+    \ 00000a 38                   sec
+    \ 00000b e91000               sbc     ##16
+    \ 00000e 1b                   tcs
+    \ 00000f 98                   tya
+    \ 000010 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000012 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000014 22......             jsl     long:`?L455`
+    \ 000018 a31c                 lda     28,s
+    \ 00001a 29ff00               and     ##255
+    \ 00001d 85..                 sta     dp:.tiny _Dp
+    \ 00001f a90001               lda     ##256
+    \ 000022 a20000               ldx     ##0
+    \ 000025 38                   sec
+    \ 000026 e5..                 sbc     dp:.tiny _Dp
+    \ 000028 b001                 bcs     `?L414`
+    \ 00002a ca                   dex
+    \ 00002b          `?L414`:
+    \ 00002b 86..                 stx     dp:.tiny (_Dp+6)
+    \ 00002d 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00002f 3b                   tsc
+    \ 000030 18                   clc
+    \ 000031 690900               adc     ##9
+    \ 000034 22......             jsl     long:`?L459`
+    \ 000038 a31c                 lda     28,s
+    \ 00003a 29ff00               and     ##255
+    \ 00003d 22......             jsl     long:`?L460`
+    \ 000041 3b                   tsc
+    \ 000042 22......             jsl     long:`?L462`
+    \ 000046 22......             jsl     long:`?L451`
+    \ 00004a          `?L418`:
+    \ 00004a b7..                 lda     [.tiny _Dp],y
+    \ 00004c 48                   pha
+    \ 00004d 88                   dey
+    \ 00004e 88                   dey
+    \ 00004f 10f9                 bpl     `?L418`
+    \ 000051 3b                   tsc
+    \ 000052 18                   clc
+    \ 000053 691100               adc     ##17
+    \ 000056 22......             jsl     long:`?L450`
+    \ 00005a          `?L420`:
+    \ 00005a b7..                 lda     [.tiny _Dp],y
+    \ 00005c 48                   pha
+    \ 00005d 88                   dey
+    \ 00005e 88                   dey
+    \ 00005f 10f9                 bpl     `?L420`
+    \ 000061 3b                   tsc
+    \ 000062 18                   clc
+    \ 000063 691900               adc     ##25
+    \ 000066 22......             jsl     long:`?L463`
+    \ 00006a a9f800               lda     ##248
+    \ 00006d 48                   pha
+    \ 00006e 3b                   tsc
+    \ 00006f 18                   clc
+    \ 000070 691b00               adc     ##27
+    \ 000073 22......             jsl     long:`?L450`
+    \ 000077          `?L423`:
+    \ 000077 b7..                 lda     [.tiny _Dp],y
+    \ 000079 48                   pha
+    \ 00007a 88                   dey
+    \ 00007b 88                   dey
+    \ 00007c 10f9                 bpl     `?L423`
+    \ 00007e 3b                   tsc
+    \ 00007f 18                   clc
+    \ 000080 692300               adc     ##35
+    \ 000083 22......             jsl     long:`?L457`
+    \ 000087 3b                   tsc
+    \ 000088 18                   clc
+    \ 000089 691a00               adc     ##26
+    \ 00008c 1b                   tcs
+    \ 00008d 3b                   tsc
+    \ 00008e 18                   clc
+    \ 00008f 690900               adc     ##9
+    \ 000092 22......             jsl     long:`?L450`
+    \ 000096          `?L426`:
+    \ 000096 b7..                 lda     [.tiny _Dp],y
+    \ 000098 48                   pha
+    \ 000099 88                   dey
+    \ 00009a 88                   dey
+    \ 00009b 10f9                 bpl     `?L426`
+    \ 00009d 22......             jsl     long:int64_lo
+    \ 0000a1 86..                 stx     dp:.tiny (_Dp+2)
+    \ 0000a3 85..                 sta     dp:.tiny _Dp
+    \ 0000a5 68                   pla
+    \ 0000a6 68                   pla
+    \ 0000a7 68                   pla
+    \ 0000a8 68                   pla
+    \ 0000a9 a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 0000ab a5..                 lda     dp:.tiny _Dp
+    \ 0000ad a8                   tay
+    \ 0000ae 3b                   tsc
+    \ 0000af 18                   clc
+    \ 0000b0 691000               adc     ##16
+    \ 0000b3 5c......             jmp     long:`?L449`
+    \ 000000                      .section farcode,text
+    \ 000000          fix16_lerp16:
+    \ 000000 d4..                 pei     dp:.tiny (_Dp+8)
+    \ 000002 d4..                 pei     dp:.tiny (_Dp+10)
+    \ 000004 d4..                 pei     dp:.tiny (_Dp+12)
+    \ 000006 d4..                 pei     dp:.tiny (_Dp+14)
+    \ 000008 a8                   tay
+    \ 000009 3b                   tsc
+    \ 00000a 38                   sec
+    \ 00000b e91200               sbc     ##18
+    \ 00000e 1b                   tcs
+    \ 00000f 98                   tya
+    \ 000010 86..                 stx     dp:.tiny (_Dp+14)
+    \ 000012 85..                 sta     dp:.tiny (_Dp+12)
+    \ 000014 22......             jsl     long:`?L455`
+    \ 000018 a5..                 lda     dp:.tiny (_Dp+4)
+    \ 00001a 8309                 sta     9,s
+    \ 00001c a90000               lda     ##0
+    \ 00001f a20100               ldx     ##1
+    \ 000022 38                   sec
+    \ 000023 e309                 sbc     9,s
+    \ 000025 b001                 bcs     `?L429`
+    \ 000027 ca                   dex
+    \ 000028          `?L429`:
+    \ 000028 86..                 stx     dp:.tiny (_Dp+6)
+    \ 00002a 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00002c 3b                   tsc
+    \ 00002d 18                   clc
+    \ 00002e 690b00               adc     ##11
+    \ 000031 22......             jsl     long:`?L459`
+    \ 000035 a309                 lda     9,s
+    \ 000037 22......             jsl     long:`?L460`
+    \ 00003b 3b                   tsc
+    \ 00003c 22......             jsl     long:`?L462`
+    \ 000040 22......             jsl     long:`?L451`
+    \ 000044          `?L433`:
+    \ 000044 b7..                 lda     [.tiny _Dp],y
+    \ 000046 48                   pha
+    \ 000047 88                   dey
+    \ 000048 88                   dey
+    \ 000049 10f9                 bpl     `?L433`
+    \ 00004b 3b                   tsc
+    \ 00004c 18                   clc
+    \ 00004d 691300               adc     ##19
+    \ 000050 22......             jsl     long:`?L450`
+    \ 000054          `?L435`:
+    \ 000054 b7..                 lda     [.tiny _Dp],y
+    \ 000056 48                   pha
+    \ 000057 88                   dey
+    \ 000058 88                   dey
+    \ 000059 10f9                 bpl     `?L435`
+    \ 00005b 3b                   tsc
+    \ 00005c 18                   clc
+    \ 00005d 691b00               adc     ##27
+    \ 000060 22......             jsl     long:`?L463`
+    \ 000064 a9f000               lda     ##240
+    \ 000067 48                   pha
+    \ 000068 3b                   tsc
+    \ 000069 18                   clc
+    \ 00006a 691d00               adc     ##29
+    \ 00006d 22......             jsl     long:`?L450`
+    \ 000071          `?L438`:
+    \ 000071 b7..                 lda     [.tiny _Dp],y
+    \ 000073 48                   pha
+    \ 000074 88                   dey
+    \ 000075 88                   dey
+    \ 000076 10f9                 bpl     `?L438`
+    \ 000078 3b                   tsc
+    \ 000079 18                   clc
+    \ 00007a 692500               adc     ##37
+    \ 00007d 22......             jsl     long:`?L457`
+    \ 000081 3b                   tsc
+    \ 000082 18                   clc
+    \ 000083 691a00               adc     ##26
+    \ 000086 1b                   tcs
+    \ 000087 3b                   tsc
+    \ 000088 18                   clc
+    \ 000089 690b00               adc     ##11
+    \ 00008c 22......             jsl     long:`?L450`
+    \ 000090          `?L441`:
+    \ 000090 b7..                 lda     [.tiny _Dp],y
+    \ 000092 48                   pha
+    \ 000093 88                   dey
+    \ 000094 88                   dey
+    \ 000095 10f9                 bpl     `?L441`
+    \ 000097 22......             jsl     long:int64_lo
+    \ 00009b 86..                 stx     dp:.tiny (_Dp+2)
+    \ 00009d 85..                 sta     dp:.tiny _Dp
+    \ 00009f 68                   pla
+    \ 0000a0 68                   pla
+    \ 0000a1 68                   pla
+    \ 0000a2 68                   pla
+    \ 0000a3 a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 0000a5 a5..                 lda     dp:.tiny _Dp
+    \ 0000a7 a8                   tay
+    \ 0000a8 3b                   tsc
+    \ 0000a9 18                   clc
+    \ 0000aa 691200               adc     ##18
+    \ 0000ad 1b       `?L449`:    tcs
+    \ 0000ae 98                   tya
+    \ 0000af 7a                   ply
+    \ 0000b0 84..                 sty     dp:.tiny (_Dp+14)
+    \ 0000b2 7a                   ply
+    \ 0000b3 84..                 sty     dp:.tiny (_Dp+12)
+    \ 0000b5 5c......             jmp     long:`?L448`
+    \ 000000                      .section farcode,text
+    \ 000000 a20000   `?L450`:    ldx     ##0
+    \ 000003          `?L451`:
+    \ 000003 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000005 85..                 sta     dp:.tiny _Dp
+    \ 000007 a00600               ldy     ##6
+    \ 00000a 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          `?L452`:
+    \ 000000 85..                 sta     dp:.tiny _Dp
+    \ 000002 a31c                 lda     28,s
+    \ 000004 85..                 sta     dp:.tiny (_Dp+6)
+    \ 000006 a31a                 lda     26,s
+    \ 000008 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00000a 5c......             jmp     long:_Mul32
+    \ 000000                      .section farcode,text
+    \ 000000 a304     `?L453`:    lda     4,s
+    \ 000002 498000               eor     ##128
+    \ 000005 29ff00               and     ##255
+    \ 000008 38                   sec
+    \ 000009 e98000               sbc     ##128
+    \ 00000c 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000 a31d     `?L454`:    lda     29,s
+    \ 000002 498000               eor     ##128
+    \ 000005 29ff00               and     ##255
+    \ 000008 38                   sec
+    \ 000009 e98000               sbc     ##128
+    \ 00000c 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          `?L455`:
+    \ 000000 a5..                 lda     dp:.tiny _Dp
+    \ 000002 85..                 sta     dp:.tiny (_Dp+8)
+    \ 000004 a5..                 lda     dp:.tiny (_Dp+2)
+    \ 000006 85..                 sta     dp:.tiny (_Dp+10)
+    \ 000008 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          `?L456`:
+    \ 000000 85..                 sta     dp:.tiny _Dp
+    \ 000002 a320                 lda     32,s
+    \ 000004 85..                 sta     dp:.tiny (_Dp+6)
+    \ 000006 a31e                 lda     30,s
+    \ 000008 85..                 sta     dp:.tiny (_Dp+4)
+    \ 00000a 5c......             jmp     long:_Mul32
+    \ 000000                      .section farcode,text
+    \ 000000          `?L457`:
+    \ 000000 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000002 85..                 sta     dp:.tiny _Dp
+    \ 000004 5c......             jmp     long:int64_shift
+    \ 000000                      .section farcode,text
+    \ 000000 a8       `?L458`:    tay
+    \ 000001 a31b                 lda     27,s
+    \ 000003 aa                   tax
+    \ 000004 a319                 lda     25,s
+    \ 000006 86..                 stx     dp:.tiny (_Dp+4)
+    \ 000008 c8                   iny
+    \ 000009 88                   dey
+    \ 00000a 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000 a20000   `?L459`:    ldx     ##0
+    \ 000003 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000005 85..                 sta     dp:.tiny _Dp
+    \ 000007 a6..                 ldx     dp:.tiny (_Dp+14)
+    \ 000009 a5..                 lda     dp:.tiny (_Dp+12)
+    \ 00000b 5c......             jmp     long:int64_mul_i32_i32
+    \ 000000                      .section farcode,text
+    \ 000000 a20000   `?L460`:    ldx     ##0
+    \ 000003 86..                 stx     dp:.tiny (_Dp+6)
+    \ 000005 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000007 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          `?L461`:
+    \ 000000 85..                 sta     dp:.tiny _Dp
+    \ 000002 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 000004 85..                 sta     dp:.tiny (_Dp+4)
+    \ 000006 a5..                 lda     dp:.tiny (_Dp+10)
+    \ 000008 85..                 sta     dp:.tiny (_Dp+6)
+    \ 00000a 5c......             jmp     long:_Mul32
+    \ 000000                      .section farcode,text
+    \ 000000 1a       `?L462`:    inc     a
+    \ 000001 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000003 85..                 sta     dp:.tiny _Dp
+    \ 000005 a6..                 ldx     dp:.tiny (_Dp+10)
+    \ 000007 a5..                 lda     dp:.tiny (_Dp+8)
+    \ 000009 5c......             jmp     long:int64_mul_i32_i32
+    \ 000000                      .section farcode,text
+    \ 000000          `?L463`:
+    \ 000000 86..                 stx     dp:.tiny (_Dp+2)
+    \ 000002 85..                 sta     dp:.tiny _Dp
+    \ 000004 5c......             jmp     long:int64_add
+    \ 000000                      .section farcode,text
+    \ 000000 a30a     `?L464`:    lda     10,s
+    \ 000002 85..                 sta     dp:.tiny (_Dp+2)
+    \ 000004 a308                 lda     8,s
+    \ 000006 85..                 sta     dp:.tiny _Dp
+    \ 000008 5c......             jmp     long:_UDivMod32
+    \ 000000                      .section farcode,text
+    \ 000000          `?L465`:
+    \ 000000 87..                 sta     [.tiny _Dp]
+    \ 000002 a6..                 ldx     dp:.tiny (_Dp+2)
+    \ 000004 a5..                 lda     dp:.tiny _Dp
+    \ 000006 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000 a8       `?L466`:    tay
+    \ 000001 a317                 lda     23,s
+    \ 000003 aa                   tax
+    \ 000004 a315                 lda     21,s
+    \ 000006 6b                   rtl
+    \ 000000                      .section farcode,text
+    \ 000000          `?L467`:
+    \ 000000 a6..                 ldx     dp:.tiny (_Dp+8)
+    \ 000002 86..                 stx     dp:.tiny (_Dp+10)
+    \ 000004 85..                 sta     dp:.tiny (_Dp+8)
+    \ 000006 a5..                 lda     dp:.tiny (_Dp+10)
+    \ 000008 05..                 ora     dp:.tiny (_Dp+6)
+    \ 00000a 6b                   rtl
+0496                  
+0497                  #ifndef FIXMATH_NO_64BIT
+0498                  fix16_t fix16_lerp32(fix16_t inArg0, fix16_t inArg1, uint32_t inFract) {
+0499                  	int64_t tempOut;
+0500                  	tempOut   = ((int64_t)inArg0 * (0 - inFract));
+0501                  	tempOut  += ((int64_t)inArg1 * inFract);
+0502                  	tempOut >>= 32;
+0503                  	return (fix16_t)tempOut;
+0504                  }
+0505                  #endif
+
+##########################
+#                        #
+# Memory sizes (decimal) #
+#                        #
+##########################
+
+Executable        (Text): 3406 bytes
+Constant   __far        :   44 bytes

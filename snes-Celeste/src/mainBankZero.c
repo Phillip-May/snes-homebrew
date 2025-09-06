@@ -1121,6 +1121,7 @@ void monumentUpdate(uint8_t index) {
             }
             strncpy(outputText, curLineStr, curLineCharCount);
             outputText[curLineCharCount] = '\0';
+            REG_TM = 0x1F;      
             drawTextBG1(outputText, 40, 184 + (curLineNum * 8));
         }
     }
@@ -1129,7 +1130,8 @@ void monumentUpdate(uint8_t index) {
         curLineNum = 0;
         drawTextBG1("                      ", 40, 184);
         drawTextBG1("                      ", 40, 192);
-        drawTextBG1("                      ", 40, 200);        
+        drawTextBG1("                      ", 40, 200);  
+        REG_TM = 0x1E;      
     }
 
     GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
@@ -1350,6 +1352,7 @@ void strawberryUpdate(uint8_t index) {
 
         if (this->data.strawberry.frameCount > (30*2)) {
             drawTextBG1("    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+            REG_TM = 0x1E;
             this->eType = OBJ_UNUSED;
             return;
         }
@@ -1372,6 +1375,7 @@ void strawberryUpdate(uint8_t index) {
         this->data.strawberry.bgTextX = this->pos.x;
         this->data.strawberry.bgTextY = this->pos.y;
         drawTextBG1("1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+        REG_TM = 0x1F;
         GLOBAL_ScrollBG1X = 8-remainderX;
         GLOBAL_ScrollBG1Y = 8-remainderY;
         GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y = 240;
@@ -1465,6 +1469,7 @@ void flyingBerryUpdate(uint8_t index) {
 
         if (this->data.strawberry.frameCount > (30*2)) {
             drawTextBG1("    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+            REG_TM = 0x1E;
             this->eType = OBJ_UNUSED;
             return;
         }
@@ -1488,6 +1493,7 @@ void flyingBerryUpdate(uint8_t index) {
         this->data.strawberry.bgTextX = this->pos.x;
         this->data.strawberry.bgTextY = this->pos.y;
         drawTextBG1("1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+        REG_TM = 0x1F;
         GLOBAL_ScrollBG1X = 8-remainderX;
         GLOBAL_ScrollBG1Y = 8-remainderY;
         GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y = 240;
@@ -2044,6 +2050,8 @@ void LoadNextRoom(void) {
     LoadRoomData(GLOBAL_GameState.currentRoomID);
 }
 
+#define REG_DEBUG_VIEWER (*(volatile uint32_t*)0x7FFFF0u)
+
 void main(void){
 	//Variables
 	static int something = 5;
@@ -2139,12 +2147,13 @@ void main(void){
     REG_BG4SC = (0x0000ul >> (9)) | 0x03u;
     //Set background 3 tile data source address to 0xA000
     REG_BG34NBA = ((0xC000 >> 13) << 4) | ((0xA000 >> 13));
-    REG_TM = 0x1F; //Enable background 4, 3, 2, 1 and OAM/sprite only
+    //Bg1 only gets enabled when needed, this may be overcautious because of a dying ppu
+    REG_TM = 0x1E; //Enable background 4, 3, 2, 0 and OAM/sprite only
 
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_GameState.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_GameState.currentRoomID = 1; //12 for monument 20, 22 for big chest
+    GLOBAL_GameState.currentRoomID = 7; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_GameState.currentRoomID); //Test room
     LoadRoomDataVRAM();
 
@@ -2154,11 +2163,29 @@ void main(void){
 
     for (;;) {
         int8_t regRead1 = 0;
+        uint8_t regRead2 = 0;
+        uint8_t regRead3 = 0;
+        uint16_t scanline;
+        
         do{ //Wait for Vblank
+            //Latch before reading the interupt
+            //This was after before but resulted in an edge case
+            //It would be in vblank here, but by the time it latched
+            //Vblank would be over
+            regRead1 = REG_SLHV;
             regRead1 = REG_RDNMI;
         } while(regRead1 > 0);
-        onVblank();
+        regRead2 = REG_OPVCT;
+        regRead3 = REG_OPVCT;
+        //9 bits vertical scan line counter
+        scanline = ((regRead3 << 8) | regRead2) & 0x01FF; 
+        //Hacky workaround to make sure we arn't partially in a vblank already
+        REG_DEBUG_VIEWER = scanline;
+        if (scanline > 231) {
+            continue;
+        }        
 
+        onVblank();
     }
 }
 
@@ -2750,7 +2777,6 @@ void playerUpdate(struct sPlayerData* this) {
 }
 
 
-static uint32_t global_randSeed = 0xDEADBEEE; // You can set this to time(NULL) for more randomness
 // Table-based random number generator
 static const uint16_t rand_table[256] = {
     0x6f6a, 0xba79, 0xc063, 0x76ee, 0x61ba, 0xbd9f, 0xdab5, 0x340e,
@@ -2788,6 +2814,7 @@ static const uint16_t rand_table[256] = {
 };
 
 // Table-based random number generator
+static uint8_t global_randSeed = 0xDEADBEEE; // You can set this to time(NULL) for more randomness
 uint16_t my_rand() {
     global_randSeed = (global_randSeed + 1) % 256;
     return rand_table[global_randSeed];
@@ -2873,6 +2900,7 @@ void onUpdateBG4CloudsEffect(void){
 
 
 void onVblank(void) {
+    //Start of vblank critical code
     int8_t regRead1;
     //Update hardware registers
     if (!GLOBAL_ActiveLevel.isLevelLoadedVRAM) {
@@ -2894,6 +2922,7 @@ void onVblank(void) {
     }
 
     //Display FPS
+    /*
     if ((GLOBAL_FrameCount % (60*4)) == 0) {
         static uint16_t lastVBlankAmount = 0;
         static uint16_t lastFrameCount = 0;
@@ -2903,7 +2932,9 @@ void onVblank(void) {
         GLOBAL_FrameCount = 0;
         //sprintf(testStringRam, "FPS: %02d", (uint16_t)((lastFrameCount * 60) / lastVBlankAmount));
         drawTextBG1(testStringRam, 0, 0);
+        REG_TM = 0x1F;
     }
+    */
 
     //Update player hair colour
     {
@@ -2925,43 +2956,65 @@ void onVblank(void) {
     LoadOAMCopy((char *)GLOBAL_OAMCopy.Bytes,0x0000,sizeof(union uOAMCopy), 0);
 
     //Update background scrolls
-    REG_BG4HOFS = GLOBAL_ScrollBG4X;
-    REG_BG4HOFS = GLOBAL_ScrollBG4X >> 8;    
-    REG_BG4VOFS = GLOBAL_ScrollBG4Y;
-    REG_BG4VOFS = (GLOBAL_ScrollBG4Y >> 8);
+    //Workaround for calypsi optimizer bug as of 5.11
+    // BG1
+    uint16_t tmpx = GLOBAL_ScrollBG1X;
+    uint8_t lo_x = (uint8_t)(tmpx & 0xFF);
+    uint8_t hi_x = (uint8_t)(tmpx >> 8);
+    REG_BG1HOFS = lo_x;
+    REG_BG1HOFS = hi_x;
 
+    uint16_t tmpy = GLOBAL_ScrollBG1Y;
+    uint8_t lo_y = (uint8_t)(tmpy & 0xFF);
+    uint8_t hi_y = (uint8_t)(tmpy >> 8);
+    REG_BG1VOFS = lo_y;
+    REG_BG1VOFS = hi_y;
 
-    REG_BG1HOFS = GLOBAL_ScrollBG1X;
-    REG_BG1HOFS = GLOBAL_ScrollBG1X >> 8;
-    REG_BG1VOFS = GLOBAL_ScrollBG1Y;
-    REG_BG1VOFS = GLOBAL_ScrollBG1Y >> 8;
+    // BG2
+    uint16_t tmpx2 = GLOBAL_ScrollBG2X;
+    uint8_t lo_x2 = (uint8_t)(tmpx2 & 0xFF);
+    uint8_t hi_x2 = (uint8_t)(tmpx2 >> 8);
+    REG_BG2HOFS = lo_x2;
+    REG_BG2HOFS = hi_x2;
 
-    REG_BG2HOFS = GLOBAL_ScrollBG2X;
-    REG_BG2HOFS = GLOBAL_ScrollBG2X >> 8;
-    REG_BG2VOFS = GLOBAL_ScrollBG2Y;
-    REG_BG2VOFS = GLOBAL_ScrollBG2Y >> 8;
+    uint16_t tmpy2 = GLOBAL_ScrollBG2Y;
+    uint8_t lo_y2 = (uint8_t)(tmpy2 & 0xFF);
+    uint8_t hi_y2 = (uint8_t)(tmpy2 >> 8);
+    REG_BG2VOFS = lo_y2;
+    REG_BG2VOFS = hi_y2;
 
-    REG_BG3HOFS = GLOBAL_ScrollBG3X;
-    REG_BG3HOFS = GLOBAL_ScrollBG3X >> 8;
-    REG_BG3VOFS = GLOBAL_ScrollBG3Y;
-    REG_BG3VOFS = GLOBAL_ScrollBG3Y >> 8;
+    // BG3
+    uint16_t tmpx3 = GLOBAL_ScrollBG3X;
+    uint8_t lo_x3 = (uint8_t)(tmpx3 & 0xFF);
+    uint8_t hi_x3 = (uint8_t)(tmpx3 >> 8);
+    REG_BG3HOFS = lo_x3;
+    REG_BG3HOFS = hi_x3;
 
-    REG_BG4VOFS = GLOBAL_ScrollBG4Y;
-    REG_BG4VOFS = GLOBAL_ScrollBG4Y >> 8;
+    uint16_t tmpy3 = GLOBAL_ScrollBG3Y;
+    uint8_t lo_y3 = (uint8_t)(tmpy3 & 0xFF);
+    uint8_t hi_y3 = (uint8_t)(tmpy3 >> 8);
+    REG_BG3VOFS = lo_y3;
+    REG_BG3VOFS = hi_y3;
+
+    uint16_t tmpx4 = GLOBAL_ScrollBG4X;
+    uint8_t lo_x4 = (uint8_t)(tmpx4 & 0xFF);
+    uint8_t hi_x4 = (uint8_t)(tmpx4 >> 8);
+    REG_BG4HOFS = lo_x4;
+    REG_BG4HOFS = hi_x4;
+
+    uint16_t tmpy4 = GLOBAL_ScrollBG4Y;
+    uint8_t lo_y4 = (uint8_t)(tmpy4 & 0xFF);
+    uint8_t hi_y4 = (uint8_t)(tmpy4 >> 8);
+    REG_BG4VOFS = lo_y4;
+    REG_BG4VOFS = hi_y4;
+    //End of vblank critical code
 
     //Player Draw
     GLOBAL_OAMCopy.Names.OBJ000X = GLOBAL_PlayerData.objData.pos.x;
     GLOBAL_OAMCopy.Names.OBJ000Y = GLOBAL_PlayerData.objData.pos.y - GLOBAL_ScrollBG2Y;
     GLOBAL_OAMCopy.Names.CHARNUM000 = GLOBAL_PlayerData.eSriteState;
     GLOBAL_OAMCopy.Names.PROPERTIES000 = GLOBAL_PlayerData.isFliped ? (0x38+0x40) : (0x38);
-
-    do{ //Wait for reg read
-        regRead1 = REG_HVBJOY;
-    } while(regRead1 & 0x01);
-
-    GLOBAL_InputLo = REG_JOY1L;
-    GLOBAL_InputHi = REG_JOY1H;
-    
+   
     //Calculate next frame (globals)
     GLOBAL_FrameCount += 1;
     if (GLOBAL_FreezeFrames > 0) {
@@ -2981,16 +3034,27 @@ void onVblank(void) {
 
     GLOBAL_ScrollBG2Y = CLAMP(GLOBAL_PlayerData.objData.pos.y - 16 - GLOBAL_ActiveLevel.scrollPointY, 0, 31);
     GLOBAL_ScrollBG2X = 0;
-    
+
+    REG_DEBUG_VIEWER  =  GLOBAL_ScrollBG3X;
     GLOBAL_ScrollBG3X = GLOBAL_ScrollBG2X + (shakeAmount);
     GLOBAL_ScrollBG3Y = GLOBAL_ScrollBG2Y + (shakeAmount);
 
     GLOBAL_ScrollBG4Y =  smoothScrollY + (shakeAmount >> 1) - (GLOBAL_GameState.currentRoomID << 6);
     }
 
+    //It's the last thing in the frame, it'll be fine
+    regRead1 = REG_HVBJOY;
+    //do{ //Wait for reg read
+    //    regRead1 = REG_HVBJOY;
+    //} while(regRead1 & 0x01);
+
+    GLOBAL_InputLo = REG_JOY1L;
+    GLOBAL_InputHi = REG_JOY1H;
+
     updateAllObjects();
     playerUpdate(&GLOBAL_PlayerData);
     onUpdateBG4CloudsEffect();
+
 
 }
 

@@ -1,5 +1,52 @@
-#include "SNES.h"
+#include "snes_regs_xc.h"
 #include "initsnes.h"
+
+#ifdef __VBCC__
+// VBCC816 stub implementations for malloc functions
+void* farmalloc(uint32_t size) {
+    (void)size; // Suppress unused parameter warning
+    return NULL;
+}
+
+void* malloc(uint32_t size) {
+    (void)size; // Suppress unused parameter warning
+    return NULL;
+}
+
+void free(void* ptr) {
+    (void)ptr; // Suppress unused parameter warning
+}
+
+// Stub for sprintf since it's not available in vbcc816
+int sprintf(char* str, const char* format, ...) {
+    (void)str;
+    (void)format;
+    return 0;
+}
+#endif
+
+#ifdef __CALYPSI__
+// Calypsi farmalloc is just malloc (calypsi malloc is automatically far)
+void* farmalloc(uint32_t size) {
+    return malloc(size);
+}
+#endif
+
+#ifdef __mos__
+// LLVM-MOS farmalloc stub (LLVM-MOS only has near malloc)
+void* farmalloc(uint32_t size) {
+    (void)size; // Suppress unused parameter warning
+    return NULL; // Return NULL since far malloc is not available
+}
+#endif
+
+#ifdef __CC65__
+// CC65 farmalloc implementation using malloc
+void* farmalloc(uint32_t size) {
+    return malloc(size);
+}
+#endif
+
 
 
 //Based on the init snes macro by peter Lemons.
@@ -116,7 +163,16 @@ void initSNES(uint8_t ROMSPEED){
 		REG_CGDATA = 0x0000;
 	}
 
+	// VRAM
+	REG_VMAIN = 0x80;
+	REG_VMADD = 0x0000;
+	REG_DAS0L = 0x00;
+	REG_DAS0H = 0x00;
 	
+	REG_DMAP0 = 0x09;
+	REG_BBAD0 = 0x18;
+	
+	REG_MDMAEN = 0x01;
 	
     // CGRAM
 	REG_CGADD = 0x00;
@@ -517,3 +573,52 @@ int initOAMCopy(unsigned char *pSource){
 	}	
 	return 0;
 }
+
+// Cross-compiler interrupt handler implementations
+// Users MUST define snesXC_irq() and snesXC_nmi() in their code
+// If they don't, the linker will fail with undefined symbols
+// This ensures users are explicit about their interrupt handling
+
+// Compiler-specific wrapper functions for assembly vectors
+// All interrupts (emulation and native mode) use the same user functions
+#ifdef __WDC816CC__
+void far snesXC_cop_wrapper(void) {
+	snesXC_cop();
+}
+
+void far snesXC_brk_wrapper(void) {
+	snesXC_brk();
+}
+
+void far snesXC_abort_wrapper(void) {
+	snesXC_abort();
+}
+
+void far snesXC_nmi_wrapper(void) {
+	snesXC_nmi();
+}
+
+void far snesXC_irq_wrapper(void) {
+	snesXC_irq();
+}
+#else
+void snesXC_cop_wrapper(void) {
+	snesXC_cop();
+}
+
+void snesXC_brk_wrapper(void) {
+	snesXC_brk();
+}
+
+void snesXC_abort_wrapper(void) {
+	snesXC_abort();
+}
+
+void snesXC_nmi_wrapper(void) {
+	snesXC_nmi();
+}
+
+void snesXC_irq_wrapper(void) {
+	snesXC_irq();
+}
+#endif

@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "stdio.h": "c",
+        "float.h": "c",
+        "clouds.h": "c",
+        "tilemap_level2.h": "c"
+    }
+}

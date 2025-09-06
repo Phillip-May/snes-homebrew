@@ -1,0 +1,550 @@
+###############################################################################
+#                                                                             #
+# Calypsi linker for 65816                                       version 5.11 #
+#                                                       06/Sep/2025  08:24:01 #
+# Command line: --raw-multiple-memories --rom-code build/mainBankZero.o       #
+#               build/initsnes.o                                              #
+#               ../shared/port/calypsi/linker-large-large.scm clib-lc-ld.a    #
+#               --list-file=build/calypsi.lst --cross-reference               #
+#               --output-format=intel-hex -o build/calypsi.hex                #
+#                                                                             #
+###############################################################################
+
+####################
+#                  #
+# Memories summary #
+#                  #
+####################
+
+Name       Range         Size    Used    Checksum  Largest unallocated
+----------------------------------------------------------------------
+zeroPage   000000-0000ff 000100    0.0%  none      000100
+DirectPage 000100-001fff 001f00    0.3%  none      001eec
+STACK      000100-001fff 001f00   51.6%  none      000f00
+BANK0      008000-00ff00 007f01    0.2%  none      007ec5
+Vector     00fffa-00ffff 000006   33.3%  none      000002
+BANK1      018000-01ffff 008000  100.0%  none      none
+BANK2      028000-02ffff 008000    8.7%  none      0074ea
+BANK3      038000-03ffff 008000    0.0%  none      008000
+BANK4      048000-04ffff 008000    0.0%  none      008000
+BANK5      058000-05ffff 008000    0.0%  none      008000
+BANK6      068000-06ffff 008000    0.0%  none      008000
+BANK7      078000-07ffff 008000    0.0%  none      008000
+WRAM       7e2000-7fffff 01e000    7.2%  none      01bd58
+
+
+####################
+#                  #
+# Sections summary #
+#                  #
+####################
+
+Name            Range          Size    Memory     Fragments
+-----------------------------------------------------------
+registers       000100-000113  000014  DirectPage 1
+stack           000100-0010ff  001000  STACK      1
+code            008000-00803b  00003c  BANK0      3
+reset           00fffc-00fffd  000002  Vector     1
+cfar            018000-01ff3f  007f40  BANK1      3
+farcode         01ff40-01ffc2  000083  BANK1      1
+cfar            01ffc3-01ffe2  000020  BANK1      1
+data_init_table 01ffe3-01fff6  000014  BANK1      1
+farcode         01fff7-01ffff  000009  BANK1      1
+farcode         028000-028a54  000a55  BANK2      9
+cfar            028a55-028a74  000020  BANK2      1
+switch          028a75-028aa4  000030  BANK2      3
+farcode         028aa5-028b0d  000069  BANK2      10
+cfar            028b0e-028b11  000004  BANK2      1
+ifar            028b12-028b13  000002  BANK2      1
+farcode         028b14-028b15  000002  BANK2      2
+heap            7e2000-7e3fff  002000  WRAM       1
+zfar            7e4000-7e42a5  0002a6  WRAM       4
+far             7e42a6-7e42a7  000002  WRAM       1
+
+
+###################
+#                 #
+# Placement rules #
+#                 #
+###################
+
+Name       Address range  Key
+----------------------------------------------------------------------
+BANK0      008000-00ff00  Plain
+  > code
+  > ROM-banks
+BANK1      018000-01ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK2      028000-02ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK3      038000-03ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK4      048000-04ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK5      058000-05ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK6      068000-06ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK7      078000-07ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+DirectPage 000100-001fff  Plain
+  > registers
+ROM        000000-000000  Plain
+STACK      000100-001fff  Plain
+  > stack
+Vector     00fffa-00ffff  Plain
+  > (nmi 00fffa)
+  > (reset 00fffc)
+  > (irq 00fffe)
+WRAM       7e2000-7fffff  
+  > heap
+  > far
+  > zfar
+zeroPage   000000-0000ff  Plain
+  > ztiny and registers
+
+Name  Size   Align
+-------------------
+heap  002000 no
+stack 001000 no
+
+Name             Memory     Offset
+-----------------------------------
+_DirectPageStart DirectPage 000000
+_NearBaseAddress DirectPage 000000
+
+################
+#              #
+# Object files #
+#              #
+################
+
+Unit Filename             Archive
+--------------------------------------
+  0  build/mainBankZero.o -
+          >  cfar    007f84
+          >  far     000002
+          >  farcode 000226
+          >  ifar    000002
+          >  zfar    000220
+  1  build/initsnes.o     -
+          >  farcode 0007a9
+          >  switch  000030
+  3  cstartup.o           clib-lc-ld.a
+          # picked based on cstartup=normal (built-in default)
+          >  code    00003c
+          >  farcode 000001
+          >  reset   000002
+  4  exit.o               clib-lc-ld.a
+          # picked based on exit=stdexit (built-in default)
+          >  farcode 000056
+  6  controlFlow.o        clib-lc-ld.a
+          >  farcode 00000e
+  7  pseudoRegisters.o    clib-lc-ld.a
+          >  registers 000014
+  8  atexit.o             clib-lc-ld.a
+          >  zfar 000082
+  9  exitC99.o            clib-lc-ld.a
+          >  farcode 000005
+ 10  defaultExit.o        clib-lc-ld.a
+          >  farcode 000001
+ 12  streamlist.o         clib-lc-ld.a
+          >  zfar 000004
+ 13  initialize.o         clib-lc-ld.a
+          # picked based on initialize=normal (built-in default)
+          >  farcode 000083
+ 15  lib_memset.o         clib-lc-ld.a
+          >  farcode 000046
+ 16  lib_memcpy.o         clib-lc-ld.a
+          >  farcode 000049
+
+###################
+#                 #
+# Cross reference #
+#                 #
+###################
+
+__program_start in section 'code'
+ placed at address 008000-008018 of size 000019
+(cstartup.o (from clib-lc-ld.a) unit 3 section index 2)
+    Defines:
+        __program_start = 008000
+    References:
+        _DirectPageStart
+        _NearBaseAddress
+        .sectionEnd(stack)
+        _Vfp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+        __low_level_init in (cstartup.o (from clib-lc-ld.a) unit 3 section index 8)
+    Referenced from:
+        __program_root_section (cstartup.o (from clib-lc-ld.a) unit 3 section index 7)
+
+__data_initialization_needed in section 'code'
+ placed at address 008019-008030 of size 000018
+(cstartup.o (from clib-lc-ld.a) unit 3 section index 3)
+    Defines:
+        __data_initialization_needed = 008019
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+        .sectionEnd(data_init_table)
+        .sectionStart(data_init_table)
+        __initialize_sections in (initialize.o (from clib-lc-ld.a) unit 13 section index 2)
+
+Section 'code'  placed at address 008031-00803b of size 00000b
+(cstartup.o (from clib-lc-ld.a) unit 3 section index 6)
+    References:
+        exit in (exit.o (from clib-lc-ld.a) unit 4 section index 2)
+        main in (build/mainBankZero.o unit 0 section index 3)
+
+school_bin in section 'cfar'  placed at address 018000-01efff of size 007000
+(build/mainBankZero.o unit 0 section index 11)
+    Defines:
+        school_bin = 018000
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+biker_pic in section 'cfar'  placed at address 01f000-01f7ff of size 000800
+(build/mainBankZero.o unit 0 section index 17)
+    Defines:
+        biker_pic = 01f000
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+school_tilemap in section 'cfar'
+ placed at address 01f800-01ff3f of size 000740
+(build/mainBankZero.o unit 0 section index 15)
+    Defines:
+        school_tilemap = 01f800
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+__initialize_sections in section 'farcode'
+ placed at address 01ff40-01ffc2 of size 000083
+(initialize.o (from clib-lc-ld.a) unit 13 section index 2)
+    Defines:
+        __initialize_sections = 01ff40
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+        memcpy in (lib_memcpy.o (from clib-lc-ld.a) unit 16 section index 2)
+        memset in (lib_memset.o (from clib-lc-ld.a) unit 15 section index 2)
+    Referenced from:
+        __data_initialization_needed (cstartup.o (from clib-lc-ld.a) unit 3 section index 3)
+
+biker_clr in section 'cfar'  placed at address 01ffc3-01ffe2 of size 000020
+(build/mainBankZero.o unit 0 section index 19)
+    Defines:
+        biker_clr = 01ffc3
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+Section 'data_init_table'  placed at address 01ffe3-01fff6 of size 000014
+(linker generated)
+
+`?L155` in section 'farcode'  placed at address 01fff7-01ffff of size 000009
+(build/initsnes.o unit 1 section index 17)
+
+main in section 'farcode'  placed at address 028000-028225 of size 000226
+(build/mainBankZero.o unit 0 section index 3)
+    Defines:
+        main = 028000
+    References:
+        LoadCGRam in (build/initsnes.o unit 1 section index 4)
+        LoadOAMCopy in (build/initsnes.o unit 1 section index 9)
+        LoadVram in (build/initsnes.o unit 1 section index 5)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+        biker_clr in (build/mainBankZero.o unit 0 section index 19)
+        biker_pic in (build/mainBankZero.o unit 0 section index 17)
+        initOAMCopy in (build/initsnes.o unit 1 section index 10)
+        initSNES in (build/initsnes.o unit 1 section index 3)
+        ... 5 more
+    Referenced from:
+        (cstartup.o (from clib-lc-ld.a) unit 3 section index 6)
+
+initSNES in section 'farcode'  placed at address 028226-028436 of size 000211
+(build/initsnes.o unit 1 section index 3)
+    Defines:
+        initSNES = 028226
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+LoadCGRam in section 'farcode'  placed at address 028437-028606 of size 0001d0
+(build/initsnes.o unit 1 section index 4)
+    Defines:
+        LoadCGRam = 028437
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+        (build/initsnes.o unit 1 section index 27)
+
+LoadOAMCopy in section 'farcode'
+ placed at address 028607-028797 of size 000191
+(build/initsnes.o unit 1 section index 9)
+    Defines:
+        LoadOAMCopy = 028607
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+        (build/initsnes.o unit 1 section index 29)
+
+LoadVram in section 'farcode'  placed at address 028798-028928 of size 000191
+(build/initsnes.o unit 1 section index 5)
+    Defines:
+        LoadVram = 028798
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+        (build/initsnes.o unit 1 section index 28)
+
+exit in section 'farcode'  placed at address 028929-02897e of size 000056
+(exit.o (from clib-lc-ld.a) unit 4 section index 2)
+    Defines:
+        exit = 028929
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+        _Exit in (exitC99.o (from clib-lc-ld.a) unit 9 section index 2)
+        _ExitCloseStreams in (streamlist.o (from clib-lc-ld.a) unit 12 section index 2)
+        _JmpIndLong in (controlFlow.o (from clib-lc-ld.a) unit 6 section index 3)
+        __atexit in (atexit.o (from clib-lc-ld.a) unit 8 section index 2)
+        __atexit_index in (atexit.o (from clib-lc-ld.a) unit 8 section index 3)
+    Referenced from:
+        (cstartup.o (from clib-lc-ld.a) unit 3 section index 6)
+
+memcpy in section 'farcode'  placed at address 02897f-0289c7 of size 000049
+(lib_memcpy.o (from clib-lc-ld.a) unit 16 section index 2)
+    Defines:
+        memcpy = 02897f
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        __initialize_sections (initialize.o (from clib-lc-ld.a) unit 13 section index 2)
+
+initOAMCopy in section 'farcode'
+ placed at address 0289c8-028a0e of size 000047
+(build/initsnes.o unit 1 section index 10)
+    Defines:
+        initOAMCopy = 0289c8
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+memset in section 'farcode'  placed at address 028a0f-028a54 of size 000046
+(lib_memset.o (from clib-lc-ld.a) unit 15 section index 2)
+    Defines:
+        memset = 028a0f
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        __initialize_sections (initialize.o (from clib-lc-ld.a) unit 13 section index 2)
+
+school_pal in section 'cfar'  placed at address 028a55-028a74 of size 000020
+(build/mainBankZero.o unit 0 section index 13)
+    Defines:
+        school_pal = 028a55
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+`?L138` in section 'switch'  placed at address 028a75-028a84 of size 000010
+(build/initsnes.o unit 1 section index 29)
+    References:
+        LoadOAMCopy in (build/initsnes.o unit 1 section index 9)
+
+`?L136` in section 'switch'  placed at address 028a85-028a94 of size 000010
+(build/initsnes.o unit 1 section index 28)
+    References:
+        LoadVram in (build/initsnes.o unit 1 section index 5)
+
+`?L134` in section 'switch'  placed at address 028a95-028aa4 of size 000010
+(build/initsnes.o unit 1 section index 27)
+    References:
+        LoadCGRam in (build/initsnes.o unit 1 section index 4)
+
+`?L156` in section 'farcode'  placed at address 028aa5-028ab3 of size 00000f
+(build/initsnes.o unit 1 section index 18)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+
+_JmpIndLong in section 'farcode'
+ placed at address 028ab4-028ac1 of size 00000e
+(controlFlow.o (from clib-lc-ld.a) unit 6 section index 3)
+    Defines:
+        _JmpIndLong = 028ab4
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 4 section index 2)
+
+`?L159` in section 'farcode'  placed at address 028ac2-028acf of size 00000e
+(build/initsnes.o unit 1 section index 20)
+
+`?L163` in section 'farcode'  placed at address 028ad0-028adc of size 00000d
+(build/initsnes.o unit 1 section index 23)
+
+`?L154` in section 'farcode'  placed at address 028add-028ae9 of size 00000d
+(build/initsnes.o unit 1 section index 16)
+
+`?L167` in section 'farcode'  placed at address 028aea-028af4 of size 00000b
+(build/initsnes.o unit 1 section index 26)
+
+`?L165` in section 'farcode'  placed at address 028af5-028afb of size 000007
+(build/initsnes.o unit 1 section index 24)
+
+`?L162` in section 'farcode'  placed at address 028afc-028b02 of size 000007
+(build/initsnes.o unit 1 section index 22)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+
+`?L161` in section 'farcode'  placed at address 028b03-028b08 of size 000006
+(build/initsnes.o unit 1 section index 21)
+
+_Exit in section 'farcode'  placed at address 028b09-028b0d of size 000005
+(exitC99.o (from clib-lc-ld.a) unit 9 section index 2)
+    Defines:
+        _Exit = 028b09
+    References:
+        _Stub_exit in (defaultExit.o (from clib-lc-ld.a) unit 10 section index 2)
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 4 section index 2)
+
+school_bin_size in section 'cfar'
+ placed at address 028b0e-028b11 of size 000004
+(build/mainBankZero.o unit 0 section index 10)
+    Defines:
+        school_bin_size = 028b0e
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+Section 'ifar'  placed at address 028b12-028b13 of size 000002
+(build/mainBankZero.o unit 0 initializer for section index 9)
+
+__low_level_init in section 'farcode'
+ placed at address 028b14-028b14 of size 000001
+(cstartup.o (from clib-lc-ld.a) unit 3 section index 8)
+    Defines:
+        __low_level_init = 028b14
+    Referenced from:
+        __program_start (cstartup.o (from clib-lc-ld.a) unit 3 section index 2)
+
+_Stub_exit in section 'farcode'  placed at address 028b15-028b15 of size 000001
+(defaultExit.o (from clib-lc-ld.a) unit 10 section index 2)
+    Defines:
+        _Stub_exit = 028b15
+    Referenced from:
+        _Exit (exitC99.o (from clib-lc-ld.a) unit 9 section index 2)
+
+_Dp in section 'registers'  placed at address 000100-000113 of size 000014
+(pseudoRegisters.o (from clib-lc-ld.a) unit 7 section index 2)
+    Defines:
+        _Vfp = 000110
+        _Dp = 000100
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+        initSNES (build/initsnes.o unit 1 section index 3)
+        LoadCGRam (build/initsnes.o unit 1 section index 4)
+        LoadVram (build/initsnes.o unit 1 section index 5)
+        LoadOAMCopy (build/initsnes.o unit 1 section index 9)
+        (build/initsnes.o unit 1 section index 18)
+        (build/initsnes.o unit 1 section index 22)
+        __program_start (cstartup.o (from clib-lc-ld.a) unit 3 section index 2)
+        ... 6 more
+
+Section 'stack'  placed at address 000100-0010ff of size 001000
+(linker generated)
+
+__program_root_section in section 'reset'
+ placed at address 00fffc-00fffd of size 000002
+(cstartup.o (from clib-lc-ld.a) unit 3 section index 7)
+    Defines:
+        __program_root_section = 00fffc
+    References:
+        __program_start in (cstartup.o (from clib-lc-ld.a) unit 3 section index 2)
+
+Section 'heap'  placed at address 7e2000-7e3fff of size 002000
+(linker generated)
+
+__atexit_index in section 'zfar'
+ placed at address 7e4000-7e4001 of size 000002
+(atexit.o (from clib-lc-ld.a) unit 8 section index 3)
+    Defines:
+        __atexit_index = 7e4000
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 4 section index 2)
+
+__atexit in section 'zfar'  placed at address 7e4002-7e4081 of size 000080
+(atexit.o (from clib-lc-ld.a) unit 8 section index 2)
+    Defines:
+        __atexit = 7e4002
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 4 section index 2)
+
+_ExitCloseStreams in section 'zfar'
+ placed at address 7e4082-7e4085 of size 000004
+(streamlist.o (from clib-lc-ld.a) unit 12 section index 2)
+    Defines:
+        _ExitCloseStreams = 7e4082
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 4 section index 2)
+
+oamCopy in section 'zfar'  placed at address 7e4086-7e42a5 of size 000220
+(build/mainBankZero.o unit 0 section index 2)
+    Defines:
+        oamCopy = 7e4086
+    Referenced from:
+        main (build/mainBankZero.o unit 0 section index 3)
+
+something in section 'far'  placed at address 7e42a6-7e42a7 of size 000002
+(build/mainBankZero.o unit 0 section index 9)
+
+##########################
+#                        #
+# Memory sizes (decimal) #
+#                        #
+##########################
+
+Executable       (Text): 35668 bytes
+Data                   :   680 bytes
+Non-initialized        : 12308 bytes

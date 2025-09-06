@@ -1,0 +1,112 @@
+Section CODE:
+	00028000 _BEG_CODE
+	00028000 ~~initSNES
+	00028275 ~~LoadCGRam
+	00028468 ~~LoadVram
+	00028666 ~~LoadLoVram
+	000286db ~~ClearVram
+	000287b0 ~~LoadOAMCopy
+	0002881a ~~initOAMCopy
+	0002889b ~~SPCWaitBoot
+	000288de ~~TransferBlockSPC
+	0002896e ~~SPCExecute
+	000289c1 ~~sprintf
+	00028a32 ~~strlen
+	00028a50 ~~~asl
+	00028a58 ~~~fmov
+	00028a79 ~~~fsw
+	00028aa3 ~~~llsr
+	00028ad3 ~~_format
+	000292bb ~~~ludv
+	000292d5 ~~~lumd
+	000292ea ~~~swt
+	0002930b ~~_flsbuf
+	000295b5 ~~_getbuf
+	0002967e ~~malloc
+	0002975b ~~sbrk
+	000297a9 ~~~comdiv
+	000297ea ~~~udv
+	0002981e ~~_closeall
+	0002985e ~~fclose
+	00029961 ~~fflush
+	000299de ~~free
+	00029aa7 ~~strcpy
+	00029acc ~~~umd
+	00029ad2 _END_CODE
+
+Section KDATA:
+	00048000 _BEG_KDATA
+	0004817c _END_KDATA
+
+Section DATA:
+	007e2000 _BEG_DATA
+	007e2000 ~~displayString1
+	007e2028 ~~displayString2
+	007e2050 ~~displayString3
+	007e2078 ~~displayString4
+	007e20a0 ~~displayString5
+	007e20c8 ~~heap_start
+	007e20cc ~~heap_end
+	007e20d0 ~~far_heap_start
+	007e20d4 ~~far_heap_end
+	007e20fa ~~_ctype
+	007e21fb ~~_iob
+	007e238f _END_DATA
+
+Section UDATA:
+	007e238f _BEG_UDATA
+	007e258f ~~_heap_top
+	007e2593 ~~_close_stdio
+	007e2597 ~~_mem_start
+	007e259b _END_UDATA
+
+Section SnesGraphics1:
+	00058000 _BEG_SNESGRAPHICS1
+	00058000 ~~TestInsert
+	0005800a ~~SNESFONT_bin
+	00058402 ~~END_SNESFONT_bin
+	00058402 _END_SNESGRAPHICS1
+
+Section SPCROM:
+	00068000 _BEG_SPCROM
+	00068000 ~~SPC700Code
+	0006f70d ~~END_SPC700Code
+	0006f70d _END_SPCROM
+
+Section BANK1:
+	00018000 _BEG_BANK1
+	00018000 ~~testDSP1Mul
+	0001819c ~~testDSP1Norm
+	00018333 ~~main
+	000184e2 ~~IRQHandler
+	000184e3 ~~termM0Init
+	000185c5 ~~termM0PrintStringXY
+	00018620 _END_BANK1
+
+Section startup:
+	00000000 _BEG_STARTUP
+	00000059 _END_STARTUP
+
+Section registration_data:
+	00007fb0 _BEG_REGISTRATION_DATA
+	00007fe0 _END_REGISTRATION_DATA
+
+Section vectors:
+	00007fe4 _BEG_VECTORS
+	00008000 _END_VECTORS
+
+Section filler:
+	0003ffff _BEG_FILLER
+	00040000 _END_FILLER
+
+ABSOLUTES:
+	00000000 START
+	00000049 IRQ
+	00000059 ~~unlink
+	00000059 ~~close
+	00000059 ~~open
+	00000059 ~~isatty
+	00000059 ~~write
+	00000059 ~~lseek
+	00000059 ~~ftod
+
