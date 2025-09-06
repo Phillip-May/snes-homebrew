@@ -2153,7 +2153,7 @@ void main(void){
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_GameState.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_GameState.currentRoomID = 7; //12 for monument 20, 22 for big chest
+    GLOBAL_GameState.currentRoomID = 1; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_GameState.currentRoomID); //Test room
     LoadRoomDataVRAM();
 
