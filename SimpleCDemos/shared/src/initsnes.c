@@ -8,11 +8,6 @@ void* farmalloc(uint32_t size) {
     return NULL;
 }
 
-void* malloc(uint32_t size) {
-    (void)size; // Suppress unused parameter warning
-    return NULL;
-}
-
 void free(void* ptr) {
     (void)ptr; // Suppress unused parameter warning
 }
@@ -37,6 +32,30 @@ void* farmalloc(uint32_t size) {
 void* farmalloc(uint32_t size) {
     (void)size; // Suppress unused parameter warning
     return NULL; // Return NULL since far malloc is not available
+}
+#endif
+
+#ifdef __JCC__
+// JCC816 stub implementations for malloc functions
+void* farmalloc(uint32_t size) {
+    (void)size; // Suppress unused parameter warning
+    return NULL;
+}
+
+void* malloc(uint32_t size) {
+    (void)size; // Suppress unused parameter warning
+    return NULL;
+}
+
+void free(void* ptr) {
+    (void)ptr; // Suppress unused parameter warning
+}
+
+// Stub for sprintf since it's not available in JCC816
+int sprintf(char* str, const char* format, ...) {
+    (void)str;
+    (void)format;
+    return 0;
 }
 #endif
 

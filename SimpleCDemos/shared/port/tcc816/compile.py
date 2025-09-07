@@ -131,9 +131,39 @@ def main():
     if args.output:
         cmd.extend(["-o", os.path.basename(args.output)])
     
-    # Add source files with just filenames (all in build directory root)
-    for source in copied_sources:
-        cmd.append(source)
+    # TCC816 doesn't support multiple files with -c, so we need to compile them separately
+    if len(copied_sources) > 1:
+        # Compile each source file separately
+        for source in copied_sources:
+            single_cmd = cmd[:-1]  # Remove the -c flag for individual compiles
+            single_cmd.extend(["-c", source])
+            
+            print("Running:", " ".join(single_cmd))
+            
+            try:
+                result = subprocess.run(single_cmd, capture_output=True, text=True, cwd=build_dir)
+                
+                if result.returncode != 0:
+                    print("STDOUT:", result.stdout)
+                    print("STDERR:", result.stderr)
+                    sys.exit(result.returncode)
+                    
+            except Exception as e:
+                print("Error running TCC816:", e)
+                sys.exit(1)
+        
+        print("TCC816 compilation completed successfully")
+        
+        # Convert assembly files to object files and link
+        asm_files = [f for f in os.listdir(build_dir) if f.endswith('.o') and not f.endswith('.obj')]
+        if asm_files and not args.output:
+            print("Converting assembly to object files...")
+            convert_and_link(build_dir, asm_files)
+        
+        return  # Exit early since we handled multiple files
+    
+    # Single file compilation (original behavior)
+    cmd.append(copied_sources[0])
     
     # Print the command for debugging
     print("Running:", " ".join(cmd))

@@ -3,8 +3,6 @@ typedef	unsigned char byte;
 //LoROM mememory map
 
 
-#include <float.h>
-#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -35,7 +33,7 @@ void main(void){
 	//Initialize the stack
 	initSNES(SLOWROM);
 	
-	LoadVram(school_bin, 0x2000, (uint16_t) school_bin_size, 7);
+	LoadVram(school_bin, 0x2000, sizeof(school_bin), 7);
 	LoadCGRam(school_pal, 0x00, sizeof(school_pal), something);
 	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr), 0); // Load BG Palette Data
 	LoadVram(biker_pic, 0x0000, sizeof(biker_pic), 7);
@@ -43,7 +41,6 @@ void main(void){
 	//ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
 	//Initialise BG1's tilemap to incrementing tiles indexes bitmap
 	LoadVram(school_tilemap, BGTileLocation, sizeof(school_tilemap), 7);	
-	
 	//Initialize OAM copy structure
 	initOAMCopy(oamCopy.Bytes);
 	
@@ -67,15 +64,19 @@ void main(void){
 	REG_BG1VOFS = 0x00;
 	REG_BG1VOFS = 0x00;	
 		
-	REG_NMITIMEN = 0x01;
+	REG_NMITIMEN = 0x01; //Joypad autoread enable
 	REG_INIDISP = 0x0F;
 	while(1){
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
 		} while( (regRead1 > 0));
+		LoadOAMCopy(oamCopy.Bytes,0x0000,sizeof(union uOAMCopy),0);
+		do{ //Wait for joypad read ready
+			regRead1 = REG_HVBJOY;
+		} while( (regRead1 & 0x01) != 0);
+
 		lastInputLo = REG_JOY1L;
 		lastInputHi = REG_JOY1H;
-		LoadOAMCopy(oamCopy.Bytes,0x0000,sizeof(union uOAMCopy),0);
 		//Up
 		if (lastInputHi & 0x08){
 			spriteY--;
@@ -103,7 +104,8 @@ void main(void){
 		}//Idle
 		
 		oamCopy.Names.OBJ000X = spriteX;
-		oamCopy.Names.OAMTABLE2BYTE00 = (spriteX & 0x0100) >> 8;
+		oamCopy.Names.OAMTABLE2BYTE00 &= 0xFE;
+		oamCopy.Names.OAMTABLE2BYTE00 |= (spriteX & 0x0100) >> 8;
 		oamCopy.Names.OBJ000Y = spriteY;
 	}
 }

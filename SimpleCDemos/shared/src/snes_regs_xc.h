@@ -38,7 +38,6 @@ void free(void* ptr) {
 
 // Function declarations for vbcc816 stubs
 void* farmalloc(uint32_t size);
-void* malloc(uint32_t size);
 void free(void* ptr);
 int sprintf(char* str, const char* format, ...);
 
@@ -71,6 +70,19 @@ void* farmalloc(uint32_t size);
 #include <stdio.h>
 // Function declaration for farmalloc stub
 void* farmalloc(uint32_t size);
+#endif
+
+#ifdef __JCC__
+// JCC816 doesn't have malloc support, provide declarations
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+// Function declarations for JCC816 stubs
+void* farmalloc(uint32_t size);
+void* malloc(uint32_t size);
+void free(void* ptr);
+int sprintf(char* str, const char* format, ...);
 #endif
 
 #define u8_reg(addr) (*(vu8)addr)

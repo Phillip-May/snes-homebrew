@@ -59,8 +59,8 @@ def main():
     
     # Copy header files that the source code needs
     header_files = [
-        ("SNES.h", [os.path.join(work_dir, "SNES.h")]),
-        ("int.h", [os.path.join(work_dir, "..", "shared", "src", "int.h")]),
+        ("snes_regs_xc.h", [os.path.join(work_dir, "..", "shared", "src", "snes_regs_xc.h")]),
+        ("int_snes_xc.h", [os.path.join(work_dir, "..", "shared", "src", "int_snes_xc.h")]),
         ("initsnes.h", [os.path.join(work_dir, "..", "shared", "src", "initsnes.h")])
     ]
     

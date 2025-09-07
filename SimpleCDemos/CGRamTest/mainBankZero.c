@@ -6,7 +6,7 @@
 
 char testString[40] = "Initial string in heap";
 
-int main(void){
+void main(void){
 	//Example
 	int size = 4; /*one extra for '\0'*/
 	uint8_t *test_heap;
@@ -41,7 +41,6 @@ int main(void){
 	REG_INIDISP = 0x0F;
 	while(1){
 	}
-	return 0;
 }
 
 // Cross-compiler interrupt handlers, must be present

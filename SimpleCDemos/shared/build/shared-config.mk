@@ -26,7 +26,13 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
 	LD = wdcln
 	CCFLAGS = -WL -SM -MK -MT -ML -WP -MU -MV -SI -SP -D__WDC816CC__=1
 	ASFLAGS = 
-	LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(BUILD_DIR)/mainBankZero.obj $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -Lcl
+	# Use floating point math library if USE_FLOATING_POINT is set
+	# WDC816CC requires both -Lml (math library) and -Lcl (standard library) for floating point
+	ifeq ($(USE_FLOATING_POINT),1)
+		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(BUILD_DIR)/mainBankZero.obj $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lml -Lcl
+	else
+		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(BUILD_DIR)/mainBankZero.obj $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lcl
+	endif
 	INCLUDES = -I "C:\wdc\Tools\include" -I "$(SHARED_SRC_DIR)" -I "lib" -I "include"
 	OUTPUT_EXT = .bin
 	POST_LINK = @powershell -Command "if (Test-Path '$(BUILD_DIR)/mainBankZero.bin') { Copy-Item '$(BUILD_DIR)/mainBankZero.bin' '$(BUILD_DIR)/mainBankZero_wdc816cc.smc' }"
@@ -68,7 +74,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	CC = mos-common-clang
 	AS = mos-common-clang
 	LD = mos-common-clang
-	CCFLAGS = -I$(SHARED_SRC_DIR) -Iinclude -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -O3 -D__mos__=1 -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector
+	CCFLAGS = -I$(SHARED_SRC_DIR) -Iinclude -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector
 	ASFLAGS = 
 	LDFLAGS = -lexit-loop -linit-stack
 	INCLUDES = 
@@ -98,7 +104,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
 	CC = python $(SHARED_PORT_DIR)\jcc816\compile.py
 	AS = python $(SHARED_PORT_DIR)\jcc816\compile.py
 	LD = python $(SHARED_PORT_DIR)\jcc816\compile.py
-	CCFLAGS = -l example=$(SHARED_PORT_DIR)/jcc816/exampleHeader.xml -O 0 -D 2 -V 2 -r build
+	CCFLAGS = -l example=$(SHARED_PORT_DIR)/jcc816/exampleHeader.xml -O 0 -D 2 -V 2 -r build -D__JCC__=1
 	ASFLAGS = 
 	LDFLAGS = 
 	INCLUDES = 
@@ -189,10 +195,10 @@ endif
 
 # TCC816 Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
-	C_SOURCES = mainBankZero.c
+	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = 
 	OBJECTS = $(BUILD_DIR)/mainBankZero.o
-	vpath %.c .
+	vpath %.c $(SHARED_SRC_DIR) .
 	vpath %.asm 
 	vpath %.h .
 endif
@@ -230,7 +236,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
 	$(POST_LINK)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
-	$(CC) $(CCFLAGS) $(INCLUDES) mainBankZero.c
+	$(CC) $(CCFLAGS) $(INCLUDES) $(C_SOURCES)
 	$(POST_LINK)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
