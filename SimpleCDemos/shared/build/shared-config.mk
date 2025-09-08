@@ -44,7 +44,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 	CC = "C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc"
 	AS = "C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc"
 	LD = "C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc"
-	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include"
+	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -D__VBCC__=1
 	ASFLAGS = 
 	LDFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt
 	INCLUDES = 
@@ -76,7 +76,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	LD = mos-common-clang
 	CCFLAGS = -I$(SHARED_SRC_DIR) -Iinclude -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector
 	ASFLAGS = 
-	LDFLAGS = -lexit-loop -linit-stack
+	LDFLAGS = -lexit-loop
 	INCLUDES = 
 	OUTPUT_EXT = .smc
 	POST_LINK = 
@@ -166,9 +166,10 @@ endif
 # LLVM-Mos Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
-	ASM_SOURCES = 
+	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/vectors.s $(SHARED_PORT_DIR)/llvm-mos/startup.s
 	OBJECTS = 
 	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
+	vpath %.s $(SHARED_PORT_DIR)/llvm-mos
 	vpath %.asm 
 	vpath %.h .
 endif
@@ -221,8 +222,8 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	@echo "Compiling with LLVM-MOS..."
-	@echo "$(CC) $(CCFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT) $(C_SOURCES)"
-	@powershell -Command "& '$(SHARED_PORT_DIR)/llvm-mos/compile.bat' '$(CC)' $(CCFLAGS) $(LDFLAGS) -o '$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)' $(C_SOURCES)"
+	@echo "$(CC) $(CCFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT) $(C_SOURCES) $(ASM_SOURCES)"
+	@powershell -Command "& '$(SHARED_PORT_DIR)/llvm-mos/compile.bat' '$(CC)' $(CCFLAGS) $(LDFLAGS) -o '$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)' $(C_SOURCES) $(ASM_SOURCES)"
 	@echo "Compilation completed successfully"
 	$(POST_LINK)
 else

@@ -3,7 +3,7 @@
 
 #ifdef __VBCC__
 // VBCC816 stub implementations for malloc functions
-void* farmalloc(uint32_t size) {
+void* farMalloc(uint32_t size) {
     (void)size; // Suppress unused parameter warning
     return NULL;
 }
@@ -12,24 +12,18 @@ void free(void* ptr) {
     (void)ptr; // Suppress unused parameter warning
 }
 
-// Stub for sprintf since it's not available in vbcc816
-int sprintf(char* str, const char* format, ...) {
-    (void)str;
-    (void)format;
-    return 0;
-}
 #endif
 
 #ifdef __CALYPSI__
 // Calypsi farmalloc is just malloc (calypsi malloc is automatically far)
-void* farmalloc(uint32_t size) {
+void* farMalloc(uint32_t size) {
     return malloc(size);
 }
 #endif
 
 #ifdef __mos__
 // LLVM-MOS farmalloc stub (LLVM-MOS only has near malloc)
-void* farmalloc(uint32_t size) {
+void* farMalloc(uint32_t size) {
     (void)size; // Suppress unused parameter warning
     return NULL; // Return NULL since far malloc is not available
 }
@@ -37,12 +31,12 @@ void* farmalloc(uint32_t size) {
 
 #ifdef __JCC__
 // JCC816 stub implementations for malloc functions
-void* farmalloc(uint32_t size) {
+void* farMalloc(uint32_t size) {
     (void)size; // Suppress unused parameter warning
     return NULL;
 }
 
-void* malloc(uint32_t size) {
+void* nearMalloc(uint32_t size) {
     (void)size; // Suppress unused parameter warning
     return NULL;
 }
@@ -51,17 +45,11 @@ void free(void* ptr) {
     (void)ptr; // Suppress unused parameter warning
 }
 
-// Stub for sprintf since it's not available in JCC816
-int sprintf(char* str, const char* format, ...) {
-    (void)str;
-    (void)format;
-    return 0;
-}
 #endif
 
 #ifdef __CC65__
 // CC65 farmalloc implementation using malloc
-void* farmalloc(uint32_t size) {
+void* farMalloc(uint32_t size) {
     return malloc(size);
 }
 #endif
@@ -78,8 +66,8 @@ void* farmalloc(uint32_t size) {
 void initSNES(uint8_t ROMSPEED){
 
 	int i;
-	int cCONSTZERO = 0;
-	int* pCONSTZERO = &cCONSTZERO;
+	volatile uint16_t cCONSTZERO = 0;
+	volatile uint16_t* pCONSTZERO = &cCONSTZERO;
 	REG_MEMSEL = ROMSPEED;  // Access Cycle Designation (Slow ROM / Fast ROM)
 
 	REG_INIDISP = 0x8F;// Display Control 1: Brightness & Screen Enable Register ($2100)
@@ -146,9 +134,7 @@ void initSNES(uint8_t ROMSPEED){
 	REG_SETINI = 0x00; // Display Control 2 = 0 ($2133)
 	
 	REG_JOYWR = 0x00; // Joypad Output = 0 ($4016)
-	
-	REG_NMITIMEN = 0x01; // Interrupt Enable & Joypad Request: Reset VBlank, Interrupt, Joypad ($4200)
-	
+		
 	REG_WRIO = 0xFF; // Programmable I/O Port (Open-Collector Output) = $FF ($4201)
 	
 	REG_WRMPYA = 0x00; // Set Unsigned  8-Bit Multiplicand = 0 ($4202)
@@ -170,36 +156,22 @@ void initSNES(uint8_t ROMSPEED){
 		REG_OAMDATA = 0x00;
 		REG_OAMDATA = 0x00;
 	}
-	
+
 	for(i = 0; i < 20; i++){
 		REG_OAMDATA = 0x00;
 	}
 	
 
-	//Clear CGRAM with a loop
-	REG_CGADD = 0x0000;
-	for(i = 0; i < 0x200; i++) {
-		REG_CGDATA = 0x0000;
+	// Clear CGRAM
+	for(i = 0; i < 256; i++) {
+		LoadCGRam((const unsigned char*)pCONSTZERO, i, sizeof(cCONSTZERO), 0);
 	}
 
-	// VRAM
-	REG_VMAIN = 0x80;
-	REG_VMADD = 0x0000;
-	REG_DAS0L = 0x00;
-	REG_DAS0H = 0x00;
-	
-	REG_DMAP0 = 0x09;
-	REG_BBAD0 = 0x18;
-	
-	REG_MDMAEN = 0x01;
-	
-    // CGRAM
-	REG_CGADD = 0x00;
-	REG_DAS0L = 0x00;
-	REG_DAS0H = 0x02;
-	REG_DMAP0 = 0x08;
-	REG_BBAD0 = 0x22;
-	REG_MDMAEN = 0x01;
+	// Clear VRAM using existing ClearVram function in chunks
+	// Clear VRAM in 32KB chunks (0x8000 bytes each) to avoid DMA size issues
+	for(i = 0; i < 2; i++) {
+		ClearVram((const unsigned char*)pCONSTZERO, i * 0x4000, 0x8000, 1);
+	}
 }
 
 //======================================
@@ -638,6 +610,65 @@ void snesXC_nmi_wrapper(void) {
 }
 
 void snesXC_irq_wrapper(void) {
+	snesXC_irq();
+}
+#endif
+
+// VBCC-specific interrupt handlers
+#ifdef __VBCC__
+__near __interrupt void __irq_cop(void) {
+	snesXC_cop();
+}
+
+__near __interrupt void __irq_brk(void) {
+	snesXC_brk();
+}
+
+__near __interrupt void __irq_vblank(void) {
+	snesXC_nmi();
+}
+
+__near __interrupt void __irq_ext(void) {
+	snesXC_irq();
+}
+
+__near __interrupt void __irq_cop6502(void) {
+	snesXC_cop();
+}
+
+__near __interrupt void __irq_nmi6502(void) {
+	snesXC_nmi();
+}
+
+__near __interrupt void __irq_ext6502(void) {
+	snesXC_irq();
+}
+#endif
+
+// Calypsi-specific interrupt handlers
+#ifdef __CALYPSI__
+__attribute__((section("CODE_IN_BANK0"), interrupt(0xFFE4)))
+void snesXC_cop_handler(void) {
+	snesXC_cop();
+}
+
+__attribute__((section("CODE_IN_BANK0"), interrupt(0xFFE6)))
+void snesXC_brk_handler(void) {
+	snesXC_brk();
+}
+
+__attribute__((section("CODE_IN_BANK0"), interrupt(0xFFE8)))
+void snesXC_abort_handler(void) {
+	snesXC_abort();
+}
+
+__attribute__((section("CODE_IN_BANK0"), interrupt(0xFFEA)))
+void snesXC_nmi_handler(void) {
+	snesXC_nmi();
+}
+
+__attribute__((section("CODE_IN_BANK0"), interrupt(0xFFEE)))
+void snesXC_irq_handler(void) {
 	snesXC_irq();
 }
 #endif

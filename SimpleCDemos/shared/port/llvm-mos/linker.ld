@@ -1,6 +1,7 @@
-/* 6502 simulator linker script.
+/* SNES LoROM linker script for LLVM-MOS
  *
- * Produces a 64KiB memory image file usable with the provided simulator.
+ * Produces a 32KiB ROM image for SNES LoROM mapping.
+ * Based on vectors.asm reference from wdc816cc.
  */
 
 /* Provide imaginary (zero page) registers. */
@@ -20,16 +21,50 @@ REGION_ALIAS("c_writeable", ram)
 /* Set initial soft stack address to just above zero page */
 __stack = 0x0200;
 
+/* Set entry point to our startup code */
+ENTRY(_start)
+
 SECTIONS {
   INCLUDE c.ld
 
-  .rom_bank_0_fixed : { *(.rom_bank_0_fixed .rom_bank_0_fixed.*) } >rom_bank_0  
-  
-  .vector 0xfffc : {
-    SHORT(_start)      /* Entrypoint */
-  } >rom_bank_0
+  /* Ensure our startup code is first */
+  .text.startup : { *(.text.startup) } >rom_bank_0
 
-   
+  .rom_bank_0_fixed : { *(.rom_bank_0_fixed .rom_bank_0_fixed.*) } >rom_bank_0
+  
+  /* Ensure data initialization is properly handled */
+  .data : {
+    *(.data .data.*)
+    . = ALIGN(2);
+  } >ram AT >rom_bank_0
+  
+  .bss : {
+    *(.bss .bss.*)
+    *(COMMON)
+    . = ALIGN(2);
+  } >ram  
+  
+  /* SNES Interrupt Vectors - Native Mode */
+  .vectors_native 0xFFE4 : {
+    SHORT(COP)        /* COP vector */
+    SHORT(BRK)        /* BRK vector */
+    SHORT(ABORT)      /* ABORT vector */
+    SHORT(NMI)        /* NMI vector */
+    SHORT(DIRQ)       /* Reserved vector */
+    SHORT(IRQ)        /* IRQ vector */
+    /* 4 bytes reserved */
+    LONG(0x00000000)
+  } >rom_bank_0
+  
+  /* SNES Interrupt Vectors - Emulation Mode */
+  .vectors_emulation 0xFFF4 : {
+    SHORT(COP)        /* COP vector */
+    SHORT(DIRQ)       /* Reserved vector */
+    SHORT(ABORT)      /* ABORT vector */
+    SHORT(NMI)        /* NMI vector */
+    SHORT(_start)     /* RESET vector - points to program entry point */
+    SHORT(IRQ)        /* IRQ vector */
+  } >rom_bank_0
 }
 
 OUTPUT_FORMAT {

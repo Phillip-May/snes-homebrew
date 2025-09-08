@@ -5,6 +5,7 @@
 	  (scatter-to ROM-banks)
 	  )
 	(memory BANK0 (address (#x8000 . #xFF00))
+	  (section CODE_IN_BANK0)
       (section code)
 	  (section ROM-banks)
 	)	 
@@ -54,9 +55,9 @@
     (memory WRAM (address (#x7e2000 . #x7fffff))
            (section heap far zfar))
 
-    ;; Hardware Vectors at $FFFA–$FFFF
-    (memory Vector (address (#xfffa . #xffff))
-           (section (nmi #xfffa) (reset #xfffc) (irq #xfffe)))
+    ;; Hardware Vectors at $FFe0–$FFFF
+    (memory Vector (address (#xffe0 . #xffff))
+           (section (reset #xfffc) ))
 
     ;; Special block allocations
     (block heap  (size #x2000)) ;; 8KB heap in WRAM

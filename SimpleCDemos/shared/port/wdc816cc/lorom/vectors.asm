@@ -101,7 +101,8 @@ START:
 		sta $2132
 		stz $2133
 		stz $4016
-		stz $4200
+		lda #$80
+		sta $4200		; Enable VBlank interrupts
 		lda #$FF
 		sta $4201
 		stz $4202
@@ -280,7 +281,13 @@ NMI:
 	pha
 	phx
 	phy
+	phb
+	phd
+	; Acknowledge NMI interrupt
+	lda	$4210		; Read NMI status to acknowledge
 	jsl	~~snesXC_nmi_wrapper
+	pld
+	plb
 	ply
 	plx
 	pla
@@ -295,7 +302,13 @@ IRQ:
 	pha
 	phx
 	phy
+	phb
+	phd
+	; Acknowledge IRQ interrupt
+	lda	$4211		; Read IRQ status to acknowledge
 	jsl	~~snesXC_irq_wrapper
+	pld
+	plb
 	ply
 	plx
 	pla
@@ -359,14 +372,14 @@ VECTORS	SECTION OFFSET $007FE4
 N_COP   DW   COP
 N_BRK   DW   BRK
 N_ABORT DW   ABORT        
-N_NMI   DW   NMI
+N_NMI   DW   $8000+NMI
 N_RSRVD DW   DIRQ
 N_IRQ   DW   IRQ
         DS   4
 E_COP   DW   COP
 E_RSRVD DW   DIRQ
 E_ABORT DW   ABORT
-E_NMI   DW   NMI
+E_NMI   DW   $8000+NMI
 E_RESET DW   $8000
 E_IRQ   DW   IRQ
 

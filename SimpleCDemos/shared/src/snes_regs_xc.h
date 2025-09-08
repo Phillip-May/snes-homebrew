@@ -8,6 +8,25 @@
 // For all compilers, use our custom SNES register definitions
 #include "int_snes_xc.h"
 
+// Compiler identification macro
+#ifdef __WDC816CC__
+#define SNES_XC_COMPILER_NAME "WDC816CC"
+#elif defined(__VBCC__)
+#define SNES_XC_COMPILER_NAME "VBCC816"
+#elif defined(__CC65__)
+#define SNES_XC_COMPILER_NAME "CC65"
+#elif defined(__TCC816__)
+#define SNES_XC_COMPILER_NAME "TCC816"
+#elif defined(__CALYPSI__)
+#define SNES_XC_COMPILER_NAME "Calypsi"
+#elif defined(__mos__)
+#define SNES_XC_COMPILER_NAME "LLVM-MOS"
+#elif defined(__JCC__)
+#define SNES_XC_COMPILER_NAME "JCC816"
+#else
+#define SNES_XC_COMPILER_NAME "Unknown"
+#endif
+
 // Stub malloc functions for compilers that don't support them
 #ifdef __TCC816__
 // TCC816 doesn't have malloc support, provide stubs
@@ -39,7 +58,6 @@ void free(void* ptr) {
 // Function declarations for vbcc816 stubs
 void* farmalloc(uint32_t size);
 void free(void* ptr);
-int sprintf(char* str, const char* format, ...);
 
 #endif
 
@@ -79,10 +97,9 @@ void* farmalloc(uint32_t size);
 #endif
 
 // Function declarations for JCC816 stubs
-void* farmalloc(uint32_t size);
-void* malloc(uint32_t size);
+void* farMalloc(uint32_t size);
+void* nearMalloc(uint32_t size);
 void free(void* ptr);
-int sprintf(char* str, const char* format, ...);
 #endif
 
 #define u8_reg(addr) (*(vu8)addr)
