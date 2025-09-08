@@ -318,10 +318,10 @@ void snesXC_irq(void) {
 int termM0Init(void){	
 	const static unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
 	const static unsigned char BGCLEAR[] = {0x20, 0x00};
-	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL), 0); // Load BG Palette Data
+	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL)); // Load BG Palette Data
 	//TODO Fix init snes and make it actually clear VRAM
-	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin), 7);
-    ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
+	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin));
+    ClearVram(BGCLEAR, 0xF800, 0x400); // Clear VRAM Map To Fixed Tile Word
 	
 	REG_BGMODE  = 0x08;
 	REG_BG1SC  = 0xFC;
@@ -344,7 +344,7 @@ int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY){
 	do {
 		regRead1 = REG_RDNMI;
 	} while(regRead1 > 0);
-	LoadLoVram((unsigned char *)szInput, 0xF800+inpX+inpY*0x40, strlen(szInput), 0); // Load Text To VRAM Lo Bytes
+	LoadLoVram((unsigned char *)szInput, 0xF800+inpX+inpY*0x40, strlen(szInput)); // Load Text To VRAM Lo Bytes
 	//Wait for 1 more frames
 	do {
 		regRead1 = REG_RDNMI;
@@ -565,12 +565,9 @@ void whetstones(long xtra, long x100, int calibrate) {
     termM0PrintStringXY("MF=MFLOPS MO=MOPS",(uint8_t)0,(uint8_t)6);
     
     // Run tests one by one - results are displayed automatically in pout()
-    test1_array_elements(xtra, x100, calibrate);
-    
+    test1_array_elements(xtra, x100, calibrate);    
     test2_array_parameter(xtra, x100, calibrate);
-    
-    test3_conditional_jumps(xtra, x100, calibrate);
-    
+    test3_conditional_jumps(xtra, x100, calibrate);    
     test4_integer_arithmetic(xtra, x100, calibrate);
     test5_trig_functions(xtra, x100, calibrate);
     test6_procedure_calls(xtra, x100, calibrate);

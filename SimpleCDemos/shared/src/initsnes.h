@@ -18,16 +18,19 @@
 #ifndef _INITSNES
 #define _INITSNES
 void initSNES(uint8_t ROMSPEED);
-FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination,
-				uint16_t cSize, int cChannel);
-FUNCTIONATR int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination, 
-				uint16_t cSize, int cChannel);
-FUNCTIONATR int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-				uint16_t cSize, int cChannel);
-FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-				uint16_t cSize, int cChannel);
-FUNCTIONATR int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
-				uint16_t cSize, int cChannel);
-int initOAMCopy(unsigned char *pSource);			
+FUNCTIONATR void LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination,
+				uint16_t cSize);
+FUNCTIONATR void LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination, 
+				uint16_t cSize);
+FUNCTIONATR void LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize);
+FUNCTIONATR void LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize);
+FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize);
+FUNCTIONATR void LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize);
+void initOAMCopy(unsigned char *pSource);			
+
 
 #endif

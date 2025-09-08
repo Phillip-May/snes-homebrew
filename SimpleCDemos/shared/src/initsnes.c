@@ -1,6 +1,22 @@
 #include "snes_regs_xc.h"
 #include "initsnes.h"
 
+#ifdef __TCC816__
+#include <snes/interrupt.h>
+void init_tcc816_interrupts(void);
+
+// Pointer splitting union for TCC816 compiler
+typedef union {
+    const unsigned char *ptr;
+    struct {
+        uint16_t low16;   // low 16 bits for A1T registers
+        uint8_t  high8;   // high 8 bits for A1B registers
+    } parts;
+    uint32_t full;
+} PtrSplit;
+#endif
+
+
 #ifdef __VBCC__
 // VBCC816 stub implementations for malloc functions
 void* farMalloc(uint32_t size) {
@@ -164,14 +180,19 @@ void initSNES(uint8_t ROMSPEED){
 
 	// Clear CGRAM
 	for(i = 0; i < 256; i++) {
-		LoadCGRam((const unsigned char*)pCONSTZERO, i, sizeof(cCONSTZERO), 0);
+		LoadCGRam((const unsigned char*)pCONSTZERO, i, sizeof(cCONSTZERO));
 	}
 
 	// Clear VRAM using existing ClearVram function in chunks
 	// Clear VRAM in 32KB chunks (0x8000 bytes each) to avoid DMA size issues
 	for(i = 0; i < 2; i++) {
-		ClearVram((const unsigned char*)pCONSTZERO, i * 0x4000, 0x8000, 1);
+		ClearVram((const unsigned char*)pCONSTZERO, i * 0x4000, 0x8000);
 	}
+	
+#ifdef __TCC816__
+	// Initialize TCC816 interrupt handling
+	init_tcc816_interrupts();
+#endif
 }
 
 //======================================
@@ -182,8 +203,21 @@ void initSNES(uint8_t ROMSPEED){
 // SIZE: Size Of Data (# Of Colours To Copy) in sets of two
 // CHAN: DMA Channel To Transfer Data (0..7) This takes an int to prevent a 
 // compiler warning.
-FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination, uint16_t cSize,
-				int cChannel){
+FUNCTIONATR void LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestination, uint16_t cSize){
+#ifdef __TCC816__
+	PtrSplit src;
+	REG_CGADD = pCGRAMDestination;
+	src.ptr = pSource;
+	
+	// Always use channel 0
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x22;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0L = (uint8_t)(cSize & 0xFF);
+	REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
+	REG_MDMAEN = 0x01;
+#else
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	
@@ -191,86 +225,15 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);
 	REG_CGADD = pCGRAMDestination;
 	
-	switch(cChannel){
-		case 0:
-			REG_DMAP0 = 0x00;
-			REG_BBAD0 = 0x22;
-			REG_A1T0 = regWrite1;
-			REG_A1B0 = regWrite2;
-			REG_DAS0L = (uint8_t)(cSize & 0xFF);
-			REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x01;
-			break;
-		case 1:
-			REG_DMAP1 = 0x00;
-			REG_BBAD1 = 0x22;
-			REG_A1T1 = regWrite1;
-			REG_A1B1 = regWrite2;
-			REG_DAS1L = (uint8_t)(cSize & 0xFF);
-			REG_DAS1H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x02;
-			break;
-		case 2:
-			REG_DMAP2 = 0x00;
-			REG_BBAD2 = 0x22;
-			REG_A1T2 = regWrite1;
-			REG_A1B2 = regWrite2;
-			REG_DAS2L = (uint8_t)(cSize & 0xFF);
-			REG_DAS2H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x04;
-			break;
-		case 3:
-			REG_DMAP3 = 0x00;
-			REG_BBAD3 = 0x22;
-			REG_A1T3 = regWrite1;
-			REG_A1B3 = regWrite2;
-			REG_DAS3L = (uint8_t)(cSize & 0xFF);
-			REG_DAS3H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x08;
-			break;
-		case 4:
-			REG_DMAP4 = 0x00;
-			REG_BBAD4 = 0x22;
-			REG_A1T4 = regWrite1;
-			REG_A1B4 = regWrite2;
-			REG_DAS4L = (uint8_t)(cSize & 0xFF);
-			REG_DAS4H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x10;
-			break;
-		case 5:
-			REG_DMAP5 = 0x00;
-			REG_BBAD5 = 0x22;
-			REG_A1T5 = regWrite1;
-			REG_A1B5 = regWrite2;
-			REG_DAS5L = (uint8_t)(cSize & 0xFF);
-			REG_DAS5H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x20;
-			break;
-		case 6:
-			REG_DMAP6 = 0x00;
-			REG_BBAD6 = 0x22;
-			REG_A1T6 = regWrite1;
-			REG_A1B6 = regWrite2;
-			REG_DAS6L = (uint8_t)(cSize & 0xFF);
-			REG_DAS6H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x40;
-			break;
-		case 7:
-			REG_DMAP7 = 0x00;
-			REG_BBAD7 = 0x22;
-			REG_A1T7 = regWrite1;
-			REG_A1B7 = regWrite2;
-			REG_DAS7L = (uint8_t)(cSize & 0xFF);
-			REG_DAS7H = (uint8_t)((cSize >> 8) & 0xFF);
-			REG_MDMAEN = 0x80;
-			break;
-		default:
-			//Insert some compiler/run-time warning if possible
-			return -1;
-			break;
-	}
-	
-	return 0;
+	// Always use channel 0
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x22;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0L = (uint8_t)(cSize & 0xFF);
+	REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
+	REG_MDMAEN = 0x01;
+#endif
 }
 
 //==================================
@@ -281,86 +244,37 @@ FUNCTIONATR int LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinati
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
 //Load Data into Vram, using DMA channel 0
-FUNCTIONATR int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
+FUNCTIONATR void LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize){
+#ifdef __TCC816__
+	PtrSplit src;
+	REG_VMAIN = 0x80;
+	REG_VMADD = (pVRAMDestination >> 1);
+	src.ptr = pSource;
+	
+	// Always use channel 0
+	REG_DMAP0 = 0x01;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#else
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x80;
 	REG_VMADD = (pVRAMDestination >> 1);
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	switch(cChannel){
-		case 0:
-			REG_DMAP0 = 0x01;
-			REG_BBAD0 = 0x18;
-			REG_A1T0 = regWrite1;
-			REG_A1B0 = regWrite2;
-			REG_DAS0 = cSize;
-			REG_MDMAEN = 0x01;			
-			break;
-		case 1:
-			REG_DMAP1 = 0x01;
-			REG_BBAD1 = 0x18;
-			REG_A1T1 = regWrite1;
-			REG_A1B1 = regWrite2;
-			REG_DAS1 = cSize;
-			REG_MDMAEN = 0x02;			
-			break;
-		case 2:
-			REG_DMAP2 = 0x01;
-			REG_BBAD2 = 0x18;
-			REG_A1T2 = regWrite1;
-			REG_A1B2 = regWrite2;
-			REG_DAS2 = cSize;
-			REG_MDMAEN = 0x04;			
-			break;
-		case 3:
-			REG_DMAP3 = 0x01;
-			REG_BBAD3 = 0x18;
-			REG_A1T3 = regWrite1;
-			REG_A1B3 = regWrite2;
-			REG_DAS3 = cSize;
-			REG_MDMAEN = 0x08;			
-			break;
-		case 4:
-			REG_DMAP4 = 0x01;
-			REG_BBAD4 = 0x18;
-			REG_A1T4 = regWrite1;
-			REG_A1B4 = regWrite2;
-			REG_DAS4 = cSize;
-			REG_MDMAEN = 0x10;			
-			break;
-		case 5:
-			REG_DMAP5 = 0x01;
-			REG_BBAD5 = 0x18;
-			REG_A1T5 = regWrite1;
-			REG_A1B5 = regWrite2;
-			REG_DAS5 = cSize;
-			REG_MDMAEN = 0x20;			
-			break;
-		case 6:
-			REG_DMAP6 = 0x01;
-			REG_BBAD6 = 0x18;
-			REG_A1T6 = regWrite1;
-			REG_A1B6 = regWrite2;
-			REG_DAS6 = cSize;
-			REG_MDMAEN = 0x40;			
-			break;
-		case 7:
-			REG_DMAP7 = 0x01;
-			REG_BBAD7 = 0x18;
-			REG_A1T7 = regWrite1;
-			REG_A1B7 = regWrite2;
-			REG_DAS7 = cSize;
-			REG_MDMAEN = 0x80;			
-			break;
-		default:
-			//Insert some compiler/run-time warning if possible
-			return -1;
-			break;
-	}		
 	
-	return 0;
+	// Always use channel 0
+	REG_DMAP0 = 0x01;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#endif
 }	
 
 //=============================================
@@ -370,8 +284,22 @@ FUNCTIONATR int LoadVram(const unsigned char *pSource, uint16_t pVRAMDestination
 //      DEST: 16-Bit VRAM Destination (WORD Address)
 // SIZETILES: Size Of Tile Data (BYTE Size)
 //      CHAN: DMA Channel To Transfer Data (0..7)
-FUNCTIONATR int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
+FUNCTIONATR void LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize){
+#ifdef __TCC816__
+	PtrSplit src;
+	REG_VMAIN = 0x00;
+	REG_VMADD = (pVRAMDestination >> 1);
+	src.ptr = pSource;
+	
+	// Always use channel 0
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#else
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x00;
@@ -379,17 +307,33 @@ FUNCTIONATR int LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
-	REG_DMAP7 = 0x00;
-	REG_BBAD7 = 0x18;
-	REG_A1T7 = regWrite1;
-	REG_A1B7 = regWrite2;
-	REG_DAS7 = cSize;
-	REG_MDMAEN = 0x80;
-	return 0;
+	// Always use channel 0
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#endif
 }
 
-FUNCTIONATR int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
+FUNCTIONATR void LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize){
+#ifdef __TCC816__
+	PtrSplit src;
+	REG_VMAIN = 0x80;
+	REG_VMADD = (pVRAMDestination >> 1);
+	src.ptr = pSource;
+	
+	// Always use channel 0
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x19;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0L = (uint8_t)(cSize & 0xFF);
+	REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
+	REG_MDMAEN = 0x01;
+#else
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x80;
@@ -397,14 +341,15 @@ FUNCTIONATR int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
-	REG_DMAP7 = 0x00;
-	REG_BBAD7 = 0x19;
-	REG_A1T7 = regWrite1;
-	REG_A1B7 = regWrite2;
-	REG_DAS7L = (uint8_t)(cSize & 0xFF);
-	REG_DAS7H = (uint8_t)((cSize >> 8) & 0xFF);
-	REG_MDMAEN = 0x80;
-	return 0;
+	// Always use channel 0
+	REG_DMAP0 = 0x00;
+	REG_BBAD0 = 0x19;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0L = (uint8_t)(cSize & 0xFF);
+	REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
+	REG_MDMAEN = 0x01;
+#endif
 }
 
 
@@ -416,8 +361,37 @@ FUNCTIONATR int LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 // DEST: 16-Bit VRAM Destination (WORD Address)
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
-FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
-			 uint16_t cSize, int cChannel){
+FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize){
+#ifdef __TCC816__
+	PtrSplit src;
+	uint16_t regWrite3;
+
+	regWrite3 = (pVRAMDestination >> 1);
+	//Transfer LoByte
+	REG_VMAIN = 0x00;
+	REG_VMADD = regWrite3;
+	src.ptr = pSource;
+	
+	// Always use channel 0
+	REG_DMAP0 = 0x08;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+	
+	//Transfer HiByte
+	REG_VMAIN = 0x80;
+	REG_VMADD = regWrite3;
+	src.ptr = pSource + 1;
+	
+	REG_BBAD0 = 0x19;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#else
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	uint16_t regWrite3;
@@ -429,12 +403,13 @@ FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinatio
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
-	REG_DMAP6 = 0x08;
-	REG_BBAD6 = 0x18;
-	REG_A1T6 = regWrite1;
-	REG_A1B6 = regWrite2;
-	REG_DAS6 = cSize;
-	REG_MDMAEN = 0x40;
+	// Always use channel 0
+	REG_DMAP0 = 0x08;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
 	
 	//Transfer HiByte
 	REG_VMAIN = 0x80;
@@ -442,13 +417,12 @@ FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinatio
 	regWrite1 = (uint16_t) ((uint32_t)pSource+1);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
 	
-	REG_BBAD6 = 0x19;
-	REG_A1T6 = regWrite1;
-	REG_A1B6 = regWrite2;
-	REG_DAS6 = cSize;
-	REG_MDMAEN = 0x40;
-	
-	return 0;
+	REG_BBAD0 = 0x19;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#endif
 }
 
 //===================================
@@ -458,95 +432,39 @@ FUNCTIONATR int ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinatio
 // DEST: 16-Bit OAM Destination (WORD Address)
 // SIZE: Size Of Data (BYTE Size)
 // CHAN: DMA Channel To Transfer Data (0..7)
-FUNCTIONATR int LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
-				uint16_t cSize, int cChannel) {
+FUNCTIONATR void LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
+				uint16_t cSize) {
+#ifdef __TCC816__
+	PtrSplit src;
+	src.ptr = pSource;
+	
+	// Always use channel 0
+	REG_OAMADD = pVRAMDestination;
+	REG_DAS0 = cSize;
+	REG_DMAP0 = 0x02;
+	REG_BBAD0 = 0x04; //0x2104
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_MDMAEN = 0x01;
+#else
 	uint16_t regWrite1; //Variable for storing hardware registers
 	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
 	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);	
-	cChannel = 0;
-	switch(cChannel) {
-		case 0:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS0 = cSize;
-			REG_DMAP0 = 0x02;
-			REG_BBAD0 = 0x04; //0x2104
-			REG_A1T0 = regWrite1;
-			REG_A1B0 = regWrite2;
-			REG_MDMAEN = 0x01;
-			break;
-		case 1:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS1 = cSize;
-			REG_DMAP1 = 0x02;
-			REG_BBAD1 = 0x04; //0x2104
-			REG_A1T1 = regWrite1;
-			REG_A1B1 = regWrite2;
-			REG_MDMAEN = 0x02;
-			break;
-		case 2:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS2 = cSize;
-			REG_DMAP2 = 0x02;
-			REG_BBAD2 = 0x04; //0x2104
-			REG_A1T2 = regWrite1;
-			REG_A1B2 = regWrite2;
-			REG_MDMAEN = 0x04;
-			break;
-		case 3:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS3 = cSize;
-			REG_DMAP3 = 0x02;
-			REG_BBAD3 = 0x04; //0x2104
-			REG_A1T3 = regWrite1;
-			REG_A1B3 = regWrite2;
-			REG_MDMAEN = 0x08;
-			break;
-		case 4:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS4 = cSize;
-			REG_DMAP4 = 0x02;
-			REG_BBAD4 = 0x04; //0x2104
-			REG_A1T4 = regWrite1;
-			REG_A1B4 = regWrite2;
-			REG_MDMAEN = 0x10;
-			break;
-		case 5:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS5 = cSize;
-			REG_DMAP5 = 0x02;
-			REG_BBAD5 = 0x04; //0x2104
-			REG_A1T5 = regWrite1;
-			REG_A1B5 = regWrite2;
-			REG_MDMAEN = 0x20;
-			break;
-		case 6:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS6 = cSize;
-			REG_DMAP6 = 0x02;
-			REG_BBAD6 = 0x04; //0x2104
-			REG_A1T6 = regWrite1;
-			REG_A1B6 = regWrite2;
-			REG_MDMAEN = 0x40;
-			break;
-		case 7:
-			REG_OAMADD = pVRAMDestination;
-			REG_DAS7 = cSize;
-			REG_DMAP7 = 0x02;
-			REG_BBAD7 = 0x04; //0x2104
-			REG_A1T7 = regWrite1;
-			REG_A1B7 = regWrite2;
-			REG_MDMAEN = 0x80;
-			break;
-		default:
-			break;
-	}
 	
-	return 0;
+	// Always use channel 0
+	REG_OAMADD = pVRAMDestination;
+	REG_DAS0 = cSize;
+	REG_DMAP0 = 0x02;
+	REG_BBAD0 = 0x04; //0x2104
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_MDMAEN = 0x01;
+#endif
 }
 
 
-int initOAMCopy(unsigned char *pSource){
+void initOAMCopy(unsigned char *pSource){
 	uint16_t i;
 	for (i = 0; i < 128; i++){
 		*pSource = 0x01;
@@ -562,7 +480,6 @@ int initOAMCopy(unsigned char *pSource){
 		*pSource = 0x55;
 		pSource++;
 	}	
-	return 0;
 }
 
 // Cross-compiler interrupt handler implementations
@@ -670,5 +587,14 @@ void snesXC_nmi_handler(void) {
 __attribute__((section("CODE_IN_BANK0"), interrupt(0xFFEE)))
 void snesXC_irq_handler(void) {
 	snesXC_irq();
+}
+#endif
+
+#ifdef __TCC816__
+/* Initialize TCC816 interrupt handling using PVSnesLib */
+void init_tcc816_interrupts(void) {
+    /* Set the VBlank handler using PVSnesLib's nmiSet function */
+    /* This will also enable VBlank interrupts and joypad auto-read */
+    nmiSet(snesXC_nmi);
 }
 #endif

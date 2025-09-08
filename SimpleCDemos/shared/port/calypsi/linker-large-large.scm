@@ -45,7 +45,7 @@
 
 	(memory zeroPage (address (#x00 . #xff))
             (section (ztiny registers)))
-	(memory DirectPage (address (#x0100 . #x1FFF))
+	(memory DirectPage (address (#x400 . #x1FFF))
             (section (registers)))
 
     (memory STACK (address (#x0100 . #x1FFF))

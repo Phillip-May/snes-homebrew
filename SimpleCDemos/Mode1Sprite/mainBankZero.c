@@ -33,14 +33,14 @@ void main(void){
 	//Initialize the stack
 	initSNES(SLOWROM);
 	
-	LoadVram(school_bin, 0x2000, sizeof(school_bin), 7);
-	LoadCGRam(school_pal, 0x00, sizeof(school_pal), something);
-	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr), 0); // Load BG Palette Data
-	LoadVram(biker_pic, 0x0000, sizeof(biker_pic), 7);
+	LoadVram(school_bin, 0x2000, sizeof(school_bin));
+	LoadCGRam(school_pal, 0x00, sizeof(school_pal));
+	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr)); // Load BG Palette Data
+	LoadVram(biker_pic, 0x0000, sizeof(biker_pic));
 	
 	//ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
 	//Initialise BG1's tilemap to incrementing tiles indexes bitmap
-	LoadVram(school_tilemap, BGTileLocation, sizeof(school_tilemap), 7);	
+	LoadVram(school_tilemap, BGTileLocation, sizeof(school_tilemap));	
 	//Initialize OAM copy structure
 	initOAMCopy(oamCopy.Bytes);
 	
@@ -70,7 +70,7 @@ void main(void){
 		do{ //Wait for Vblank
 			regRead1 = REG_RDNMI;
 		} while( (regRead1 > 0));
-		LoadOAMCopy(oamCopy.Bytes,0x0000,sizeof(union uOAMCopy),0);
+		LoadOAMCopy(oamCopy.Bytes,0x0000,sizeof(union uOAMCopy));
 		do{ //Wait for joypad read ready
 			regRead1 = REG_HVBJOY;
 		} while( (regRead1 & 0x01) != 0);

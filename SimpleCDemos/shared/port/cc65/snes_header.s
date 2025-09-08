@@ -34,7 +34,7 @@
 .word $0000  ; COP (co-processor)
 .word $0000  ; BRK (break)
 .word $0000  ; ABORT
-.word $0000  ; NMI (non-maskable interrupt)
+.word nmi_handler  ; NMI (non-maskable interrupt)
 .word custom_start  ; RESET (start vector) - points to custom startup routine
 .word $0000  ; IRQ (interrupt request)
 
@@ -49,3 +49,28 @@ custom_start:
     ; Jump to main function
     JMP _main
 
+.import _snesXC_nmi_wrapper
+.segment "CODE"
+nmi_handler:
+    ; disable interrupts to avoid nested IRQs while we save registers
+    sei
+
+    ; Save A, X, Y on the stack so C code can use them freely
+    pha         ; push A
+    txa
+    pha         ; push X (via A)
+    tya
+    pha         ; push Y (via A)
+
+    ; Now call the C routine (JSR to cc65 symbol)
+    jsr _snesXC_nmi_wrapper
+
+    ; Restore Y, X, A (note: PLA pulls into A).
+    pla         ; A <- saved Y
+    tay         ; Y <- A
+    pla         ; A <- saved X
+    tax         ; X <- A
+    pla         ; A <- saved A
+
+    cli
+    rti

@@ -11,17 +11,17 @@
 // Compiler identification macro
 #ifdef __WDC816CC__
 #define SNES_XC_COMPILER_NAME "WDC816CC"
-#elif defined(__VBCC__)
+#elif __VBCC__
 #define SNES_XC_COMPILER_NAME "VBCC816"
-#elif defined(__CC65__)
+#elif __CC65__
 #define SNES_XC_COMPILER_NAME "CC65"
-#elif defined(__TCC816__)
+#elif __TCC816__
 #define SNES_XC_COMPILER_NAME "TCC816"
-#elif defined(__CALYPSI__)
+#elif __CALYPSI__
 #define SNES_XC_COMPILER_NAME "Calypsi"
-#elif defined(__mos__)
+#elif __mos__
 #define SNES_XC_COMPILER_NAME "LLVM-MOS"
-#elif defined(__JCC__)
+#elif __JCC__
 #define SNES_XC_COMPILER_NAME "JCC816"
 #else
 #define SNES_XC_COMPILER_NAME "Unknown"
@@ -34,19 +34,6 @@
 #define NULL ((void*)0)
 #endif
 
-void* farmalloc(uint32_t size) {
-    (void)size; // Suppress unused parameter warning
-    return NULL;
-}
-
-void* malloc(uint32_t size) {
-    (void)size; // Suppress unused parameter warning
-    return NULL;
-}
-
-void free(void* ptr) {
-    (void)ptr; // Suppress unused parameter warning
-}
 #endif
 
 #ifdef __VBCC__
@@ -56,8 +43,8 @@ void free(void* ptr) {
 #endif
 
 // Function declarations for vbcc816 stubs
-void* farmalloc(uint32_t size);
-void free(void* ptr);
+void* farMalloc(uint32_t size);
+void* nearMalloc(uint32_t size);
 
 #endif
 
@@ -67,7 +54,7 @@ void free(void* ptr);
 #include <stdio.h>
 
 // Function declaration for cc65
-void* farmalloc(uint32_t size);
+void* farMalloc(uint32_t size);
 #endif
 
 #ifdef __WDC816CC__

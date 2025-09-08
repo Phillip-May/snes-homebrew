@@ -29,9 +29,9 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
 	# Use floating point math library if USE_FLOATING_POINT is set
 	# WDC816CC requires both -Lml (math library) and -Lcl (standard library) for floating point
 	ifeq ($(USE_FLOATING_POINT),1)
-		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(BUILD_DIR)/mainBankZero.obj $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lml -Lcl
+		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(PROJECT_OBJECTS) $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lml -Lcl -O$(BUILD_DIR)/mainBankZero.bin
 	else
-		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(BUILD_DIR)/mainBankZero.obj $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lcl
+		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(PROJECT_OBJECTS) $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lcl -O$(BUILD_DIR)/mainBankZero.bin
 	endif
 	INCLUDES = -I "C:\wdc\Tools\include" -I "$(SHARED_SRC_DIR)" -I "lib" -I "include"
 	OUTPUT_EXT = .bin
@@ -104,7 +104,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
 	CC = python $(SHARED_PORT_DIR)\jcc816\compile.py
 	AS = python $(SHARED_PORT_DIR)\jcc816\compile.py
 	LD = python $(SHARED_PORT_DIR)\jcc816\compile.py
-	CCFLAGS = -l example=$(SHARED_PORT_DIR)/jcc816/exampleHeader.xml -O 0 -D 2 -V 2 -r build -D__JCC__=1
+	CCFLAGS = -l example=$(SHARED_PORT_DIR)/jcc816/exampleHeader.xml -O 0 -D 2 -V 2 -r build
 	ASFLAGS = 
 	LDFLAGS = 
 	INCLUDES = 
@@ -135,9 +135,13 @@ endif
 
 # WDC816CC Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
-	C_SOURCES = mainBankZero.c $(SHARED_PORT_DIR)/wdc816cc/lorom/kernel.c $(SHARED_SRC_DIR)/initsnes.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_PORT_DIR)/wdc816cc/lorom/kernel.c $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = $(SHARED_PORT_DIR)/wdc816cc/lorom/vectors.asm
-	OBJECTS = $(BUILD_DIR)/mainBankZero.obj $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj $(BUILD_DIR)/vectors.obj
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .obj,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj $(BUILD_DIR)/vectors.obj
 	vpath %.c $(SHARED_PORT_DIR)/wdc816cc/lorom $(SHARED_SRC_DIR) .
 	vpath %.asm $(SHARED_PORT_DIR)/wdc816cc/lorom
 	vpath %.h .
@@ -145,7 +149,9 @@ endif
 
 # VBCC65816 Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
-	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = 
 	OBJECTS = 
 	vpath %.c $(SHARED_SRC_DIR) .
@@ -155,9 +161,13 @@ endif
 
 # Calypsi Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
-	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = 
-	OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/initsnes.o
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o
 	vpath %.c $(SHARED_SRC_DIR) .
 	vpath %.asm 
 	vpath %.h .
@@ -165,7 +175,9 @@ endif
 
 # LLVM-Mos Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
-	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
 	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/vectors.s $(SHARED_PORT_DIR)/llvm-mos/startup.s
 	OBJECTS = 
 	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
@@ -176,9 +188,13 @@ endif
 
 # CC65 Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
-	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/cc65/putchar_stub.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/cc65/putchar_stub.c
 	ASM_SOURCES = $(SHARED_PORT_DIR)/cc65/snes_header.s $(SHARED_PORT_DIR)/cc65/runtime_stubs.s
-	OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/initsnes.o $(BUILD_DIR)/putchar_stub.o $(BUILD_DIR)/snes_header.o $(BUILD_DIR)/runtime_stubs.o
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o $(BUILD_DIR)/putchar_stub.o $(BUILD_DIR)/snes_header.o $(BUILD_DIR)/runtime_stubs.o
 	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/cc65 .
 	vpath %.asm $(SHARED_PORT_DIR)/cc65
 	vpath %.h .
@@ -186,7 +202,9 @@ endif
 
 # JCC816 Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
-	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = 
 	OBJECTS = 
 	vpath %.c $(SHARED_SRC_DIR) .
@@ -196,9 +214,13 @@ endif
 
 # TCC816 Source Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
-	C_SOURCES = mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = 
-	OBJECTS = $(BUILD_DIR)/mainBankZero.o
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS)
 	vpath %.c $(SHARED_SRC_DIR) .
 	vpath %.asm 
 	vpath %.h .
@@ -242,8 +264,8 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 	@echo "Compiling with VBCC65816..."
-	@echo "\"C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc\" $(CCFLAGS) mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)"
-	@$(SHARED_PORT_DIR)/vbcc816/vc.bat $(CCFLAGS) mainBankZero.c $(SHARED_SRC_DIR)/initsnes.c -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
+	@echo "\"C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc\" $(CCFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)"
+	@$(SHARED_PORT_DIR)/vbcc816/vc.bat $(CCFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
 	@echo "Compilation completed successfully"
 	$(POST_LINK)
 else
