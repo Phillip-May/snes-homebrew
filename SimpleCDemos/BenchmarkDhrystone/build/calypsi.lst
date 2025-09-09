@@ -1,0 +1,1241 @@
+###############################################################################
+#                                                                             #
+# Calypsi linker for 65816                                       version 5.11 #
+#                                                       09/Sep/2025  01:25:34 #
+# Command line: --raw-multiple-memories --rom-code build/dry.o                #
+#               build/mainBankZero.o build/initsnes.o                         #
+#               ../shared/port/calypsi/linker-large-large.scm clib-lc-ld.a    #
+#               --list-file=build/calypsi.lst --cross-reference               #
+#               --output-format=intel-hex -o build/calypsi.hex                #
+#                                                                             #
+###############################################################################
+
+####################
+#                  #
+# Memories summary #
+#                  #
+####################
+
+Name       Range         Size    Used    Checksum  Largest unallocated
+----------------------------------------------------------------------
+zeroPage   000000-0000ff 000100    0.0%  none      000100
+STACK      000100-001fff 001f00   51.6%  none      000f00
+DirectPage 000400-001fff 001c00    0.3%  none      001bec
+BANK0      008000-00ff00 007f01    0.7%  none      007e1c
+Vector     00ffe0-00ffff 000020   37.5%  none      00000c
+BANK1      018000-01ffff 008000   19.1%  none      006780
+BANK2      028000-02ffff 008000    0.0%  none      008000
+BANK3      038000-03ffff 008000    0.0%  none      008000
+BANK4      048000-04ffff 008000    0.0%  none      008000
+BANK5      058000-05ffff 008000    0.0%  none      008000
+BANK6      068000-06ffff 008000    0.0%  none      008000
+BANK7      078000-07ffff 008000    0.0%  none      008000
+WRAM       7e2000-7fffff 01e000   11.2%  none      01aa58
+
+
+####################
+#                  #
+# Sections summary #
+#                  #
+####################
+
+Name                       Range          Size    Memory     Fragments
+----------------------------------------------------------------------
+stack                      000100-0010ff  001000  STACK      1
+registers                  000400-000413  000014  DirectPage 1
+code                       008000-00803b  00003c  BANK0      3
+CODE_IN_BANK0              00803c-0080e4  0000a9  BANK0      5
+$$interruptVector_0x00ffe4 00ffe4-00ffe5  000002  Vector     1
+$$interruptVector_0x00ffe6 00ffe6-00ffe7  000002  Vector     1
+$$interruptVector_0x00ffe8 00ffe8-00ffe9  000002  Vector     1
+$$interruptVector_0x00ffea 00ffea-00ffeb  000002  Vector     1
+$$interruptVector_0x00ffee 00ffee-00ffef  000002  Vector     1
+reset                      00fffc-00fffd  000002  Vector     1
+cfar                       018000-0183f7  0003f8  BANK1      1
+farcode                    0183f8-019576  00117f  BANK1      31
+cfar                       019577-0195f0  00007a  BANK1      4
+farcode                    0195f1-01960c  00001c  BANK1      1
+cfar                       01960d-019626  00001a  BANK1      1
+farcode                    019627-01963f  000019  BANK1      1
+cfar                       019640-019658  000019  BANK1      1
+farcode                    019659-019670  000018  BANK1      1
+switch                     019671-019688  000018  BANK1      1
+cfar                       019689-0196b3  00002b  BANK1      2
+farcode                    0196b4-0196ea  000037  BANK1      3
+cfar                       0196eb-0196fb  000011  BANK1      1
+farcode                    0196fc-01971a  00001f  BANK1      2
+cfar                       01971b-019729  00000f  BANK1      1
+farcode                    01972a-019753  00002a  BANK1      3
+cfar                       019754-019761  00000e  BANK1      1
+farcode                    019762-0197e9  000088  BANK1      11
+cfar                       0197ea-0197f3  00000a  BANK1      1
+farcode                    0197f4-019807  000014  BANK1      2
+data_init_table            019808-019811  00000a  BANK1      1
+cfar                       019812-01981a  000009  BANK1      1
+farcode                    01981b-01982c  000012  BANK1      2
+cfar                       01982d-01983c  000010  BANK1      2
+farcode                    01983d-01985b  00001f  BANK1      4
+cfar                       01985c-019862  000007  BANK1      1
+farcode                    019863-019875  000013  BANK1      3
+cfar                       019876-019879  000004  BANK1      2
+farcode                    01987a-01987f  000006  BANK1      6
+heap                       7e2000-7e3fff  002000  WRAM       1
+zfar                       7e4000-7e55a7  0015a8  WRAM       16
+
+
+###################
+#                 #
+# Placement rules #
+#                 #
+###################
+
+Name       Address range  Key
+----------------------------------------------------------------------
+BANK0      008000-00ff00  Plain
+  > CODE_IN_BANK0
+  > code
+  > ROM-banks
+BANK1      018000-01ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK2      028000-02ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK3      038000-03ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK4      048000-04ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK5      058000-05ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK6      068000-06ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+BANK7      078000-07ffff  
+  > farcode
+  > cfar
+  > chuge
+  > switch
+  > data_init_table
+  > ifar
+  > ROM-banks
+DirectPage 000400-001fff  Plain
+  > registers
+ROM        000000-000000  Plain
+STACK      000100-001fff  Plain
+  > stack
+Vector     00ffe0-00ffff  Plain
+  > (reset 00fffc)
+WRAM       7e2000-7fffff  
+  > heap
+  > far
+  > zfar
+zeroPage   000000-0000ff  Plain
+  > ztiny and registers
+
+Name  Size   Align
+-------------------
+heap  002000 no
+stack 001000 no
+
+Name             Memory     Offset
+-----------------------------------
+_DirectPageStart DirectPage 000000
+_NearBaseAddress DirectPage 000000
+
+################
+#              #
+# Object files #
+#              #
+################
+
+Unit Filename             Archive
+--------------------------------------
+  0  build/dry.o          -
+          >  cfar    00005d
+          >  farcode 0005a8
+          >  switch  000018
+          >  zfar    001518
+  1  build/mainBankZero.o -
+          >  cfar    0004cf
+          >  farcode 000656
+          >  zfar    00000a
+  2  build/initsnes.o     -
+          >  $$interruptVector_0x00ffe4 000002
+          >  $$interruptVector_0x00ffe6 000002
+          >  $$interruptVector_0x00ffe8 000002
+          >  $$interruptVector_0x00ffea 000002
+          >  $$interruptVector_0x00ffee 000002
+          >  CODE_IN_BANK0              0000a9
+          >  farcode                    000330
+  4  cstartup.o           clib-lc-ld.a
+          # picked based on cstartup=normal (built-in default)
+          >  code    00003c
+          >  farcode 000001
+          >  reset   000002
+  5  exit.o               clib-lc-ld.a
+          # picked based on exit=stdexit (built-in default)
+          >  farcode 000056
+  7  controlFlow.o        clib-lc-ld.a
+          >  farcode 00000e
+  8  pseudoRegisters.o    clib-lc-ld.a
+          >  registers 000014
+  9  atexit.o             clib-lc-ld.a
+          >  zfar 000082
+ 10  exitC99.o            clib-lc-ld.a
+          >  farcode 000005
+ 11  defaultExit.o        clib-lc-ld.a
+          >  farcode 000001
+ 13  streamlist.o         clib-lc-ld.a
+          >  zfar 000004
+ 14  lib_strlen.o         clib-lc-ld.a
+          >  farcode 000019
+ 15  vswitch16.o          clib-lc-ld.a
+          >  farcode 00007d
+ 16  integer.o            clib-lc-ld.a
+          >  farcode 000101
+ 17  lib_strcmp.o         clib-lc-ld.a
+          >  farcode 00003a
+ 18  lib_strcpy.o         clib-lc-ld.a
+          >  farcode 00003c
+ 19  lib_strcat.o         clib-lc-ld.a
+          >  farcode 00007a
+ 20  initialize.o         clib-lc-ld.a
+          # picked based on initialize=normal (built-in default)
+          >  farcode 000083
+ 22  lib_memset.o         clib-lc-ld.a
+          >  farcode 000046
+ 23  lib_memcpy.o         clib-lc-ld.a
+          >  farcode 000049
+
+###################
+#                 #
+# Cross reference #
+#                 #
+###################
+
+__program_start in section 'code'
+ placed at address 008000-008018 of size 000019
+(cstartup.o (from clib-lc-ld.a) unit 4 section index 2)
+    Defines:
+        __program_start = 008000
+    References:
+        _DirectPageStart
+        _NearBaseAddress
+        .sectionEnd(stack)
+        _Vfp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        __low_level_init in (cstartup.o (from clib-lc-ld.a) unit 4 section index 8)
+    Referenced from:
+        __program_root_section (cstartup.o (from clib-lc-ld.a) unit 4 section index 7)
+
+__data_initialization_needed in section 'code'
+ placed at address 008019-008030 of size 000018
+(cstartup.o (from clib-lc-ld.a) unit 4 section index 3)
+    Defines:
+        __data_initialization_needed = 008019
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        .sectionEnd(data_init_table)
+        .sectionStart(data_init_table)
+        __initialize_sections in (initialize.o (from clib-lc-ld.a) unit 20 section index 2)
+
+Section 'code'  placed at address 008031-00803b of size 00000b
+(cstartup.o (from clib-lc-ld.a) unit 4 section index 6)
+    References:
+        exit in (exit.o (from clib-lc-ld.a) unit 5 section index 2)
+        main in (build/mainBankZero.o unit 1 section index 9)
+
+snesXC_irq_handler in section 'CODE_IN_BANK0'
+ placed at address 00803c-008070 of size 000035
+(build/initsnes.o unit 2 section index 27)
+    Defines:
+        snesXC_irq_handler = 00803c
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        snesXC_irq in (build/mainBankZero.o unit 1 section index 14)
+    Referenced from:
+        (build/initsnes.o unit 2 section index 31)
+
+snesXC_nmi_handler in section 'CODE_IN_BANK0'
+ placed at address 008071-00808d of size 00001d
+(build/initsnes.o unit 2 section index 26)
+    Defines:
+        snesXC_nmi_handler = 008071
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        snesXC_nmi in (build/mainBankZero.o unit 1 section index 13)
+    Referenced from:
+        (build/initsnes.o unit 2 section index 30)
+
+snesXC_abort_handler in section 'CODE_IN_BANK0'
+ placed at address 00808e-0080aa of size 00001d
+(build/initsnes.o unit 2 section index 25)
+    Defines:
+        snesXC_abort_handler = 00808e
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        snesXC_abort in (build/mainBankZero.o unit 1 section index 12)
+    Referenced from:
+        (build/initsnes.o unit 2 section index 29)
+
+snesXC_brk_handler in section 'CODE_IN_BANK0'
+ placed at address 0080ab-0080c7 of size 00001d
+(build/initsnes.o unit 2 section index 24)
+    Defines:
+        snesXC_brk_handler = 0080ab
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        snesXC_brk in (build/mainBankZero.o unit 1 section index 11)
+    Referenced from:
+        (build/initsnes.o unit 2 section index 28)
+
+snesXC_cop_handler in section 'CODE_IN_BANK0'
+ placed at address 0080c8-0080e4 of size 00001d
+(build/initsnes.o unit 2 section index 23)
+    Defines:
+        snesXC_cop_handler = 0080c8
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        snesXC_cop in (build/mainBankZero.o unit 1 section index 10)
+    Referenced from:
+        (build/initsnes.o unit 2 section index 22)
+
+SNESFONT_bin in section 'cfar'  placed at address 018000-0183f7 of size 0003f8
+(build/mainBankZero.o unit 1 section index 31)
+    Defines:
+        SNESFONT_bin = 018000
+    Referenced from:
+        termM0Init (build/mainBankZero.o unit 1 section index 15)
+
+snesPrintResults in section 'farcode'
+ placed at address 0183f8-018682 of size 00028b
+(build/mainBankZero.o unit 1 section index 8)
+    Defines:
+        snesPrintResults = 0183f8
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        _Mul32 in (integer.o (from clib-lc-ld.a) unit 16 section index 3)
+        `_StringLiteral_=====================` in (build/mainBankZero.o unit 1 section index 33)
+        `_StringLiteral_Dhrystones/sec: ` in (build/mainBankZero.o unit 1 section index 37)
+        `_StringLiteral_Frames: ` in (build/mainBankZero.o unit 1 section index 38)
+        `_StringLiteral_Higher=Better` in (build/mainBankZero.o unit 1 section index 39)
+        `_StringLiteral_Optimized out entire test` in (build/mainBankZero.o unit 1 section index 40)
+        `_StringLiteral_Runs: ` in (build/mainBankZero.o unit 1 section index 42)
+        ... 6 more
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+Proc0 in section 'farcode'  placed at address 018683-0188d0 of size 00024e
+(build/dry.o unit 0 section index 4)
+    Defines:
+        Proc0 = 018683
+    References:
+        Array1Glob in (build/dry.o unit 0 section index 25)
+        Array2Glob in (build/dry.o unit 0 section index 26)
+        BoolGlob in (build/dry.o unit 0 section index 22)
+        Char2Glob in (build/dry.o unit 0 section index 24)
+        Func1 in (build/dry.o unit 0 section index 13)
+        Func2 in (build/dry.o unit 0 section index 14)
+        Proc1 in (build/dry.o unit 0 section index 5)
+        Proc2 in (build/dry.o unit 0 section index 6)
+        ... 15 more
+    Referenced from:
+        dhrystone_main (build/dry.o unit 0 section index 3)
+
+initSNES in section 'farcode'  placed at address 0188d1-018ae1 of size 000211
+(build/initsnes.o unit 2 section index 3)
+    Defines:
+        initSNES = 0188d1
+    References:
+        ClearVram in (build/initsnes.o unit 2 section index 8)
+        LoadCGRam in (build/initsnes.o unit 2 section index 4)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+intToString in section 'farcode'
+ placed at address 018ae2-018c0b of size 00012a
+(build/mainBankZero.o unit 1 section index 5)
+    Defines:
+        intToString = 018ae2
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        _UDivMod32 in (integer.o (from clib-lc-ld.a) unit 16 section index 11)
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+Proc8 in section 'farcode'  placed at address 018c0c-018d18 of size 00010d
+(build/dry.o unit 0 section index 12)
+    Defines:
+        Proc8 = 018c0c
+    References:
+        IntGlob in (build/dry.o unit 0 section index 21)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        _Mul16 in (integer.o (from clib-lc-ld.a) unit 16 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+main in section 'farcode'  placed at address 018d19-018e0e of size 0000f6
+(build/mainBankZero.o unit 1 section index 9)
+    Defines:
+        main = 018d19
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        _StringLiteral_Calypsi in (build/mainBankZero.o unit 1 section index 34)
+        `_StringLiteral_Compiler:` in (build/mainBankZero.o unit 1 section index 35)
+        `_StringLiteral_Dhrystone Test for SNES in C` in (build/mainBankZero.o unit 1 section index 36)
+        `_StringLiteral_Running benchmark...` in (build/mainBankZero.o unit 1 section index 41)
+        `_StringLiteral_TEST COMPLETE           ` in (build/mainBankZero.o unit 1 section index 43)
+        dhrystone_main in (build/dry.o unit 0 section index 3)
+        initSNES in (build/initsnes.o unit 2 section index 3)
+        termM0Init in (build/mainBankZero.o unit 1 section index 15)
+        termM0PrintStringXY in (build/mainBankZero.o unit 1 section index 16)
+    Referenced from:
+        (cstartup.o (from clib-lc-ld.a) unit 4 section index 6)
+
+Func2 in section 'farcode'  placed at address 018e0f-018ef8 of size 0000ea
+(build/dry.o unit 0 section index 14)
+    Defines:
+        Func2 = 018e0f
+    References:
+        Func1 in (build/dry.o unit 0 section index 13)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        strcmp in (lib_strcmp.o (from clib-lc-ld.a) unit 17 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+DivMod16 in section 'farcode'  placed at address 018ef9-018f0a of size 000012
+(integer.o (from clib-lc-ld.a) unit 16 section index 5)
+    References:
+        _UDivMod16 in (integer.o (from clib-lc-ld.a) unit 16 section index 6)
+
+_UDivMod16 in section 'farcode'  placed at address 018f0b-018f2f of size 000025
+(integer.o (from clib-lc-ld.a) unit 16 section index 6)
+    Defines:
+        _UDivMod16 = 018f0b
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        (integer.o (from clib-lc-ld.a) unit 16 section index 5)
+
+_Div16 in section 'farcode'  placed at address 018f30-018f3d of size 00000e
+(integer.o (from clib-lc-ld.a) unit 16 section index 7)
+    Defines:
+        _Div16 = 018f30
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+_DivModSign16 in section 'farcode'
+ placed at address 018f3e-018f45 of size 000008
+(integer.o (from clib-lc-ld.a) unit 16 section index 9)
+
+_UDivMod32 in section 'farcode'  placed at address 018f46-018f8e of size 000049
+(integer.o (from clib-lc-ld.a) unit 16 section index 11)
+    Defines:
+        _UDivMod32 = 018f46
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        intToString (build/mainBankZero.o unit 1 section index 5)
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+_DivModSign32 in section 'farcode'
+ placed at address 018f8f-018fa4 of size 000016
+(integer.o (from clib-lc-ld.a) unit 16 section index 14)
+    Defines:
+        _DivModSign32 = 018f8f
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+termM0PrintStringXY in section 'farcode'
+ placed at address 018fa5-01902f of size 00008b
+(build/mainBankZero.o unit 1 section index 16)
+    Defines:
+        termM0PrintStringXY = 018fa5
+    References:
+        LoadLoVram in (build/initsnes.o unit 2 section index 6)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        strlen in (lib_strlen.o (from clib-lc-ld.a) unit 14 section index 2)
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+        main (build/mainBankZero.o unit 1 section index 9)
+        (build/mainBankZero.o unit 1 section index 18)
+
+__initialize_sections in section 'farcode'
+ placed at address 019030-0190b2 of size 000083
+(initialize.o (from clib-lc-ld.a) unit 20 section index 2)
+    Defines:
+        __initialize_sections = 019030
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        memcpy in (lib_memcpy.o (from clib-lc-ld.a) unit 23 section index 2)
+        memset in (lib_memset.o (from clib-lc-ld.a) unit 22 section index 2)
+    Referenced from:
+        __data_initialization_needed (cstartup.o (from clib-lc-ld.a) unit 4 section index 3)
+
+_ValueSwitch16 in section 'farcode'
+ placed at address 0190b3-01912f of size 00007d
+(vswitch16.o (from clib-lc-ld.a) unit 15 section index 2)
+    Defines:
+        _ValueSwitch16 = 0190b3
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        Proc6 (build/dry.o unit 0 section index 10)
+
+strcat in section 'farcode'  placed at address 019130-0191a9 of size 00007a
+(lib_strcat.o (from clib-lc-ld.a) unit 19 section index 2)
+    Defines:
+        strcat = 019130
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        strlen in (lib_strlen.o (from clib-lc-ld.a) unit 14 section index 2)
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+termM0Init in section 'farcode'  placed at address 0191aa-01921b of size 000072
+(build/mainBankZero.o unit 1 section index 15)
+    Defines:
+        termM0Init = 0191aa
+    References:
+        ClearVram in (build/initsnes.o unit 2 section index 8)
+        LoadCGRam in (build/initsnes.o unit 2 section index 4)
+        LoadLoVram in (build/initsnes.o unit 2 section index 6)
+        SNESFONT_bin in (build/mainBankZero.o unit 1 section index 31)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+ClearVram in section 'farcode'  placed at address 01921c-01927e of size 000063
+(build/initsnes.o unit 2 section index 8)
+    Defines:
+        ClearVram = 01921c
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        termM0Init (build/mainBankZero.o unit 1 section index 15)
+        initSNES (build/initsnes.o unit 2 section index 3)
+
+Proc6 in section 'farcode'  placed at address 01927f-0192e1 of size 000063
+(build/dry.o unit 0 section index 10)
+    Defines:
+        Proc6 = 01927f
+    References:
+        Func3 in (build/dry.o unit 0 section index 15)
+        IntGlob in (build/dry.o unit 0 section index 21)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        _ValueSwitch16 in (vswitch16.o (from clib-lc-ld.a) unit 15 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        (build/dry.o unit 0 section index 31)
+
+exit in section 'farcode'  placed at address 0192e2-019337 of size 000056
+(exit.o (from clib-lc-ld.a) unit 5 section index 2)
+    Defines:
+        exit = 0192e2
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        _Exit in (exitC99.o (from clib-lc-ld.a) unit 10 section index 2)
+        _ExitCloseStreams in (streamlist.o (from clib-lc-ld.a) unit 13 section index 2)
+        _JmpIndLong in (controlFlow.o (from clib-lc-ld.a) unit 7 section index 3)
+        __atexit in (atexit.o (from clib-lc-ld.a) unit 9 section index 2)
+        __atexit_index in (atexit.o (from clib-lc-ld.a) unit 9 section index 3)
+    Referenced from:
+        (cstartup.o (from clib-lc-ld.a) unit 4 section index 6)
+
+LoadCGRam in section 'farcode'  placed at address 019338-019387 of size 000050
+(build/initsnes.o unit 2 section index 4)
+    Defines:
+        LoadCGRam = 019338
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        termM0Init (build/mainBankZero.o unit 1 section index 15)
+        initSNES (build/initsnes.o unit 2 section index 3)
+
+memcpy in section 'farcode'  placed at address 019388-0193d0 of size 000049
+(lib_memcpy.o (from clib-lc-ld.a) unit 23 section index 2)
+    Defines:
+        memcpy = 019388
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        __initialize_sections (initialize.o (from clib-lc-ld.a) unit 20 section index 2)
+
+memset in section 'farcode'  placed at address 0193d1-019416 of size 000046
+(lib_memset.o (from clib-lc-ld.a) unit 22 section index 2)
+    Defines:
+        memset = 0193d1
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        __initialize_sections (initialize.o (from clib-lc-ld.a) unit 20 section index 2)
+
+strcpy in section 'farcode'  placed at address 019417-019452 of size 00003c
+(lib_strcpy.o (from clib-lc-ld.a) unit 18 section index 2)
+    Defines:
+        strcpy = 019417
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        (build/dry.o unit 0 section index 18)
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+Proc2 in section 'farcode'  placed at address 019453-01948e of size 00003c
+(build/dry.o unit 0 section index 6)
+    Defines:
+        Proc2 = 019453
+    References:
+        IntGlob in (build/dry.o unit 0 section index 21)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+strcmp in section 'farcode'  placed at address 01948f-0194c8 of size 00003a
+(lib_strcmp.o (from clib-lc-ld.a) unit 17 section index 2)
+    Defines:
+        strcmp = 01948f
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        Func2 (build/dry.o unit 0 section index 14)
+
+Proc1 in section 'farcode'  placed at address 0194c9-0194f9 of size 000031
+(build/dry.o unit 0 section index 5)
+    Defines:
+        Proc1 = 0194c9
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+_Mul16 in section 'farcode'  placed at address 0194fa-019529 of size 000030
+(integer.o (from clib-lc-ld.a) unit 16 section index 2)
+    Defines:
+        _Mul16 = 0194fa
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        Proc8 (build/dry.o unit 0 section index 12)
+
+LoadLoVram in section 'farcode'  placed at address 01952a-019551 of size 000028
+(build/initsnes.o unit 2 section index 6)
+    Defines:
+        LoadLoVram = 01952a
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        termM0Init (build/mainBankZero.o unit 1 section index 15)
+        termM0PrintStringXY (build/mainBankZero.o unit 1 section index 16)
+
+_Mul32 in section 'farcode'  placed at address 019552-019576 of size 000025
+(integer.o (from clib-lc-ld.a) unit 16 section index 3)
+    Defines:
+        _Mul32 = 019552
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+`_StringLiteral_DHRYSTONE PROGRAM, SOME STRING` in section 'cfar'
+ placed at address 019577-019595 of size 00001f
+(build/dry.o unit 0 section index 34)
+    Defines:
+        `_StringLiteral_DHRYSTONE PROGRAM, SOME STRING` = 019577
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`_StringLiteral_DHRYSTONE PROGRAM, 2'ND STRING` in section 'cfar'
+ placed at address 019596-0195b4 of size 00001f
+(build/dry.o unit 0 section index 33)
+    Defines:
+        `_StringLiteral_DHRYSTONE PROGRAM, 2'ND STRING` = 019596
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`_StringLiteral_DHRYSTONE PROGRAM, 1'ST STRING` in section 'cfar'
+ placed at address 0195b5-0195d3 of size 00001f
+(build/dry.o unit 0 section index 32)
+    Defines:
+        `_StringLiteral_DHRYSTONE PROGRAM, 1'ST STRING` = 0195b5
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`_StringLiteral_Dhrystone Test for SNES in C` in section 'cfar'
+ placed at address 0195d4-0195f0 of size 00001d
+(build/mainBankZero.o unit 1 section index 36)
+    Defines:
+        `_StringLiteral_Dhrystone Test for SNES in C` = 0195d4
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+Proc4 in section 'farcode'  placed at address 0195f1-01960c of size 00001c
+(build/dry.o unit 0 section index 8)
+    Defines:
+        Proc4 = 0195f1
+    References:
+        Char2Glob in (build/dry.o unit 0 section index 24)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`_StringLiteral_Optimized out entire test` in section 'cfar'
+ placed at address 01960d-019626 of size 00001a
+(build/mainBankZero.o unit 1 section index 40)
+    Defines:
+        `_StringLiteral_Optimized out entire test` = 01960d
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+strlen in section 'farcode'  placed at address 019627-01963f of size 000019
+(lib_strlen.o (from clib-lc-ld.a) unit 14 section index 2)
+    Defines:
+        strlen = 019627
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        termM0PrintStringXY (build/mainBankZero.o unit 1 section index 16)
+        (build/mainBankZero.o unit 1 section index 22)
+        strcat (lib_strcat.o (from clib-lc-ld.a) unit 19 section index 2)
+
+`_StringLiteral_TEST COMPLETE           ` in section 'cfar'
+ placed at address 019640-019658 of size 000019
+(build/mainBankZero.o unit 1 section index 43)
+    Defines:
+        `_StringLiteral_TEST COMPLETE           ` = 019640
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+snesXC_nmi in section 'farcode'  placed at address 019659-019670 of size 000018
+(build/mainBankZero.o unit 1 section index 13)
+    Defines:
+        snesXC_nmi = 019659
+    References:
+        frameCounter in (build/mainBankZero.o unit 1 section index 2)
+    Referenced from:
+        snesXC_nmi_handler (build/initsnes.o unit 2 section index 26)
+
+`?L132` in section 'switch'  placed at address 019671-019688 of size 000018
+(build/dry.o unit 0 section index 31)
+    References:
+        Proc6 in (build/dry.o unit 0 section index 10)
+
+`_StringLiteral_=====================` in section 'cfar'
+ placed at address 019689-01969e of size 000016
+(build/mainBankZero.o unit 1 section index 33)
+    Defines:
+        `_StringLiteral_=====================` = 019689
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+`_StringLiteral_Running benchmark...` in section 'cfar'
+ placed at address 01969f-0196b3 of size 000015
+(build/mainBankZero.o unit 1 section index 41)
+    Defines:
+        `_StringLiteral_Running benchmark...` = 01969f
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+`?L179` in section 'farcode'  placed at address 0196b4-0196c6 of size 000013
+(build/mainBankZero.o unit 1 section index 21)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L113` in section 'farcode'  placed at address 0196c7-0196d8 of size 000012
+(build/initsnes.o unit 2 section index 17)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+Proc5 in section 'farcode'  placed at address 0196d9-0196ea of size 000012
+(build/dry.o unit 0 section index 9)
+    Defines:
+        Proc5 = 0196d9
+    References:
+        BoolGlob in (build/dry.o unit 0 section index 22)
+        Char1Glob in (build/dry.o unit 0 section index 23)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`_StringLiteral_Dhrystones/sec: ` in section 'cfar'
+ placed at address 0196eb-0196fb of size 000011
+(build/mainBankZero.o unit 1 section index 37)
+    Defines:
+        `_StringLiteral_Dhrystones/sec: ` = 0196eb
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+Func1 in section 'farcode'  placed at address 0196fc-01970b of size 000010
+(build/dry.o unit 0 section index 13)
+    Defines:
+        Func1 = 0196fc
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        Func2 (build/dry.o unit 0 section index 14)
+
+`?L114` in section 'farcode'  placed at address 01970c-01971a of size 00000f
+(build/initsnes.o unit 2 section index 18)
+
+`_StringLiteral_us/Dhrystone: ` in section 'cfar'
+ placed at address 01971b-019729 of size 00000f
+(build/mainBankZero.o unit 1 section index 44)
+    Defines:
+        `_StringLiteral_us/Dhrystone: ` = 01971b
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+_JmpIndLong in section 'farcode'
+ placed at address 01972a-019737 of size 00000e
+(controlFlow.o (from clib-lc-ld.a) unit 7 section index 3)
+    Defines:
+        _JmpIndLong = 01972a
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 5 section index 2)
+
+`?L117` in section 'farcode'  placed at address 019738-019745 of size 00000e
+(build/initsnes.o unit 2 section index 20)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L110` in section 'farcode'  placed at address 019746-019753 of size 00000e
+(build/initsnes.o unit 2 section index 16)
+
+`_StringLiteral_Higher=Better` in section 'cfar'
+ placed at address 019754-019761 of size 00000e
+(build/mainBankZero.o unit 1 section index 39)
+    Defines:
+        `_StringLiteral_Higher=Better` = 019754
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+`?L185` in section 'farcode'  placed at address 019762-01976f of size 00000e
+(build/mainBankZero.o unit 1 section index 25)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L183` in section 'farcode'  placed at address 019770-01977d of size 00000e
+(build/mainBankZero.o unit 1 section index 24)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L182` in section 'farcode'  placed at address 01977e-01978b of size 00000e
+(build/mainBankZero.o unit 1 section index 23)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L181` in section 'farcode'  placed at address 01978c-019798 of size 00000d
+(build/dry.o unit 0 section index 17)
+    References:
+        PtrGlb in (build/dry.o unit 0 section index 27)
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+Func3 in section 'farcode'  placed at address 019799-0197a5 of size 00000d
+(build/dry.o unit 0 section index 15)
+    Defines:
+        Func3 = 019799
+    Referenced from:
+        Proc6 (build/dry.o unit 0 section index 10)
+
+`?L178` in section 'farcode'  placed at address 0197a6-0197b1 of size 00000c
+(build/mainBankZero.o unit 1 section index 20)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L174` in section 'farcode'  placed at address 0197b2-0197bd of size 00000c
+(build/mainBankZero.o unit 1 section index 17)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L177` in section 'farcode'  placed at address 0197be-0197c8 of size 00000b
+(build/mainBankZero.o unit 1 section index 19)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        `_StringLiteral_ ` in (build/mainBankZero.o unit 1 section index 32)
+
+`?L184` in section 'farcode'  placed at address 0197c9-0197d3 of size 00000b
+(build/dry.o unit 0 section index 20)
+    References:
+        PtrGlb in (build/dry.o unit 0 section index 27)
+
+`?L183` in section 'farcode'  placed at address 0197d4-0197de of size 00000b
+(build/dry.o unit 0 section index 19)
+    References:
+        Char1Glob in (build/dry.o unit 0 section index 23)
+
+Proc7 in section 'farcode'  placed at address 0197df-0197e9 of size 00000b
+(build/dry.o unit 0 section index 11)
+    Defines:
+        Proc7 = 0197df
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`_StringLiteral_Compiler:` in section 'cfar'
+ placed at address 0197ea-0197f3 of size 00000a
+(build/mainBankZero.o unit 1 section index 35)
+    Defines:
+        `_StringLiteral_Compiler:` = 0197ea
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+snesTimeFrames in section 'farcode'
+ placed at address 0197f4-0197fd of size 00000a
+(build/mainBankZero.o unit 1 section index 7)
+    Defines:
+        snesTimeFrames = 0197f4
+    References:
+        frameCounter in (build/mainBankZero.o unit 1 section index 2)
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+`?L180` in section 'farcode'  placed at address 0197fe-019807 of size 00000a
+(build/dry.o unit 0 section index 16)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+Section 'data_init_table'  placed at address 019808-019811 of size 00000a
+(linker generated)
+
+`_StringLiteral_Frames: ` in section 'cfar'
+ placed at address 019812-01981a of size 000009
+(build/mainBankZero.o unit 1 section index 38)
+    Defines:
+        `_StringLiteral_Frames: ` = 019812
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+`?L188` in section 'farcode'  placed at address 01981b-019823 of size 000009
+(build/mainBankZero.o unit 1 section index 28)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+
+`?L176` in section 'farcode'  placed at address 019824-01982c of size 000009
+(build/mainBankZero.o unit 1 section index 18)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        termM0PrintStringXY in (build/mainBankZero.o unit 1 section index 16)
+
+_StringLiteral_Calypsi in section 'cfar'
+ placed at address 01982d-019834 of size 000008
+(build/mainBankZero.o unit 1 section index 34)
+    Defines:
+        _StringLiteral_Calypsi = 01982d
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+BGPAL in section 'cfar'  placed at address 019835-01983c of size 000008
+(build/mainBankZero.o unit 1 section index 29)
+
+`?L180` in section 'farcode'  placed at address 01983d-019844 of size 000008
+(build/mainBankZero.o unit 1 section index 22)
+    References:
+        strlen in (lib_strlen.o (from clib-lc-ld.a) unit 14 section index 2)
+
+`?L182` in section 'farcode'  placed at address 019845-01984c of size 000008
+(build/dry.o unit 0 section index 18)
+    References:
+        _Dp in (pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+        strcpy in (lib_strcpy.o (from clib-lc-ld.a) unit 18 section index 2)
+
+dhrystone_main in section 'farcode'
+ placed at address 01984d-019854 of size 000008
+(build/dry.o unit 0 section index 3)
+    Defines:
+        dhrystone_main = 01984d
+    References:
+        Proc0 in (build/dry.o unit 0 section index 4)
+    Referenced from:
+        main (build/mainBankZero.o unit 1 section index 9)
+
+`?L116` in section 'farcode'  placed at address 019855-01985b of size 000007
+(build/initsnes.o unit 2 section index 19)
+
+`_StringLiteral_Runs: ` in section 'cfar'
+ placed at address 01985c-019862 of size 000007
+(build/mainBankZero.o unit 1 section index 42)
+    Defines:
+        `_StringLiteral_Runs: ` = 01985c
+    Referenced from:
+        snesPrintResults (build/mainBankZero.o unit 1 section index 8)
+
+`?L187` in section 'farcode'  placed at address 019863-019869 of size 000007
+(build/mainBankZero.o unit 1 section index 27)
+
+`?L186` in section 'farcode'  placed at address 01986a-019870 of size 000007
+(build/mainBankZero.o unit 1 section index 26)
+
+_Exit in section 'farcode'  placed at address 019871-019875 of size 000005
+(exitC99.o (from clib-lc-ld.a) unit 10 section index 2)
+    Defines:
+        _Exit = 019871
+    References:
+        _Stub_exit in (defaultExit.o (from clib-lc-ld.a) unit 11 section index 2)
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 5 section index 2)
+
+`_StringLiteral_ ` in section 'cfar'
+ placed at address 019876-019877 of size 000002
+(build/mainBankZero.o unit 1 section index 32)
+    Defines:
+        `_StringLiteral_ ` = 019876
+    Referenced from:
+        (build/mainBankZero.o unit 1 section index 19)
+
+BGCLEAR in section 'cfar'  placed at address 019878-019879 of size 000002
+(build/mainBankZero.o unit 1 section index 30)
+
+__low_level_init in section 'farcode'
+ placed at address 01987a-01987a of size 000001
+(cstartup.o (from clib-lc-ld.a) unit 4 section index 8)
+    Defines:
+        __low_level_init = 01987a
+    Referenced from:
+        __program_start (cstartup.o (from clib-lc-ld.a) unit 4 section index 2)
+
+_Stub_exit in section 'farcode'  placed at address 01987b-01987b of size 000001
+(defaultExit.o (from clib-lc-ld.a) unit 11 section index 2)
+    Defines:
+        _Stub_exit = 01987b
+    Referenced from:
+        _Exit (exitC99.o (from clib-lc-ld.a) unit 10 section index 2)
+
+snesXC_irq in section 'farcode'  placed at address 01987c-01987c of size 000001
+(build/mainBankZero.o unit 1 section index 14)
+    Defines:
+        snesXC_irq = 01987c
+    Referenced from:
+        snesXC_irq_handler (build/initsnes.o unit 2 section index 27)
+
+snesXC_abort in section 'farcode'
+ placed at address 01987d-01987d of size 000001
+(build/mainBankZero.o unit 1 section index 12)
+    Defines:
+        snesXC_abort = 01987d
+    Referenced from:
+        snesXC_abort_handler (build/initsnes.o unit 2 section index 25)
+
+snesXC_brk in section 'farcode'  placed at address 01987e-01987e of size 000001
+(build/mainBankZero.o unit 1 section index 11)
+    Defines:
+        snesXC_brk = 01987e
+    Referenced from:
+        snesXC_brk_handler (build/initsnes.o unit 2 section index 24)
+
+snesXC_cop in section 'farcode'  placed at address 01987f-01987f of size 000001
+(build/mainBankZero.o unit 1 section index 10)
+    Defines:
+        snesXC_cop = 01987f
+    Referenced from:
+        snesXC_cop_handler (build/initsnes.o unit 2 section index 23)
+
+_Dp in section 'registers'  placed at address 000400-000413 of size 000014
+(pseudoRegisters.o (from clib-lc-ld.a) unit 8 section index 2)
+    Defines:
+        _Vfp = 000410
+        _Dp = 000400
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        Proc1 (build/dry.o unit 0 section index 5)
+        Proc2 (build/dry.o unit 0 section index 6)
+        Proc6 (build/dry.o unit 0 section index 10)
+        Proc7 (build/dry.o unit 0 section index 11)
+        Proc8 (build/dry.o unit 0 section index 12)
+        Func2 (build/dry.o unit 0 section index 14)
+        (build/dry.o unit 0 section index 16)
+        ... 44 more
+
+Section 'stack'  placed at address 000100-0010ff of size 001000
+(linker generated)
+
+Section '$$interruptVector_0x00ffe4'
+ placed at address 00ffe4-00ffe5 of size 000002
+(build/initsnes.o unit 2 section index 22)
+    References:
+        snesXC_cop_handler in (build/initsnes.o unit 2 section index 23)
+
+Section '$$interruptVector_0x00ffe6'
+ placed at address 00ffe6-00ffe7 of size 000002
+(build/initsnes.o unit 2 section index 28)
+    References:
+        snesXC_brk_handler in (build/initsnes.o unit 2 section index 24)
+
+Section '$$interruptVector_0x00ffe8'
+ placed at address 00ffe8-00ffe9 of size 000002
+(build/initsnes.o unit 2 section index 29)
+    References:
+        snesXC_abort_handler in (build/initsnes.o unit 2 section index 25)
+
+Section '$$interruptVector_0x00ffea'
+ placed at address 00ffea-00ffeb of size 000002
+(build/initsnes.o unit 2 section index 30)
+    References:
+        snesXC_nmi_handler in (build/initsnes.o unit 2 section index 26)
+
+Section '$$interruptVector_0x00ffee'
+ placed at address 00ffee-00ffef of size 000002
+(build/initsnes.o unit 2 section index 31)
+    References:
+        snesXC_irq_handler in (build/initsnes.o unit 2 section index 27)
+
+__program_root_section in section 'reset'
+ placed at address 00fffc-00fffd of size 000002
+(cstartup.o (from clib-lc-ld.a) unit 4 section index 7)
+    Defines:
+        __program_root_section = 00fffc
+    References:
+        __program_start in (cstartup.o (from clib-lc-ld.a) unit 4 section index 2)
+
+Section 'heap'  placed at address 7e2000-7e3fff of size 002000
+(linker generated)
+
+__atexit_index in section 'zfar'
+ placed at address 7e4000-7e4001 of size 000002
+(atexit.o (from clib-lc-ld.a) unit 9 section index 3)
+    Defines:
+        __atexit_index = 7e4000
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 5 section index 2)
+
+__atexit in section 'zfar'  placed at address 7e4002-7e4081 of size 000080
+(atexit.o (from clib-lc-ld.a) unit 9 section index 2)
+    Defines:
+        __atexit = 7e4002
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 5 section index 2)
+
+_ExitCloseStreams in section 'zfar'
+ placed at address 7e4082-7e4085 of size 000004
+(streamlist.o (from clib-lc-ld.a) unit 13 section index 2)
+    Defines:
+        _ExitCloseStreams = 7e4082
+    Referenced from:
+        exit (exit.o (from clib-lc-ld.a) unit 5 section index 2)
+
+microseconds_per_dhrystone in section 'zfar'
+ placed at address 7e4086-7e4089 of size 000004
+(build/mainBankZero.o unit 1 section index 4)
+
+dhrystones_per_second in section 'zfar'
+ placed at address 7e408a-7e408b of size 000002
+(build/mainBankZero.o unit 1 section index 3)
+
+frameCounter in section 'zfar'  placed at address 7e408c-7e408f of size 000004
+(build/mainBankZero.o unit 1 section index 2)
+    Defines:
+        frameCounter = 7e408c
+    Referenced from:
+        snesTimeFrames (build/mainBankZero.o unit 1 section index 7)
+        snesXC_nmi (build/mainBankZero.o unit 1 section index 13)
+
+Record2 in section 'zfar'  placed at address 7e4090-7e40b8 of size 000029
+(build/dry.o unit 0 section index 30)
+
+Record1 in section 'zfar'  placed at address 7e40b9-7e40e1 of size 000029
+(build/dry.o unit 0 section index 29)
+
+PtrGlbNext in section 'zfar'  placed at address 7e40e2-7e40e5 of size 000004
+(build/dry.o unit 0 section index 28)
+    Defines:
+        PtrGlbNext = 7e40e2
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+PtrGlb in section 'zfar'  placed at address 7e40e6-7e40e9 of size 000004
+(build/dry.o unit 0 section index 27)
+    Defines:
+        PtrGlb = 7e40e6
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        (build/dry.o unit 0 section index 17)
+        (build/dry.o unit 0 section index 20)
+
+Array2Glob in section 'zfar'  placed at address 7e40ea-7e553b of size 001452
+(build/dry.o unit 0 section index 26)
+    Defines:
+        Array2Glob = 7e40ea
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+Array1Glob in section 'zfar'  placed at address 7e553c-7e55a1 of size 000066
+(build/dry.o unit 0 section index 25)
+    Defines:
+        Array1Glob = 7e553c
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+
+Char2Glob in section 'zfar'  placed at address 7e55a2-7e55a2 of size 000001
+(build/dry.o unit 0 section index 24)
+    Defines:
+        Char2Glob = 7e55a2
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        Proc4 (build/dry.o unit 0 section index 8)
+
+Char1Glob in section 'zfar'  placed at address 7e55a3-7e55a3 of size 000001
+(build/dry.o unit 0 section index 23)
+    Defines:
+        Char1Glob = 7e55a3
+    Referenced from:
+        Proc5 (build/dry.o unit 0 section index 9)
+        (build/dry.o unit 0 section index 19)
+
+BoolGlob in section 'zfar'  placed at address 7e55a4-7e55a5 of size 000002
+(build/dry.o unit 0 section index 22)
+    Defines:
+        BoolGlob = 7e55a4
+    Referenced from:
+        Proc0 (build/dry.o unit 0 section index 4)
+        Proc5 (build/dry.o unit 0 section index 9)
+
+IntGlob in section 'zfar'  placed at address 7e55a6-7e55a7 of size 000002
+(build/dry.o unit 0 section index 21)
+    Defines:
+        IntGlob = 7e55a6
+    Referenced from:
+        Proc2 (build/dry.o unit 0 section index 6)
+        Proc6 (build/dry.o unit 0 section index 10)
+        Proc8 (build/dry.o unit 0 section index 12)
+
+##########################
+#                        #
+# Memory sizes (decimal) #
+#                        #
+##########################
+
+Executable       (Text):  6513 bytes
+Data                   :  5544 bytes
+Non-initialized        : 12308 bytes
