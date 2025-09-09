@@ -8,6 +8,13 @@
 /* Lua functions are in lua_standalone.c */
 #include "test_scripts.h"
 
+/* Function declarations */
+int termM0Init(void);
+int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY);
+void scroll_text_up(void);
+void clear_screen(void);
+int termM0PrintStringXY_scroll(char *szInput, uint8_t inpX, uint8_t inpY);
+
 /* External declarations for dhry.c functions */
 extern int dhrystone_main(int number_of_runs);
 
@@ -40,13 +47,6 @@ void demonstrate_lua_operation(lua_State *L, const char* operation, const char* 
         termM0PrintStringXY_scroll(result_buffer, 0, line + 1);
     }
 }
-
-/* Function declarations */
-int termM0Init(void);
-int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY);
-void scroll_text_up(void);
-void clear_screen(void);
-int termM0PrintStringXY_scroll(char *szInput, uint8_t inpX, uint8_t inpY);
 
 /* External functions required by dhry.c */
 uint32_t snesTimeFrames(void);

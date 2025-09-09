@@ -39,11 +39,16 @@ LUA_ESSENTIAL_SOURCES = $(LUA_SRC_DIR)/lapi.c $(LUA_SRC_DIR)/lcode.c $(LUA_SRC_D
                         $(LUA_SRC_DIR)/lauxlib.c $(LUA_SRC_DIR)/lbaselib.c $(LUA_SRC_DIR)/lmathlib.c \
                         $(LUA_SRC_DIR)/lstrlib.c $(LUA_SRC_DIR)/ltablib.c
 
-# Project-specific source files
-PROJECT_SOURCES = mainBankZero.c lua_snes.c $(LUA_CORE_SOURCES) $(LUA_LIB_SOURCES)
-
 # Include shared build system
 include $(SHARED_BUILD_DIR)/shared-config.mk
 
-# Override C_SOURCES for this project - use real Lua integration
+# Override C_SOURCES for this project - use real Lua integration with Calypsi
+# This must come after the include to override the shared config
 C_SOURCES = mainBankZero.c lua_snes_real.c $(LUA_ESSENTIAL_SOURCES) $(SHARED_SRC_DIR)/initsnes.c
+
+# Override OBJECTS to include all Lua object files
+LUA_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(notdir $(LUA_ESSENTIAL_SOURCES)))))
+OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/lua_snes_real.o $(LUA_OBJECTS) $(BUILD_DIR)/initsnes.o
+
+# Override vpath to include Lua source directory
+vpath %.c $(LUA_SRC_DIR) $(SHARED_SRC_DIR) .
