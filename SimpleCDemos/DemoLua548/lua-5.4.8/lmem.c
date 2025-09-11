@@ -11,6 +11,7 @@
 
 
 #include <stddef.h>
+#include <string.h>
 
 #include "lua.h"
 
@@ -98,11 +99,78 @@ void *luaM_growaux_ (lua_State *L, void *block, int nelems, int *psize,
                      int size_elems, int limit, const char *what) {
   void *newblock;
   int size = *psize;
+  char errmsg[128];
+  char size_str[16];
+  char limit_str[16];
+  char temp[16];
+  int size_val, limit_val, temp_i, i, j;
   if (nelems + 1 <= size)  /* does one extra element still fit? */
     return block;  /* nothing to be done */
   if (size >= limit / 2) {  /* cannot double it? */
     if (l_unlikely(size >= limit))  /* cannot grow even a little? */
-      luaG_runerror(L, "too many %s (limit is %d)", what, limit);
+      /* Debug: Print actual values to understand what's happening */
+      /* Build custom error message to avoid format specifier issues */
+      strcpy(errmsg, "too many ");
+      strcat(errmsg, what);
+      strcat(errmsg, " (");
+      strcat(errmsg, "size: ");
+      /* Convert size to string manually to avoid sprintf issues */
+      size_val = size;
+      if (size_val == 0) {
+        strcpy(size_str, "0");
+      } else {
+        temp_i = 0;
+        while (size_val > 0) {
+          temp[temp_i++] = '0' + (size_val % 10);
+          size_val /= 10;
+        }
+        /* Reverse the string */
+        for (j = 0; j < temp_i; j++) {
+          size_str[j] = temp[temp_i - 1 - j];
+        }
+        size_str[temp_i] = '\0';
+      }
+      strcat(errmsg, size_str);
+      strcat(errmsg, ", limit: ");
+      /* Convert limit to string manually */
+      limit_val = limit;
+      if (limit_val == 0) {
+        strcpy(limit_str, "0");
+      } else {
+        temp_i = 0;
+        while (limit_val > 0) {
+          temp[temp_i++] = '0' + (limit_val % 10);
+          limit_val /= 10;
+        }
+        /* Reverse the string */
+        for (j = 0; j < temp_i; j++) {
+          limit_str[j] = temp[temp_i - 1 - j];
+        }
+        limit_str[temp_i] = '\0';
+      }
+      strcat(errmsg, limit_str);
+      strcat(errmsg, ")");
+      /* Add debug info about INT_MAX and MAX_INT */
+      strcat(errmsg, " [INT_MAX=");
+      /* Convert INT_MAX to string */
+      limit_val = INT_MAX;
+      if (limit_val == 0) {
+        strcat(errmsg, "0");
+      } else {
+        temp_i = 0;
+        while (limit_val > 0) {
+          temp[temp_i++] = '0' + (limit_val % 10);
+          limit_val /= 10;
+        }
+        /* Reverse the string and add to errmsg */
+        for (j = 0; j < temp_i; j++) {
+          temp[j] = temp[temp_i - 1 - j];
+        }
+        temp[temp_i] = '\0';
+        strcat(errmsg, temp);
+      }
+      strcat(errmsg, "]");
+      luaG_runerror(L, "%s", errmsg);
     size = limit;  /* still have at least one free place */
   }
   else {

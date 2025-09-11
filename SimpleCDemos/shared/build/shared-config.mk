@@ -59,12 +59,34 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 	CC = "C:\calypsi-65816-5.11\bin\cc65816"
 	AS = "C:\calypsi-65816-5.11\bin\cc65816"
 	LD = "C:\calypsi-65816-5.11\bin\ln65816"
-	CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+	# Check for huge model - requires --enable-huge-attribute with large data model
+	ifeq ($(ROM_TYPE),huge)
+		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=large --enable-huge-attribute --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+	else
+		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+	endif
 	ASFLAGS = 
 	LDFLAGS = --raw-multiple-memories --rom-code
 	INCLUDES = -I"$(SHARED_SRC_DIR)" -I"lib" -I"include"
 	OUTPUT_EXT = .smc
-	POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+	# ROM type selection: huge, HiROM, or default LoROM
+	ifeq ($(ROM_TYPE),huge)
+		ifeq ($(ROM_MAPPING),HiROM)
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-huge-huge-HiROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_HiROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		else
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-huge-huge-LoROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_LoROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		endif
+	else
+		ifeq ($(ROM_TYPE),HiROM)
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-large-large-HiROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_HiROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		else
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-large-large-LoROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_LoROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		endif
+	endif
 	CALYPSI_PATH = C:\calypsi-65816-5.11
 	COMPILER_NAME = calypsi
 endif
@@ -239,7 +261,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 	@$(MAKE) $(OBJECTS)
-	$(LD) $(LDFLAGS) $(OBJECTS) $(SHARED_PORT_DIR)/calypsi/linker-large-large.scm clib-lc-ld.a --list-file=$(BUILD_DIR)/calypsi.lst --cross-reference --output-format=intel-hex -o $(BUILD_DIR)/calypsi.hex
+	$(LD) $(LDFLAGS) $(OBJECTS) $(LINKER_SCRIPT) clib-lc-ld.a --list-file=$(BUILD_DIR)/calypsi.lst --cross-reference --output-format=intel-hex -o $(BUILD_DIR)/calypsi.hex
 	$(POST_LINK)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
@@ -396,6 +418,16 @@ help:
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make info               - Show current compiler info"
 	@echo "  make help               - Show this help message"
+	@echo ""
+	@echo Calypsi ROM type options:
+	@echo "  ROM_TYPE=HiROM          - Use HiROM mapping (default: LoROM)"
+	@echo "  ROM_TYPE=huge           - Use huge data/code model with --enable-huge-attribute"
+	@echo "  ROM_MAPPING=HiROM       - Use HiROM mapping when ROM_TYPE=huge (default: LoROM)"
+	@echo ""
+	@echo Examples:
+	@echo "  make COMPILER=calypsi ROM_TYPE=HiROM"
+	@echo "  make COMPILER=calypsi ROM_TYPE=huge"
+	@echo "  make COMPILER=calypsi ROM_TYPE=huge ROM_MAPPING=HiROM"
 
 # Phony targets
 .PHONY: all clean wdc vbcc65816 calypsi llvm-mos cc65 jcc816 tcc816 info help

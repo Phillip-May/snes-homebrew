@@ -2,10 +2,7 @@
 *   SNES MMIO register definitions
 */
 
-#ifndef __SNES_REGS_H
-#define __SNES_REGS_H
-
-// For all compilers, use our custom SNES register definitions
+#ifndef __SNES_REGS_H`
 #include "int_snes_xc.h"
 
 // Compiler identification macro

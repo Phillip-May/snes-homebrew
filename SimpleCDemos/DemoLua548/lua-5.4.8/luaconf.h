@@ -104,7 +104,7 @@
 */
 
 /* predefined options for LUA_INT_TYPE */
-#define LUA_INT_INT		1
+#define LUA_INT_INT		    1
 #define LUA_INT_LONG		2
 #define LUA_INT_LONGLONG	3
 

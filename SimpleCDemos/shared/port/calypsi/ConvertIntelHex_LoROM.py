@@ -6,7 +6,7 @@ def main():
     # Check if correct number of arguments provided
     if len(sys.argv) != 3:
         print("Error: Invalid number of parameters")
-        print("Usage: python ConvertIntelHex.py <input_path> <output_path>")
+        print("Usage: python ConvertIntelHex_LoROM.py <input_path> <output_path>")
         print(f"Received {len(sys.argv) - 1} arguments: {sys.argv[1:]}")
         sys.exit(1)
     
@@ -33,7 +33,7 @@ def main():
         print(f"Error: Output directory is not writable: {output_dir}")
         sys.exit(1)
     
-    print(f"Converting Intel Hex file: {inputPath}")
+    print(f"Converting Intel Hex file to LoROM: {inputPath}")
     print(f"Output file: {outputPath}")
     
     try:
@@ -46,6 +46,7 @@ def main():
     data = ih.todict()
 
     def pc_to_lorom(offset):
+        """Convert PC address to LoROM SNES address"""
         if offset < 0x8000 or offset >= 0x800000:
             return None  # Invalid LoROM address
         bank = (offset >> 16) & 0x7F  # Only 0x00–0x7D valid for LoROM
@@ -57,15 +58,19 @@ def main():
         with open(outputPath, "wb") as f:
             # Write each byte to file
             for address, byte in data.items():
-                if address == "start_addr":  #Intel hex way of saying start address
-                    continue  #Skip because reset vector in the hex does it
-                # Seek to the correct address before writing
-                #print(hex(pc_to_lorom(address)))
+                if address == "start_addr":  # Intel hex way of saying start address
+                    continue  # Skip because reset vector in the hex does it
+                
+                # Validate LoROM address range
                 if address < 0x8000:
-                    #Should only be nothing
-                    raise Exception("Error ROM data placed in invalid area")
-                f.seek(pc_to_lorom(address))
-
+                    raise Exception("Error: ROM data placed in invalid area for LoROM")
+                
+                # Convert to LoROM address
+                lorom_addr = pc_to_lorom(address)
+                if lorom_addr is None:
+                    raise Exception(f"Error: Invalid LoROM address: 0x{address:06X}")
+                
+                f.seek(lorom_addr)
                 f.write(bytes([byte]))
 
             # Pad file to nearest multiple of 32K (32768 bytes)
@@ -73,7 +78,7 @@ def main():
             padding_needed = (32768 - (current_size % 32768)) % 32768
             f.write(b'\x00' * padding_needed)
         
-        print(f"Successfully converted {inputPath} to {outputPath}")
+        print(f"Successfully converted {inputPath} to LoROM format: {outputPath}")
         
     except Exception as e:
         print(f"Error: Failed to write output file: {e}")
