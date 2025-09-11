@@ -28,18 +28,7 @@
 #define LUA_MAXINDEX		(INT_MAX - 2)
 #define LUA_MAXUPVAL		255
 
-/* Garbage collection configuration */
-#define LUA_GCGEN		0
-#define LUA_GCINC		1
-#define LUA_GCCOLLECT		2
-#define LUA_GCCOUNT		3
-#define LUA_GCCOUNTB		4
-#define LUA_GCSTEP		5
-#define LUA_GCSETPAUSE		6
-#define LUA_GCSETSTEPMUL	7
-#define LUA_GCISRUNNING		9
-#define LUA_GCGEN		0
-#define LUA_GCINC		1
+/* Garbage collection configuration - let the main luaconf.h define these */
 
 /* Disable features we don't need on SNES */
 #define LUA_USE_APICHECK	0
@@ -70,6 +59,23 @@
 
 /* Error handling */
 #define lua_assert(c)		((void)0)
+
+/* Override MAX_INT to fix opcode limit issue on SNES */
+/* The default MAX_INT = INT_MAX (32767) is too small for Lua opcodes */
+/* We need a larger value that fits in 32-bit but is much larger than 16-bit */
+#undef MAX_INT
+#define MAX_INT 0x7FFFFFFF  /* 2^31 - 1, maximum 32-bit signed integer */
+
+/* Define missing types that Lua needs */
+#define LUA_UNSIGNED unsigned long
+#define LUA_KCONTEXT ptrdiff_t
+#define LUA_API extern
+#define LUALIB_API extern
+
+/* Define missing constants */
+#define LUA_IDSIZE 60
+#define LUAL_BUFFERSIZE 8192
+#define LUAI_MAXALIGN long double
 
 /* Include the original luaconf.h for everything else */
 #include "lua-5.4.8/luaconf.h"

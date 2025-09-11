@@ -7,7 +7,7 @@
 
 /* Memory pool sizes */
 #define POOL1_SIZE (65535ul)
-#define POOL2_SIZE (32768ul)
+#define POOL2_SIZE (50000ul)
 
 /* Memory pool declarations with section attributes */
 extern uint8_t banked_heap1[POOL1_SIZE] __attribute__((section("BANKED_HEAP1")));

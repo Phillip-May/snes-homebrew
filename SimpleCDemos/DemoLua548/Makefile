@@ -33,16 +33,16 @@ LUA_LIB_SOURCES = $(LUA_SRC_DIR)/lauxlib.c $(LUA_SRC_DIR)/lbaselib.c $(LUA_SRC_D
 
 # Essential Lua files only (for initial testing)
 LUA_ESSENTIAL_SOURCES = $(LUA_SRC_DIR)/lapi.c $(LUA_SRC_DIR)/lcode.c $(LUA_SRC_DIR)/ldebug.c \
-                        $(LUA_SRC_DIR)/ldo.c $(LUA_SRC_DIR)/lfunc.c $(LUA_SRC_DIR)/lgc.c \
+                        $(LUA_SRC_DIR)/ldo.c $(LUA_SRC_DIR)/ldump.c $(LUA_SRC_DIR)/lfunc.c $(LUA_SRC_DIR)/lgc.c \
                         $(LUA_SRC_DIR)/llex.c $(LUA_SRC_DIR)/lmem.c $(LUA_SRC_DIR)/lobject.c \
                         $(LUA_SRC_DIR)/lopcodes.c $(LUA_SRC_DIR)/lparser.c \
-                        $(LUA_SRC_DIR)/lstring.c $(LUA_SRC_DIR)/ltable.c $(LUA_SRC_DIR)/ltm.c \
-                        $(LUA_SRC_DIR)/lundump.c $(LUA_SRC_DIR)/lvm.c $(LUA_SRC_DIR)/lzio.c \
+                        $(LUA_SRC_DIR)/lstate.c $(LUA_SRC_DIR)/lstring.c $(LUA_SRC_DIR)/ltable.c $(LUA_SRC_DIR)/ltm.c \
+                        $(LUA_SRC_DIR)/lundump.c $(LUA_SRC_DIR)/lzio.c \
                         $(LUA_SRC_DIR)/lauxlib.c $(LUA_SRC_DIR)/lbaselib.c $(LUA_SRC_DIR)/lmathlib.c \
                         $(LUA_SRC_DIR)/lstrlib.c $(LUA_SRC_DIR)/ltablib.c
 
 # Problematic files that need to be compiled without huge attribute
-LUA_PROBLEMATIC_SOURCES = $(LUA_SRC_DIR)/lstate.c
+# LUA_PROBLEMATIC_SOURCES = $(LUA_SRC_DIR)/lstate.c
 
 # Include shared build system
 include $(SHARED_BUILD_DIR)/shared-config.mk
@@ -51,15 +51,29 @@ include $(SHARED_BUILD_DIR)/shared-config.mk
 # This must come after the include to override the shared config
 C_SOURCES = mainBankZero.c snes_memory_manager.c $(LUA_ESSENTIAL_SOURCES) $(SHARED_SRC_DIR)/initsnes.c
 
+# Override STDLIB for huge mode - we don't need the huge library since we built successfully without it
+ifeq ($(ROM_TYPE),huge)
+	STDLIB = 
+endif
+
 # Override OBJECTS to include all Lua object files
 LUA_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(notdir $(LUA_ESSENTIAL_SOURCES)))))
-LUA_PROBLEMATIC_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(notdir $(LUA_PROBLEMATIC_SOURCES)))))
-OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/snes_memory_manager.o $(LUA_OBJECTS) $(LUA_PROBLEMATIC_OBJECTS) $(BUILD_DIR)/initsnes.o
+OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/snes_memory_manager.o $(LUA_OBJECTS) $(BUILD_DIR)/lvm.o $(BUILD_DIR)/initsnes.o
 
 # Override vpath to include Lua source directory
 vpath %.c $(LUA_SRC_DIR) $(SHARED_SRC_DIR) .
 
-# Custom build rule for problematic files (compile without huge attribute)
-$(BUILD_DIR)/lstate.o: $(LUA_SRC_DIR)/lstate.c
-	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
-	"C:\calypsi-65816-5.11\bin\cc65816" --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1 -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -o $@ $<
+# Custom build rule for problematic files (compile without huge attribute due to compiler bug)
+# $(BUILD_DIR)/lstate.o: $(LUA_SRC_DIR)/lstate.c
+#	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+#	"C:\calypsi-65816-5.11\bin\cc65816" --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1 -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -o $@ $<
+
+# Target to copy pre-compiled files from build-backup-huge
+copy-huge-files:
+	@if exist "build-backup-huge" (
+		echo Copying pre-compiled files from build-backup-huge...
+		copy "build-backup-huge\*.o" "build\" /Y
+		echo Pre-compiled files copied successfully.
+	) else (
+		echo Warning: build-backup-huge directory not found.
+	)

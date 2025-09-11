@@ -7,6 +7,7 @@
 #include "snes_regs_xc.h"
 #include "include/imagedata.h"
 #include "initsnes.h"
+#include "luaconf_snes.h"  /* Include custom SNES Lua config before lua.h */
 #include "lua-5.4.8/lua.h"
 #include "lua-5.4.8/lauxlib.h"
 #include "snes_memory_manager.h"
@@ -29,7 +30,27 @@ void* lua_alloc_debug(void* ud, void* ptr, size_t osize, size_t nsize);
 
 /* Lua allocator function using SNES memory manager */
 void* lua_alloc_debug(void *ud, void *ptr, size_t osize, size_t nsize) {
+    static int alloc_count = 0;
+    char debug_buffer[128];
+    void *result;
+    extern int current_line;  // Declare external reference to current_line
+    
     (void)ud;  // unused parameter
+    alloc_count++;
+    
+    /* Log allocation attempts (but limit to first 10 to avoid spam) */
+    if (alloc_count <= 10) {
+        if (nsize == 0) {
+            sprintf(debug_buffer, "  -> Lua alloc #%d: FREE %p (was %u bytes)", alloc_count, (void*)ptr, (unsigned int)osize);
+            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        } else if (ptr == NULL) {
+            sprintf(debug_buffer, "  -> Lua alloc #%d: MALLOC %u bytes", alloc_count, (unsigned int)nsize);
+            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        } else {
+            sprintf(debug_buffer, "  -> Lua alloc #%d: REALLOC %p %u->%u bytes", alloc_count, (void*)ptr, (unsigned int)osize, (unsigned int)nsize);
+            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        }
+    }
     
     if (nsize == 0) {
         if (ptr != NULL) {
@@ -39,10 +60,23 @@ void* lua_alloc_debug(void *ud, void *ptr, size_t osize, size_t nsize) {
     }
     
     if (ptr == NULL) {
-        return snes_malloc(nsize);
+        result = snes_malloc(nsize);
+    } else {
+        result = snes_realloc(ptr, osize, nsize);
     }
     
-    return snes_realloc(ptr, osize, nsize);
+    /* Log allocation results (but limit to first 10 to avoid spam) */
+    if (alloc_count <= 10) {
+        if (result != NULL) {
+            sprintf(debug_buffer, "  -> Lua alloc #%d: SUCCESS -> %p", alloc_count, (void*)result);
+            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        } else {
+            sprintf(debug_buffer, "  -> Lua alloc #%d: FAILED!", alloc_count);
+            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        }
+    }
+    
+    return result;
 }
 
 /* Lua constants */
@@ -155,16 +189,118 @@ static int snes_collectgarbage(lua_State *L) {
 
 /* Initialize Lua for SNES */
 int lua_snes_init(void) {
-    char debug_buffer[64];
+    char debug_buffer[128];
+    
+    /* Test memory manager before Lua initialization */
+    termM0PrintStringXY_scroll("  Testing memory before Lua...", 0, current_line);
+    
+    /* Test small allocation first */
+    void *test_ptr = snes_malloc(1024);
+    if (test_ptr != NULL) {
+        sprintf(debug_buffer, "  -> Test alloc 1KB: SUCCESS (%p)", (void*)test_ptr);
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        snes_free(test_ptr);
+        sprintf(debug_buffer, "  -> Test free: OK");
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    } else {
+        sprintf(debug_buffer, "  -> Test alloc 1KB: FAILED");
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        return 0;
+    }
+    
+    /* Test larger allocation that Lua might need */
+    void *test_ptr2 = snes_malloc(8192);
+    if (test_ptr2 != NULL) {
+        sprintf(debug_buffer, "  -> Test alloc 8KB: SUCCESS (%p)", (void*)test_ptr2);
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        snes_free(test_ptr2);
+        sprintf(debug_buffer, "  -> Test free: OK");
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    } else {
+        sprintf(debug_buffer, "  -> Test alloc 8KB: FAILED");
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        return 0;
+    }
+    
+    /* Display memory manager status */
+    uint32_t pool1_free = g_mem_manager.pool1_end - g_mem_manager.pool1_current;
+    uint32_t pool2_free = g_mem_manager.pool2_end - g_mem_manager.pool2_current;
+    sprintf(debug_buffer, "  -> Pool1 free: %lu bytes", (unsigned long)pool1_free);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> Pool2 free: %lu bytes", (unsigned long)pool2_free);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> Pool1 start: %p", (void*)g_mem_manager.pool1_start);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> Pool2 start: %p", (void*)g_mem_manager.pool2_start);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    
+    /* Print sizeof information for debugging */
+    termM0PrintStringXY_scroll("  sizeof() debugging:", 0, current_line);
+    sprintf(debug_buffer, "  -> sizeof(int): %lu", (unsigned long)sizeof(int));
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> sizeof(size_t): %lu", (unsigned long)sizeof(size_t));
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> sizeof(void*): %lu", (unsigned long)sizeof(void*));
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> sizeof(uint32_t): %lu", (unsigned long)sizeof(uint32_t));
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> sizeof(lua_Number): %lu", (unsigned long)sizeof(lua_Number));
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> sizeof(lua_Integer): %lu", (unsigned long)sizeof(lua_Integer));
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    
+    /* Print INT_MAX debugging - this is the key issue! */
+    termM0PrintStringXY_scroll("  INT_MAX debugging:", 0, current_line);
+    sprintf(debug_buffer, "  -> INT_MAX: %d", INT_MAX);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> UINT_MAX: %u", UINT_MAX);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> LONG_MAX: %ld", LONG_MAX);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> ULONG_MAX: %lu", ULONG_MAX);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    
+    /* Check if memory manager is properly initialized */
+    if (g_mem_manager.pool1_start == NULL || g_mem_manager.pool2_start == NULL) {
+        termM0PrintStringXY_scroll("  ERROR: Memory manager not initialized!", 0, current_line);
+        return 0;
+    }
     
     /* Create Lua state with custom allocator */
     termM0PrintStringXY_scroll("  Creating Lua state...", 0, current_line);
+    termM0PrintStringXY_scroll("  -> Calling lua_newstate()...", 0, current_line);
+    
     L = lua_newstate(lua_alloc_debug, NULL);
+    
     if (L == NULL) {
         termM0PrintStringXY_scroll("  ERROR: lua_newstate() failed!", 0, current_line);
+        termM0PrintStringXY_scroll("  -> Possible causes:", 0, current_line);
+        termM0PrintStringXY_scroll("     - Insufficient memory", 0, current_line);
+        termM0PrintStringXY_scroll("     - Memory fragmentation", 0, current_line);
+        termM0PrintStringXY_scroll("     - Allocator function error", 0, current_line);
+        termM0PrintStringXY_scroll("     - Lua internal error", 0, current_line);
+        
+        /* Check memory status after failure */
+        uint32_t pool1_free_after = g_mem_manager.pool1_end - g_mem_manager.pool1_current;
+        uint32_t pool2_free_after = g_mem_manager.pool2_end - g_mem_manager.pool2_current;
+        sprintf(debug_buffer, "  -> Pool1 free after fail: %lu bytes", (unsigned long)pool1_free_after);
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        sprintf(debug_buffer, "  -> Pool2 free after fail: %lu bytes", (unsigned long)pool2_free_after);
+        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+        
         return 0; /* Failed to create state */
     }
-    termM0PrintStringXY_scroll("  Lua state created OK", 0, current_line);
+    
+    sprintf(debug_buffer, "  -> Lua state created OK at %p", (void*)L);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    
+    /* Check memory status after success */
+    uint32_t pool1_free_success = g_mem_manager.pool1_end - g_mem_manager.pool1_current;
+    uint32_t pool2_free_success = g_mem_manager.pool2_end - g_mem_manager.pool2_current;
+    sprintf(debug_buffer, "  -> Pool1 free after success: %lu bytes", (unsigned long)pool1_free_success);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
+    sprintf(debug_buffer, "  -> Pool2 free after success: %lu bytes", (unsigned long)pool2_free_success);
+    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
     
     /* Open standard libraries */
     termM0PrintStringXY_scroll("  Opening Lua libraries...", 0, current_line);
@@ -411,11 +547,26 @@ void test_memory_manager(void) {
     
     termM0PrintStringXY_scroll("=== Memory Manager Tests ===", 0, current_line);
     
+    /* Print sizeof information for debugging */
+    termM0PrintStringXY_scroll("sizeof() debugging in test:", 0, current_line);
+    sprintf(test_buffer, "  -> sizeof(char): %lu", (unsigned long)sizeof(char));
+    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    sprintf(test_buffer, "  -> sizeof(int): %lu", (unsigned long)sizeof(int));
+    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    sprintf(test_buffer, "  -> sizeof(long): %lu", (unsigned long)sizeof(long));
+    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    sprintf(test_buffer, "  -> sizeof(size_t): %lu", (unsigned long)sizeof(size_t));
+    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    sprintf(test_buffer, "  -> sizeof(void*): %lu", (unsigned long)sizeof(void*));
+    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    sprintf(test_buffer, "  -> sizeof(snes_memory_manager_t): %lu", (unsigned long)sizeof(snes_memory_manager_t));
+    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    
     /* Display pool information */
     termM0PrintStringXY_scroll("Memory Pools:", 0, current_line);
-    sprintf(test_buffer, "Pool1: %p - %p (%u bytes)", (void*)banked_heap1, (void*)g_mem_manager.pool1_end, POOL1_SIZE);
+    sprintf(test_buffer, "Pool1: %p - %p (%lu bytes)", (void*)banked_heap1, (void*)g_mem_manager.pool1_end, (unsigned long)POOL1_SIZE);
     termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    sprintf(test_buffer, "Pool2: %p - %p (%u bytes)", (void*)banked_heap2, (void*)g_mem_manager.pool2_end, POOL2_SIZE);
+    sprintf(test_buffer, "Pool2: %p - %p (%lu bytes)", (void*)banked_heap2, (void*)g_mem_manager.pool2_end, (unsigned long)POOL2_SIZE);
     termM0PrintStringXY_scroll(test_buffer, 0, current_line);
     
     /* Test 1: Allocate 60KB block (should go to pool1) */
@@ -469,6 +620,12 @@ void test_memory_manager(void) {
         strcpy(test_buffer, "  -> Freed 30KB block");
         termM0PrintStringXY_scroll(test_buffer, 0, current_line);
     }
+
+    if (block3 != NULL) {
+        snes_free(block3);
+        strcpy(test_buffer, "  -> Freed 10KB block");
+        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    }
     
     /* Test 5: Try allocation after freeing */
     termM0PrintStringXY_scroll("Test 5: Allocating 50KB after free...", 0, current_line);
@@ -483,6 +640,11 @@ void test_memory_manager(void) {
         termM0PrintStringXY_scroll(test_buffer, 0, current_line);
     }
     
+    if (block4 != NULL) {
+        snes_free(block4);
+        strcpy(test_buffer, "  -> Freed 50KB block");
+        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
+    }
     termM0PrintStringXY_scroll("Memory Manager Tests Complete!", 0, current_line);
 }
 
