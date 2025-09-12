@@ -42,12 +42,10 @@
     ;;(memory ROM (address (#x018000 . #x01FFFF)) ;;LoROM bank 1
     ;;       (section code farcode cfar chuge switch data_init_table ifar))
 
-	(memory zeroPage (address (#x00 . #xff))
-            (section (ztiny registers)))
-	(memory DirectPage (address (#x1F00 . #x1FFF))
+	(memory DirectPage (address (#x100 . #x01FF))
             (section (registers)))
 
-    (memory STACK (address (#x0100 . #x1F00))
+    (memory STACK (address (#x0200 . #x1FFF))
            (section stack))
 		   
     ;; WRAM: internal work RAM, 128KB at $7E:0000–$7E:FFFF

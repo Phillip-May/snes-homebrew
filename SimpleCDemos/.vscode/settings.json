@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "snes_regs_xc.h": "c",
+        "int_snes_xc.h": "c",
+        "stdint.h": "c",
+        "initsnes.h": "c",
+        "stdio.h": "c",
+        "mainbankzero.h": "c",
+        "imagedata.h": "c",
+        "string.h": "c",
+        "malloc.h": "c",
+        "lauxlib.h": "c",
+        "lua_snes_real.h": "c",
+        "snes_memory_manager.h": "c"
+    }
+}

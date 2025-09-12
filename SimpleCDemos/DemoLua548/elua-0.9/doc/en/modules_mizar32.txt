@@ -1,0 +1,7 @@
+// $$HEADER$$
+Reference manual - Mizar32 platform dependent modules
+-----------------------------------------------------
+
+This paragraph presents all the modules specific to the link:status.html[Mizar32] platform.
+
+// $$FOOTER$$

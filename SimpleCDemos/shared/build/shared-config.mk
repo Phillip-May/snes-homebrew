@@ -41,12 +41,12 @@ endif
 
 # VBCC65816 Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
-	CC = "C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc"
-	AS = "C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc"
-	LD = "C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc"
-	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -D__VBCC__=1
+	CC = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
+	AS = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
+	LD = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
+	CCFLAGS = +snes-his -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__
 	ASFLAGS = 
-	LDFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt
+	LDFLAGS = +snes-his -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt
 	INCLUDES = 
 	OUTPUT_EXT = .smc
 	POST_LINK = 
@@ -61,12 +61,13 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 	LD = "C:\calypsi-65816-5.11\bin\ln65816"
 	# Check for huge model - requires --enable-huge-attribute with large data model
 	ifeq ($(ROM_TYPE),huge)
-		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=huge --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+#		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=huge --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		CCFLAGS = --core=65816 -O0 --code-model=large --data-model=huge --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
 		STDLIB = C:/calypsi-65816-5.11/lib-huge/clib-huge.a
 		LDFLAGS = --raw-multiple-memories --rom-code --no-tree-shaking --no-copy-initialize huge
 	else
 		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
-		STDLIB = clib-lc-ld.a
+		STDLIB = C:/calypsi-65816-5.11/lib/clib-lc-ld-f256.a
 		LDFLAGS = --raw-multiple-memories --rom-code
 	endif
 	ASFLAGS =
@@ -178,7 +179,9 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
 	ASM_SOURCES = 
-	OBJECTS = 
+	# Generate object file names from C sources for incremental linking
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o
 	vpath %.c $(SHARED_SRC_DIR) .
 	vpath %.asm 
 	vpath %.h .
@@ -288,9 +291,9 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
 	$(POST_LINK)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
-	@echo "Compiling with VBCC65816..."
-	@echo "\"C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc\bin\vc\" $(CCFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)"
-	@$(SHARED_PORT_DIR)/vbcc816/vc.bat $(CCFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
+	@echo "Compiling with VBCC65816 (all sources in one command)..."
+	@echo "C_SOURCES: $(C_SOURCES)"
+	@$(CC) $(CCFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
 	@echo "Compilation completed successfully"
 	$(POST_LINK)
 else
@@ -336,6 +339,14 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
 $(BUILD_DIR)/%.o: %.c
 	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
 	$(CC) $(CCFLAGS) $(INCLUDES) $<
+endif
+
+# VBCC65816 specific rules
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+# Compile C sources (pattern rule) - compile to object files for incremental linking
+$(BUILD_DIR)/%.o: %.c
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(CC) $(CCFLAGS) $(INCLUDES) -c -o $@ $<
 endif
 
 # CC65 specific rules

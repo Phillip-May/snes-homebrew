@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <limits.h>
+#include <stdarg.h>
 
 /* Assert stub for SNES - just ignore failed assertions in release builds */
 void _Stub_assert(const char *filename, int linenum) {
@@ -13,12 +14,45 @@ void _Stub_assert(const char *filename, int linenum) {
     (void)linenum;
 }
 
+/* File system stubs for SNES - I/O not supported */
+int _Stub_remove(const char *pathname) {
+    /* File operations not supported on SNES */
+    (void)pathname;
+    return -1;  /* Indicate failure */
+}
+
+int _Stub_rename(const char *oldpath, const char *newpath) {
+    /* File operations not supported on SNES */
+    (void)oldpath;
+    (void)newpath;
+    return -1;  /* Indicate failure */
+}
+
+char **_Stub_environ(void) {
+    /* Environment variables not supported on SNES */
+    return NULL;
+}
+
+int system(const char *command) {
+    /* System commands not supported on SNES */
+    (void)command;
+    return -1;
+}
+
 #include "snes_regs_xc.h"
 #include "include/imagedata.h"
 #include "initsnes.h"
-/* SNES Lua config is now integrated into luaconf.h */
-#include "lua-5.4.8/lua.h"
-#include "lua-5.4.8/lauxlib.h"
+/* Use eLua 0.9 implementation for SNES */
+#include "elua-0.9/src/lua/lua.h"
+#include "elua-0.9/src/lua/lstate.h"
+#include "elua-0.9/src/lua/lauxlib.h"
+#include "elua-0.9/src/lua/lualib.h"
+#include "snes_memory_manager.h"
+
+// Define eLua platform configuration
+#define PLATFORM_SNES
+#define BUILD_TERM
+#define BUILD_ELUA
 #include "snes_memory_manager.h"
 
 /* Function declarations */
@@ -27,7 +61,8 @@ int termM0PrintStringXY(char *szInput, uint8_t inpX, uint8_t inpY);
 void scroll_text_up(void);
 void clear_screen(void);
 int termM0PrintStringXY_scroll(char *szInput, uint8_t inpX, uint8_t inpY);
-void test_memory_manager(void);
+void write_debug_info(const char* info);
+void write_debug_char(char c, uint8_t line);
 
 
 /* Lua function declarations */
@@ -35,66 +70,6 @@ void test_memory_manager(void);
 
 
 /* Function declarations */
-void* lua_alloc_debug(void* ud, void* ptr, size_t osize, size_t nsize);
-
-/* Lua allocator function using only pool3 (SA-1 SRAM) */
-void* lua_alloc_debug(void *ud, void *ptr, size_t osize, size_t nsize) {
-    static int alloc_count = 0;
-    char debug_buffer[128];
-    void *result;
-    extern int current_line;  // Declare external reference to current_line
-    
-    (void)ud;  // unused parameter
-    alloc_count++;
-    
-    /* Log ALL allocation attempts for debugging */
-    if (nsize == 0) {
-        sprintf(debug_buffer, "Lua #%d: FREE %u", alloc_count, (unsigned int)osize);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    } else if (ptr == NULL) {
-        sprintf(debug_buffer, "Lua #%d: MALLOC %u", alloc_count, (unsigned int)nsize);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    } else {
-        sprintf(debug_buffer, "Lua #%d: REALLOC %u->%u", alloc_count, (unsigned int)osize, (unsigned int)nsize);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    }
-    
-    /* Check if pool3 is available */
-    if (!g_mem_manager.pool3_available) {
-        sprintf(debug_buffer, "Lua #%d: Pool3 not available!", alloc_count);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-        return NULL;
-    }
-    
-    if (nsize == 0) {
-        if (ptr != NULL) {
-            snes_free(ptr);
-        }
-        return NULL;
-    }
-    
-    /* Use pool3-specific allocation */
-    if (ptr == NULL) {
-        result = snes_malloc_pool3(nsize);
-    } else {
-        result = snes_realloc_pool3(ptr, osize, nsize);
-    }
-    
-    /* Log ALL allocation results for debugging */
-    if (result != NULL) {
-        sprintf(debug_buffer, "Lua #%d: OK", alloc_count);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    } else {
-        sprintf(debug_buffer, "Lua #%d: FAILED!", alloc_count);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-        /* Show available pool3 memory when allocation fails */
-        uint32_t pool3_free = g_mem_manager.pool3_end - g_mem_manager.pool3_current;
-        sprintf(debug_buffer, "Pool3 free: %u bytes", (unsigned int)pool3_free);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    }
-    
-    return result;
-}
 
 /* Lua constants */
 #define LUA_OK 0
@@ -110,209 +85,185 @@ extern int current_line;
 
 /* Debug variables for luaM_growaux_ */
 
-/* Define luaL_openlibs for minimal SNES Lua */
-void luaL_openlibs(lua_State *L) {
-    /* Skip all standard libraries for now - just create a minimal Lua state */
-    /* This avoids any filesystem access issues */
-    /* We'll add our own minimal functions instead of loading standard libraries */
-    /* This avoids any filesystem access that might cause stp instructions */
+/* Lua panic handler to catch errors instead of calling abort() */
+int lua_panic_handler(lua_State *L) {
+    termM0PrintStringXY_scroll("LUA PANIC!", 0, current_line);
+    termM0PrintStringXY_scroll("Error caught by panic handler", 0, current_line);
+    return 0;  /* Return 0 to indicate error was handled */
 }
 
-/* SNES-specific Lua functions - ultra minimal versions */
-static int snes_print(lua_State *L) {
-    /* Don't use luaL_checkstring - just get the string directly */
-    if (lua_gettop(L) >= 1 && lua_isstring(L, 1)) {
-        const char *str = lua_tostring(L, 1);
-        if (str != NULL) {
-            termM0PrintStringXY_scroll((char*)str, 0, current_line);
+/* Custom memory allocator for SNES */
+void* snes_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+    (void)ud;  /* Not used in this implementation */
+    
+    /* Debug: show ALL allocator calls to track the hang */
+    static int call_count = 0;
+    call_count++;
+    
+    /* Always show call count for debugging */
+    char count_msg[16];
+    count_msg[0] = 'C';
+    count_msg[1] = 'a';
+    count_msg[2] = 'l';
+    count_msg[3] = 'l';
+    count_msg[4] = ' ';
+    count_msg[5] = '0' + (call_count / 10);
+    count_msg[6] = '0' + (call_count % 10);
+    count_msg[7] = '\0';
+    termM0PrintStringXY_scroll(count_msg, 0, current_line);
+    
+    /* Show allocation info for debugging */
+    if (call_count <= 20) {
+        char debug_msg[32];
+        debug_msg[0] = 'A';
+        debug_msg[1] = 'l';
+        debug_msg[2] = 'l'; 
+        debug_msg[3] = 'o';
+        debug_msg[4] = 'c';
+        debug_msg[5] = ' ';
+        debug_msg[6] = '0' + (call_count % 10);
+        debug_msg[7] = '\0';
+        termM0PrintStringXY_scroll(debug_msg, 0, current_line);
+        
+        /* Show allocation size for debugging */
+        if (nsize > 0) {
+            char size_msg[16];
+            size_msg[0] = 'S';
+            size_msg[1] = 'z';
+            size_msg[2] = ':';
+            size_msg[3] = '0' + (nsize % 10);
+            size_msg[4] = '\0';
+            termM0PrintStringXY_scroll(size_msg, 0, current_line);
         }
     }
-    return 0;
-}
-
-static int snes_math_add(lua_State *L) {
-    /* Don't use luaL_checknumber - just get numbers directly */
-    if (lua_gettop(L) >= 2 && lua_isnumber(L, 1) && lua_isnumber(L, 2)) {
-        lua_Number a = lua_tonumber(L, 1);
-        lua_Number b = lua_tonumber(L, 2);
-        lua_pushnumber(L, a + b);
-        return 1;
-    }
-    lua_pushnumber(L, 0);
-    return 1;
-}
-
-static int snes_math_multiply(lua_State *L) {
-    /* Don't use luaL_checknumber - just get numbers directly */
-    if (lua_gettop(L) >= 2 && lua_isnumber(L, 1) && lua_isnumber(L, 2)) {
-        lua_Number a = lua_tonumber(L, 1);
-        lua_Number b = lua_tonumber(L, 2);
-        lua_pushnumber(L, a * b);
-        return 1;
-    }
-    lua_pushnumber(L, 0);
-    return 1;
-}
-
-/* SNES-specific io.write function */
-static int snes_io_write(lua_State *L) {
-    int n = lua_gettop(L);  /* number of arguments */
-    int i;
-    for (i = 1; i <= n; i++) {
-        const char *s;
-        size_t l;
-        s = lua_tolstring(L, i, &l);  /* convert to string */
-        if (s == NULL)
-            return luaL_error(L, "'tostring' must return a string to 'print'");
-        
-        /* Print the string */
-        termM0PrintStringXY_scroll((char*)s, 0, current_line);
-    }
-    return 0;
-}
-
-/* SNES-specific io.flush function */
-static int snes_io_flush(lua_State *L) {
-    /* On SNES, we don't need to flush anything */
-    (void)L;
-    return 0;
-}
-
-/* SNES-specific os.clock function */
-static int snes_os_clock(lua_State *L) {
-    /* Simple counter for SNES - just return a basic time value */
-    static int counter = 0;
-    counter++;
-    lua_pushnumber(L, (lua_Number)counter);
-    return 1;
-}
-
-/* SNES-specific collectgarbage function */
-static int snes_collectgarbage(lua_State *L) {
-    const char *opt = luaL_optstring(L, 1, "collect");
     
-    if (strcmp(opt, "count") == 0) {
-        /* Return simulated heap usage */
-        lua_pushnumber(L, 1024.0); /* 1KB simulated */
-    } else if (strcmp(opt, "collect") == 0) {
-        /* Simulate garbage collection */
-        lua_pushnumber(L, 0); /* No objects collected */
-    } else {
-        lua_pushnumber(L, 0); /* Unknown option */
+    /* Check for stack corruption - verify current_line is reasonable */
+    if (current_line > 50) {
+        termM0PrintStringXY_scroll("STACK CORRUPT!", 0, current_line);
+        return NULL;
     }
-    return 1;
+    
+    /* Check heap state before allocation */
+    if (call_count == 3) {
+        termM0PrintStringXY_scroll("HEAP CHECK", 0, current_line);
+        if (!g_mem_manager.pool3_available) {
+            termM0PrintStringXY_scroll("HEAP CORRUPT!", 0, current_line);
+            return NULL;
+        }
+    }
+    
+    if (nsize == 0) {
+        /* Free memory */
+        if (ptr != NULL) {
+            snes_free(ptr);
+        }
+        return NULL;
+    }
+    
+    if (ptr == NULL) {
+        /* Allocate new memory */
+        termM0PrintStringXY_scroll("MALLOC", 0, current_line);
+        void* result = snes_malloc(nsize);
+        if (result == NULL) {
+            termM0PrintStringXY_scroll("MALLOC FAIL!", 0, current_line);
+        } else {
+            termM0PrintStringXY_scroll("MALLOC OK", 0, current_line);
+            /* Verify the allocated memory is valid - check SA-1 SRAM range */
+            if (result < (void*)0x400000 || result > (void*)0x500000) {
+                termM0PrintStringXY_scroll("BAD PTR!", 0, current_line);
+                /* Show a simple indicator of where the pointer is */
+                unsigned long ptr_val = (unsigned long)(uintptr_t)result;
+                if (ptr_val < 0x400000) {
+                    termM0PrintStringXY_scroll("LOW MEM", 0, current_line);
+                } else if (ptr_val < 0x7E0000) {
+                    termM0PrintStringXY_scroll("MID MEM", 0, current_line);
+                } else if (ptr_val < 0x800000) {
+                    termM0PrintStringXY_scroll("WRAM", 0, current_line);
+                } else {
+                    termM0PrintStringXY_scroll("HIGH MEM", 0, current_line);
+                }
+            }
+        }
+        return result;
+    } else {
+        /* Reallocate existing memory */
+        termM0PrintStringXY_scroll("REALLOC", 0, current_line);
+        void* result = snes_realloc(ptr, osize, nsize);
+        if (result == NULL) {
+            termM0PrintStringXY_scroll("REALLOC FAIL!", 0, current_line);
+        } else {
+            termM0PrintStringXY_scroll("REALLOC OK", 0, current_line);
+            /* Verify the reallocated memory is valid - check SA-1 SRAM range */
+            if (result < (void*)0x400000 || result > (void*)0x500000) {
+                termM0PrintStringXY_scroll("BAD PTR!", 0, current_line);
+                /* Show a simple indicator of where the pointer is */
+                unsigned long ptr_val = (unsigned long)(uintptr_t)result;
+                if (ptr_val < 0x400000) {
+                    termM0PrintStringXY_scroll("LOW MEM", 0, current_line);
+                } else if (ptr_val < 0x7E0000) {
+                    termM0PrintStringXY_scroll("MID MEM", 0, current_line);
+                } else if (ptr_val < 0x800000) {
+                    termM0PrintStringXY_scroll("WRAM", 0, current_line);
+                } else {
+                    termM0PrintStringXY_scroll("HIGH MEM", 0, current_line);
+                }
+            }
+        }
+        return result;
+    }
 }
 
 /* Initialize Lua for SNES */
 int lua_snes_init(void) {
-    char debug_buffer[128];
+    /* Initialize eLua 0.9 for SNES */
+    termM0PrintStringXY_scroll("Using eLua 0.9", 0, current_line);
     
-    /* Check memory manager status */
-    sprintf(debug_buffer, "Pool1: start=%p end=%p", g_mem_manager.pool1_start, g_mem_manager.pool1_end);
-    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    sprintf(debug_buffer, "Pool2: start=%p end=%p", g_mem_manager.pool2_start, g_mem_manager.pool2_end);
-    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    
-    /* Check SA-1 SRAM availability */
-    if (g_mem_manager.pool3_available) {
-        sprintf(debug_buffer, "Pool3: start=%p end=%p", g_mem_manager.pool3_start, g_mem_manager.pool3_end);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    } else {
-        termM0PrintStringXY_scroll("SA-1 SRAM: Not available", 0, current_line);
-        sprintf(debug_buffer, "Pool3: start=%p end=%p", g_mem_manager.pool3_start, g_mem_manager.pool3_end);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-        /* Test SA-1 SRAM directly */
-        int test_result = snes_test_sa1_sram();
-        sprintf(debug_buffer, "SA-1 test result: %d", test_result);
-        termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    }
-    
-    /* Print key debugging info */
-    sprintf(debug_buffer, "INT_MAX: %ld", (long)INT_MAX);
-    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    
-    /* Test INT_MAX directly */
-    sprintf(debug_buffer, "INT_MAX test: %d", (int)INT_MAX);
-    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    
-    /* Test SIZE_MAX directly */
-    sprintf(debug_buffer, "SIZE_MAX: %u", (unsigned int)SIZE_MAX);
-    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    
-    /* Test size_t max value */
-    sprintf(debug_buffer, "SIZE_T_MAX: %u", (unsigned int)(~(size_t)0));
-    termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-    
-    /* Test memory manager directly */
-    void *test_ptr = snes_malloc(1024);
-    if (test_ptr != NULL) {
-        termM0PrintStringXY_scroll("Test malloc: OK", 0, current_line);
-        snes_free(test_ptr);
-        termM0PrintStringXY_scroll("Test free: OK", 0, current_line);
-    } else {
-        termM0PrintStringXY_scroll("Test malloc: FAILED!", 0, current_line);
-    }
-    
-    /* Test large allocation that Lua might need */
-    void *test_large = snes_malloc(65000);
-    if (test_large != NULL) {
-        termM0PrintStringXY_scroll("Test large: OK", 0, current_line);
-        snes_free(test_large);
-        termM0PrintStringXY_scroll("Test large free: OK", 0, current_line);
-    } else {
-        termM0PrintStringXY_scroll("Test large: FAILED!", 0, current_line);
-    }
-    
-    /* Check if memory manager is properly initialized */
-    if (g_mem_manager.pool1_start == NULL || g_mem_manager.pool2_start == NULL) {
-        termM0PrintStringXY_scroll("ERROR: Memory manager not init!", 0, current_line);
+    /* Check memory manager before creating Lua state */
+    if (!g_mem_manager.pool3_available) {
+        termM0PrintStringXY_scroll("No memory available!", 0, current_line);
         return 0;
     }
     
     /* Create Lua state with custom allocator */
     termM0PrintStringXY_scroll("Creating Lua state...", 0, current_line);
+    termM0PrintStringXY_scroll("Calling lua_newstate...", 0, current_line);
     
-    L = lua_newstate(lua_alloc_debug, NULL);
+    /* Try to create Lua state - this might hang */
+    termM0PrintStringXY_scroll("About to call lua_newstate...", 0, current_line);
     
-    if (L == NULL) {
-        termM0PrintStringXY_scroll("ERROR: lua_newstate() failed!", 0, current_line);
-        return 0; /* Failed to create state */
-    }
+    /* The hang is likely in lua_newstate initialization */
+    /* Let's try a different approach - create a minimal state */
+    termM0PrintStringXY_scroll("Trying minimal approach...", 0, current_line);
     
-    termM0PrintStringXY_scroll("Lua state created OK", 0, current_line);
+    /* Try to create the basic state structure manually */
+    /* Add a timeout mechanism to prevent infinite hanging */
+    volatile int timeout_counter = 0;
     
-    /* Skip standard libraries for now to avoid opcode issues */
-    termM0PrintStringXY_scroll("Skipping libraries...", 0, current_line);
+    /* Try to create Lua state with debug tracing */
+    termM0PrintStringXY_scroll("Calling lua_newstate...", 0, current_line);
+    L = lua_newstate(snes_lua_alloc, NULL);
     
-    termM0PrintStringXY_scroll("Lua init complete!", 0, current_line);
-    return 1; /* Success */
+    /* If we reach here, lua_newstate completed */
+    termM0PrintStringXY_scroll("lua_newstate completed!", 0, current_line);
+    
+    /* Set panic handler */
+    lua_atpanic(L, lua_panic_handler);
+    
+    /* Print Lua version - use simple string to avoid sprintf issues */
+    termM0PrintStringXY_scroll("Lua 5.1.4", 0, current_line);
+    
+    /* Skip standard libraries for now - they may require full state initialization */
+    termM0PrintStringXY_scroll("Skipping std libs...", 0, current_line);
+    termM0PrintStringXY_scroll("eLua ready", 0, current_line);
+    
+    return 1;
 }
 
 /* Execute Lua string */
 int lua_snes_dostring(lua_State *L, const char *script) {
-    termM0PrintStringXY_scroll("Loading Lua script...", 0, current_line);
-    
     int status = luaL_loadstring(L, script);
     if (status == LUA_OK) {
-        termM0PrintStringXY_scroll("Script loaded OK", 0, current_line);
-        termM0PrintStringXY_scroll("Calling lua_pcall...", 0, current_line);
-        status = lua_pcall(L, 0, 0, 0);
-        if (status != LUA_OK) {
-            termM0PrintStringXY_scroll("lua_pcall failed!", 0, current_line);
-        }
-    } else {
-        termM0PrintStringXY_scroll("luaL_loadstring failed!", 0, current_line);
-        /* Print Lua error details */
-        char debug_buffer[64];
-        const char *error_msg = lua_tostring(L, -1);
-        if (error_msg != NULL) {
-            strncpy(debug_buffer, error_msg, 30);
-            debug_buffer[30] = '\0';
-            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-        } else {
-            sprintf(debug_buffer, "Error code: %d", status);
-            termM0PrintStringXY_scroll(debug_buffer, 0, current_line);
-        }
+        status = lua_pcall(L, 0, LUA_MULTRET, 0);  /* Allow multiple return values */
     }
     return status;
 }
@@ -346,105 +297,110 @@ void lua_snes_close(void) {
 
 /* Get Lua state */
 lua_State* lua_snes_getstate(void) {
+    termM0PrintStringXY_scroll("Getting Lua state...", 0, current_line);
     return L;
 }
 
-/* Calypsi stubs for SNES build */
-/* These provide the missing functions that Lua requires */
+/* Minimal stubs for SNES build */
+size_t _Stub_write(int fd, const void *buf, size_t count) { return count; }
+size_t _Stub_read(int fd, void *buf, size_t count) { return 0; }
+int _Stub_close(int fd) { return 0; }
+long _Stub_lseek(int fd, long offset, int whence) { return 0; }
+int _Stub_open(const char *pathname, int flags, ...) { return -1; }
 
-/* Stub for write function - used by Lua's I/O operations */
-size_t _Stub_write(int fd, const void *buf, size_t count) {
-    /* For SNES, we don't have a real file system */
-    /* Just return success to satisfy the linker */
-    return count;
-}
 
-/* Stub for read function - used by Lua's I/O operations */
-size_t _Stub_read(int fd, void *buf, size_t count) {
-    /* For SNES, we don't have a real file system */
-    /* Just return 0 (EOF) to satisfy the linker */
-    return 0;
-}
-
-/* Stub for close function - used by Lua's I/O operations */
-int _Stub_close(int fd) {
-    /* For SNES, we don't have a real file system */
-    /* Just return success to satisfy the linker */
-    return 0;
-}
-
-/* Stub for lseek function - used by Lua's I/O operations */
-long _Stub_lseek(int fd, long offset, int whence) {
-    /* For SNES, we don't have a real file system */
-    /* Just return success to satisfy the linker */
-    return 0;
-}
-
-/* Stub for open function - used by Lua's I/O operations */
-int _Stub_open(const char *pathname, int flags, ...) {
-    /* For SNES, we don't have a real file system */
-    /* Just return -1 (error) to satisfy the linker */
-    return -1;
-}
-
-/* SNES-compatible implementations of Lua's output functions */
-/* These replace the default stdout/stderr implementations */
-
-/* Undefine Lua macros to define our own functions */
 #undef lua_writestring
 #undef lua_writeline
 #undef lua_writestringerror
 
-void lua_writestring(const char *str, size_t len) {
-    /* For SNES, we'll just ignore output to stdout */
-    /* In a real implementation, you might want to buffer this or send to a debug port */
-    (void)str;  /* Suppress unused parameter warning */
-    (void)len;  /* Suppress unused parameter warning */
-}
+void lua_writestring(const char *str, size_t len) { (void)str; (void)len; }
+void lua_writeline(void) { }
+void lua_writestringerror(const char *str, const char *param) { (void)str; (void)param; }
 
-void lua_writeline(void) {
-    /* For SNES, we'll just ignore newline output */
-    /* In a real implementation, you might want to handle this */
-}
-
-void lua_writestringerror(const char *str, const char *param) {
-    /* For SNES, we'll just ignore error output */
-    /* In a real implementation, you might want to handle this */
-    (void)str;   /* Suppress unused parameter warning */
-    (void)param; /* Suppress unused parameter warning */
-}
-
-/* Function to demonstrate individual Lua operations with results */
+/* Minimal Lua operation demonstration */
 void demonstrate_lua_operation(lua_State *L, const char* operation, const char* description, int line) {
-    char result_buffer[128];
-    char error_buffer[128];
-    
     /* Display the operation description */
     termM0PrintStringXY_scroll((char*)description, 0, line);
     
     /* Execute the Lua operation */
+    termM0PrintStringXY_scroll("Executing...", 0, line + 1);
     int status = lua_snes_dostring(L, operation);
+    
+    /* Show status */
     if (status == LUA_OK) {
-        /* Show success message */
-        strcpy(result_buffer, "-> Success");
-        termM0PrintStringXY_scroll(result_buffer, 0, line + 1);
+        termM0PrintStringXY_scroll("Status: OK", 0, line + 2);
     } else {
-        /* Show failure message with Lua error details */
-        strcpy(result_buffer, "-> Failed (");
-        
-        /* Get the error message from Lua stack */
-        const char *error_msg = lua_tostring(L, -1);
-        if (error_msg != NULL) {
-            /* Truncate error message to fit in buffer */
-            strncpy(error_buffer, error_msg, 20);
-            error_buffer[20] = '\0';
-            strcat(result_buffer, error_buffer);
+        termM0PrintStringXY_scroll("Status: FAIL", 0, line + 2);
+    }
+    
+    /* Check stack size */
+    int stack_size = lua_gettop(L);
+    char stack_msg[32];
+    stack_msg[0] = 'S';
+    stack_msg[1] = ':';
+    if (stack_size < 10) {
+        stack_msg[2] = '0' + stack_size;
+        stack_msg[3] = '\0';
+    } else {
+        stack_msg[2] = '1';
+        stack_msg[3] = '0';
+        stack_msg[4] = '+';
+        stack_msg[5] = '\0';
+    }
+    termM0PrintStringXY_scroll(stack_msg, 0, line + 3);
+    
+    if (status == LUA_OK) {
+        /* Check if there's a result on the stack to display */
+        if (lua_gettop(L) > 0) {
+            /* Get the result and display it */
+            if (lua_isnumber(L, -1)) {
+                double result = lua_tonumber(L, -1);
+                termM0PrintStringXY_scroll("Type: number", 0, line + 4);
+                
+                /* Simple number display without sprintf */
+                char result_str[32];
+                result_str[0] = 'R';
+                result_str[1] = ':';
+                if (result < 10) {
+                    result_str[2] = '0' + (int)result;
+                    result_str[3] = '\0';
+                } else if (result < 100) {
+                    result_str[2] = '0' + ((int)result / 10);
+                    result_str[3] = '0' + ((int)result % 10);
+                    result_str[4] = '\0';
+                } else {
+                    result_str[2] = '1';
+                    result_str[3] = '0';
+                    result_str[4] = '0';
+                    result_str[5] = '+';
+                    result_str[6] = '\0';
+                }
+                termM0PrintStringXY_scroll(result_str, 0, line + 5);
+            } else if (lua_isstring(L, -1)) {
+                termM0PrintStringXY_scroll("Type: string", 0, line + 4);
+                const char* result = lua_tostring(L, -1);
+                termM0PrintStringXY_scroll("String result", 0, line + 5);
+            } else {
+                termM0PrintStringXY_scroll("Type: other", 0, line + 4);
+                termM0PrintStringXY_scroll("-> OK", 0, line + 5);
+            }
+            /* Pop the result from the stack */
+            lua_pop(L, 1);
         } else {
-            strcat(result_buffer, "Unknown error");
+            termM0PrintStringXY_scroll("No result", 0, line + 4);
+            termM0PrintStringXY_scroll("-> OK", 0, line + 5);
         }
-        strcat(result_buffer, ")");
+    } else {
+        termM0PrintStringXY_scroll("-> FAIL", 0, line + 4);
         
-        termM0PrintStringXY_scroll(result_buffer, 0, line + 1);
+        /* Show error message if available */
+        if (lua_isstring(L, -1)) {
+            const char* error_msg = lua_tostring(L, -1);
+            termM0PrintStringXY_scroll("Error:", 0, line + 5);
+            termM0PrintStringXY_scroll((char*)error_msg, 0, line + 6);
+        } else {
+            termM0PrintStringXY_scroll("Unknown error", 0, line + 5);
+        }
         
         /* Pop the error message from the stack */
         lua_pop(L, 1);
@@ -459,6 +415,45 @@ static int current_scroll_line = 0;
 static int max_display_lines = 20;  /* Maximum lines visible on screen */
 static int total_lines = 0;         /* Total lines printed */
 int current_line = 0;        /* Current line being printed on */
+
+/* Debug output for Mesen 2 Lua script */
+static char debug_buffer[256] = {0};
+static int debug_buffer_pos = 0;
+
+/* Debug register for Lua script monitoring */
+/* Use very end of WRAM for debug registers - safe area */
+#define DEBUG_CHAR_ADDR   0x7FFF00
+#define DEBUG_LINE_ADDR   0x7FFF01
+#define DEBUG_READY_ADDR  0x7FFF02
+
+/* Function to write a single character to debug register */
+void write_debug_char(char c, uint8_t line) {
+    /* Write the character data */
+    *(volatile uint8_t*)DEBUG_CHAR_ADDR = (uint8_t)c;
+    *(volatile uint8_t*)DEBUG_LINE_ADDR = line;
+    *(volatile uint8_t*)DEBUG_READY_ADDR = 1;  /* Signal that new data is available */
+    
+    /* Longer delay to give Lua script time to process */
+    volatile int delay = 0;
+    while (delay < 5000) {
+        delay++;
+    }
+}
+
+/* Function to write debug info to a specific memory location */
+void write_debug_info(const char* info) {
+    /* Write to a specific memory location that Mesen 2 can easily monitor */
+    /* We'll use a location in SNES RAM that's easy to find */
+    volatile char* debug_addr = (volatile char*)0x7E1000;
+    
+    /* Simple string copy to debug location */
+    int i = 0;
+    while (info[i] != '\0' && i < 255) {
+        debug_addr[i] = info[i];
+        i++;
+    }
+    debug_addr[i] = '\0';
+}
 
 
 #ifdef __TCC816__
@@ -497,7 +492,7 @@ int my_strlen(const char* str) {
 
 /* Clear the entire screen */
 void clear_screen(void) {
-    const static unsigned char BGCLEAR[] = {0x20, 0x00};
+    static const unsigned char BGCLEAR[] = {0x20, 0x00};
     ClearVram(BGCLEAR, 0xF800, 0x400); /* Clear VRAM Map To Fixed Tile Word */
     current_scroll_line = 0;
     total_lines = 0;
@@ -525,96 +520,6 @@ void scroll_text_up(void) {
     current_line = 0;
 }
 
-/* Test memory manager with large allocations */
-void test_memory_manager(void) {
-    char test_buffer[64];
-    
-    termM0PrintStringXY_scroll("=== Memory Manager Tests ===", 0, current_line);
-    
-    /* Print sizeof information for debugging */
-    termM0PrintStringXY_scroll("sizeof() debugging in test:", 0, current_line);
-    sprintf(test_buffer, "char:%u int:%u long:%u", (unsigned int)sizeof(char), (unsigned int)sizeof(int), (unsigned int)sizeof(long));
-    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    sprintf(test_buffer, "size_t:%u ptr:%u mgr:%u", (unsigned int)sizeof(size_t), (unsigned int)sizeof(void*), (unsigned int)sizeof(snes_memory_manager_t));
-    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    
-    /* Display pool information */
-    termM0PrintStringXY_scroll("Memory Pools:", 0, current_line);
-    sprintf(test_buffer, "Pool1: %u bytes", (unsigned int)POOL1_SIZE);
-    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    sprintf(test_buffer, "Pool2: %u bytes", (unsigned int)POOL2_SIZE);
-    termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    
-    /* Test 1: Allocate 60KB block (should go to pool1) */
-    termM0PrintStringXY_scroll("Test 1: Allocating 60KB...", 0, current_line);
-    void *block1 = snes_malloc(60000);
-    if (block1 != NULL) {
-        strcpy(test_buffer, "60KB allocation: SUCCESS");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    } else {
-        strcpy(test_buffer, "60KB allocation: FAILED");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    
-    /* Test 2: Allocate 30KB block (should go to pool2) */
-    termM0PrintStringXY_scroll("Test 2: Allocating 30KB...", 0, current_line);
-    void *block2 = snes_malloc(30000);
-    if (block2 != NULL) {
-        strcpy(test_buffer, "30KB allocation: SUCCESS");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    } else {
-        strcpy(test_buffer, "30KB allocation: FAILED");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    
-    /* Test 3: Try to allocate another 10KB block (should fail) */
-    termM0PrintStringXY_scroll("Test 3: Allocating 10KB...", 0, current_line);
-    void *block3 = snes_malloc(10000);
-    if (block3 != NULL) {
-        strcpy(test_buffer, "10KB allocation: SUCCESS (UNEXPECTED!)");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    } else {
-        strcpy(test_buffer, "10KB allocation: FAILED (expected)");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    
-    /* Test 4: Free blocks and try again */
-    termM0PrintStringXY_scroll("Test 4: Freeing blocks...", 0, current_line);
-    if (block1 != NULL) {
-        snes_free(block1);
-        strcpy(test_buffer, "Freed 60KB block");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    if (block2 != NULL) {
-        snes_free(block2);
-        strcpy(test_buffer, "Freed 30KB block");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-
-    if (block3 != NULL) {
-        snes_free(block3);
-        strcpy(test_buffer, "Freed 10KB block");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    
-    /* Test 5: Try allocation after freeing */
-    termM0PrintStringXY_scroll("Test 5: Allocating 50KB...", 0, current_line);
-    void *block4 = snes_malloc(50000);
-    if (block4 != NULL) {
-        strcpy(test_buffer, "50KB allocation: SUCCESS");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    } else {
-        strcpy(test_buffer, "50KB allocation: FAILED");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    
-    if (block4 != NULL) {
-        snes_free(block4);
-        strcpy(test_buffer, "Freed 50KB block");
-        termM0PrintStringXY_scroll(test_buffer, 0, current_line);
-    }
-    termM0PrintStringXY_scroll("Memory Manager Tests Complete!", 0, current_line);
-}
 
 /* Print string with automatic scrolling */
 int termM0PrintStringXY_scroll(char *szInput, uint8_t inpX, uint8_t inpY) {
@@ -629,6 +534,15 @@ int termM0PrintStringXY_scroll(char *szInput, uint8_t inpX, uint8_t inpY) {
         scroll_text_up();
         display_line = 0;  /* Always start from the top of the screen */
     }
+    
+    /* Write each character to debug register for Lua script monitoring */
+    int i = 0;
+    while (szInput[i] != '\0') {
+        write_debug_char(szInput[i], display_line);
+        i++;
+    }
+    /* Send null terminator to signal end of string for Lua script */
+    write_debug_char('\0', display_line);
     
     /* Wait for VBlank */
     do {
@@ -656,7 +570,6 @@ int termM0PrintStringXY_scroll(char *szInput, uint8_t inpX, uint8_t inpY) {
 
 int main(void) {
     int8_t regRead1; /* Variable for storing hardware registers */
-    lua_State *L;
     
     /* Initialization */
     initSNES(SLOWROM);
@@ -665,13 +578,32 @@ int main(void) {
     initSA1();
     
     /* Initialize custom memory manager */
+    termM0PrintStringXY_scroll("Initializing memory manager...", 0, current_line);
     snes_memory_init();
+    
+    /* Check if memory manager is working */
+    if (g_mem_manager.pool3_available) {
+        termM0PrintStringXY_scroll("SA-1 SRAM: OK", 0, current_line);
+    } else {
+        termM0PrintStringXY_scroll("SA-1 SRAM: FAIL", 0, current_line);
+    }
+    
+    termM0PrintStringXY_scroll("Memory manager ready", 0, current_line);
+    
+    /* Test memory allocation */
+    void* test_ptr = snes_malloc(1024);
+    if (test_ptr != NULL) {
+        termM0PrintStringXY_scroll("Test alloc: OK", 0, current_line);
+        snes_free(test_ptr);
+    } else {
+        termM0PrintStringXY_scroll("Test alloc: FAIL", 0, current_line);
+    }
     
     termM0Init();
     clear_screen();  /* Clear screen and initialize scrolling */
     
     /* Display header first */
-    termM0PrintStringXY_scroll("Lua 5.4.8 Demo for SNES",0,1);
+    termM0PrintStringXY_scroll("eLua 0.9 Demo for SNES",0,1);
     termM0PrintStringXY_scroll("Compiler:",0,2);
     termM0PrintStringXY_scroll(SNES_XC_COMPILER_NAME,20,2);
     REG_INIDISP = 0x0F;
@@ -681,6 +613,11 @@ int main(void) {
     
     /* Initialize Lua */
     termM0PrintStringXY_scroll("Initializing Lua...",0,current_line);
+    termM0PrintStringXY_scroll("About to call lua_snes_init...",0,current_line);
+    
+    /* Add debug before the call */
+    termM0PrintStringXY_scroll("Calling lua_snes_init now",0,current_line);
+    
     if (lua_snes_init() == 0) {
         termM0PrintStringXY_scroll("Lua init failed!",0,4);
         while(1) {
@@ -689,33 +626,63 @@ int main(void) {
             } while(regRead1 > 0);
         }
     }
+    
+    /* Add debug after the call */
+    termM0PrintStringXY_scroll("lua_snes_init completed",0,current_line);
+    termM0PrintStringXY_scroll("About to get Lua state...",0,current_line);
+    
     L = lua_snes_getstate();
+    termM0PrintStringXY_scroll("Got Lua state from getter",0,current_line);
+    termM0PrintStringXY_scroll("About to start Lua tests...",0,current_line);
     
     /* Run basic Lua test - just test core functionality */
-    termM0PrintStringXY_scroll("Lua 5.4.8 Basic Test:",0,4);
+    termM0PrintStringXY_scroll("eLua 0.9 Basic Test:",0,4);
     
-    /* Test 1: Basic arithmetic */
+    /* Test 1: Basic arithmetic - use return to get result on stack */
     termM0PrintStringXY_scroll("1. Basic Arithmetic:",0,5);
-    termM0PrintStringXY_scroll("About to test: 5+3",0,6);
-    demonstrate_lua_operation(L, "result = 5 + 3", "result = 5 + 3", 7);
+    demonstrate_lua_operation(L, "return 5 + 3", "5 + 3 = ?", 6);
     
-    /* Test 2: String operations */
+    /* Test 2: String operations - use return to get result on stack */
     termM0PrintStringXY_scroll("2. String Operations:",0,8);
-    demonstrate_lua_operation(L, "message = 'Hello Lua!'", "message = 'Hello Lua!'", 9);
+    demonstrate_lua_operation(L, "return 'Hello Lua!'", "String test", 9);
     
-    /* Test 3: Table operations */
+    /* Test 3: Table operations - use return to get result on stack */
     termM0PrintStringXY_scroll("3. Table Operations:",0,11);
-    demonstrate_lua_operation(L, "t = {x = 10, y = 20}", "t = {x = 10, y = 20}", 12);
-    demonstrate_lua_operation(L, "sum = t.x + t.y", "sum = t.x + t.y", 13);
+    demonstrate_lua_operation(L, "t = {x = 10, y = 20}; return t.x + t.y", "Table sum", 12);
     
-    /* Test 4: Function definition */
+    /* Test 4: Function definition and call - use return to get result on stack */
     termM0PrintStringXY_scroll("4. Function Definitions:",0,15);
-    demonstrate_lua_operation(L, "function square(n) return n * n end", "function square(n) defined", 16);
-    demonstrate_lua_operation(L, "result = square(4)", "result = square(4)", 17);
+    demonstrate_lua_operation(L, "function square(n) return n * n end; return square(4)", "Square function", 16);
     
-    /* Test 5: Control structures */
+    /* Test 5: Control structures - use return to get result on stack */
     termM0PrintStringXY_scroll("5. Control Structures:",0,19);
-    demonstrate_lua_operation(L, "sum = 0; for i = 1, 10 do sum = sum + i end", "for loop: sum 1 to 10", 20);
+    demonstrate_lua_operation(L, "sum = 0; for i = 1, 10 do sum = sum + i end; return sum", "For loop sum", 20);
+    
+    /* Test 6: Global variable access - test that assignments work */
+    termM0PrintStringXY_scroll("6. Global Variables:",0,22);
+    demonstrate_lua_operation(L, "result = 5 + 3", "Assign result = 5+3", 23);
+    
+    /* Now fetch the global variable to show it was set */
+    termM0PrintStringXY_scroll("Fetching global 'result':",0,24);
+    lua_getglobal(L, "result");
+    if (lua_isnumber(L, -1)) {
+        int result_value = (int)lua_tonumber(L, -1);
+        char result_msg[32];
+        result_msg[0] = 'G';
+        result_msg[1] = 'l';
+        result_msg[2] = 'o';
+        result_msg[3] = 'b';
+        result_msg[4] = 'a';
+        result_msg[5] = 'l';
+        result_msg[6] = ':';
+        result_msg[7] = ' ';
+        result_msg[8] = '0' + result_value;
+        result_msg[9] = '\0';
+        termM0PrintStringXY_scroll(result_msg, 0, 25);
+    } else {
+        termM0PrintStringXY_scroll("Global not found!", 0, 25);
+    }
+    lua_pop(L, 1);  /* Remove the value from stack */
     
     termM0PrintStringXY_scroll("Lua tests complete!",0,current_line);
     
@@ -724,7 +691,6 @@ int main(void) {
         do { /* Wait for Vblank */
             regRead1 = REG_RDNMI;
         } while(regRead1 > 0);
-        termM0PrintStringXY_scroll("LUA DEMO RUNNING        ",0,current_line);
     }
     
     /* Clean up Lua (never reached due to infinite loop) */
@@ -752,8 +718,8 @@ void snesXC_irq(void) {
 }
 
 int termM0Init(void){	
-	const static unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
-	const static unsigned char BGCLEAR[] = {0x20, 0x00};
+	static const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
+	static const unsigned char BGCLEAR[] = {0x20, 0x00};
 	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL)); /* Load BG Palette Data */
 	/*TODO Fix init snes and make it actually clear VRAM */
 	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin));
