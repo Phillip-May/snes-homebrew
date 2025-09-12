@@ -553,6 +553,85 @@ HDMA Line Counter Register          $43xA ; rccc cccc, r = Repeat, c = Line coun
 */
 
 
+// SA-1 registers
+
+// $2200 - SA-1 CPU Control
+#define SA1_CCNT      (*(vu8)0x2200)
+// $2201 - SNES CPU Interrupt Enable
+#define SA1_SIE       (*(vu8)0x2201)
+// $2202 - SNES CPU Interrupt Clear
+#define SA1_SIC       (*(vu8)0x2202)
+// $2203/$2204 - SA-1 CPU Reset Vector (2 bytes)
+#define SA1_CRV       (*(vu16)0x2203)
+// $2205/$2206 - SA-1 CPU NMI Vector (2 bytes)
+#define SA1_CNV       (*(vu16)0x2205)
+// $2207/$2208 - SA-1 CPU IRQ Vector (2 bytes)
+#define SA1_CIV       (*(vu16)0x2207)
+// $2209 - SNES CPU Control
+#define SA1_SCNT      (*(vu8)0x2209)
+// $220A - SA-1 CPU Interrupt Enable
+#define SA1_CIE       (*(vu8)0x220A)
+// $220B - SA-1 CPU Interrupt Clear
+#define SA1_CIC       (*(vu8)0x220B)
+// $220C/$220D - SNES CPU NMI Vector (2 bytes)
+#define SA1_SNV       (*(vu16)0x220C)
+// $220E/$220F - SNES CPU IRQ Vector (2 bytes)
+#define SA1_SIV       (*(vu16)0x220E)
+// $2210 - H/V Timer Control
+#define SA1_TMC       (*(vu8)0x2210)
+// $2211 - SA-1 CPU Timer Restart
+#define SA1_CTR       (*(vu8)0x2211)
+// $2212/$2213 - Set H-Count (2 bytes)
+#define SA1_HCNT      (*(vu16)0x2212)
+// $2214/$2215 - Set V-Count (2 bytes)
+#define SA1_VCNT      (*(vu16)0x2214)
+// $2220 - Set Super MMC Bank C
+#define SA1_CXB       (*(vu8)0x2220)
+// $2221 - Set Super MMC Bank D
+#define SA1_DXB       (*(vu8)0x2221)
+// $2222 - Set Super MMC Bank E
+#define SA1_EXB       (*(vu8)0x2222)
+// $2223 - Set Super MMC Bank F
+#define SA1_FXB       (*(vu8)0x2223)
+// $2224 - SNES CPU BW-RAM Address Mapping
+#define SA1_BMAPS     (*(vu8)0x2224)
+// $2225 - SA-1 CPU BW-RAM Address Mapping
+#define SA1_BMAP      (*(vu8)0x2225)
+// $2226 - SNES CPU BW-RAM Write Enable
+#define SA1_SBWE      (*(vu8)0x2226)
+// $2227 - SA-1 CPU BW-RAM Write Enable
+#define SA1_CBWE      (*(vu8)0x2227)
+// $2228 - BW-RAM Write-Protected Area
+#define SA1_BPWA      (*(vu8)0x2228)
+// $2229 - SA-1 I-RAM Write Protection
+#define SA1_SIWP      (*(vu8)0x2229)
+// $222A - SA-1 I-RAM Write Protection
+#define SA1_CIWP      (*(vu8)0x222A)
+// $2230 - DMA Control
+#define SA1_DCNT      (*(vu8)0x2230)
+// $2231 - Character Conversion OMA Parameters
+#define SA1_CDMA      (*(vu8)0x2231)
+// $2232/$2233/$2234 - DMA Source Device Start Address (3 bytes)
+#define SA1_SDA       ((vu8)0x2232) // Use as array: [0]=low, [1]=mid, [2]=high
+// $2235/$2236/$2237 - DMA Destination Start Address (3 bytes)
+#define SA1_DDA       ((vu8)0x2235) // Use as array: [0]=low, [1]=mid, [2]=high
+// $2238/$2239 - DMA Terminal Counter (2 bytes)
+#define SA1_DTC       (*(vu16)0x2238)
+// $223F - BW-RAM Bit Map Format
+#define SA1_BBF       (*(vu8)0x223F)
+// $2240-$224F - Bit Map Register File (16 bytes)
+#define SA1_BRF       ((vu8)0x2240) // Use as array: [0]...[15]
+// $2250 - Arithmetic Control
+#define SA1_MCNT      (*(vu8)0x2250)
+// $2251/$2252 - Arithmetic Parameters: Multiplicand/Dividend (2 bytes)
+#define SA1_MA        (*(vu16)0x2251)
+// $2253/$2254 - Arithmetic Parameters: Multiplier/Divisor (2 bytes)
+#define SA1_MB        (*(vu16)0x2253)
+// $2258 - Variable-Length Bit Processing
+#define SA1_VBD       (*(vu8)0x2258)
+// $2259/$225A/$225B - Variable-Length Bit Game Pak ROM Start Address (3 bytes)
+#define SA1_VDA       ((vu8)0x2259) // Use as array: [0]=low, [1]=mid, [2]=high
+
 
 //A union structure for OAM duplicates so the compiler creates less warnings.
 //Table 2 consists of 2 32 bytes with 2 bit entries

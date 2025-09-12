@@ -28,6 +28,63 @@
 ** ===================================================================
 */
 
+/*
+** SNES-specific configuration
+** This configuration is optimized for the Super Nintendo Entertainment System
+** with custom memory management and 16-bit architecture constraints.
+*/
+
+/* Enable SNES-specific features */
+#define LUA_USE_SNES
+
+/* Use 32-bit integers and floats for SNES compatibility */
+#define LUA_32BITS 1
+
+/* Disable features not needed for SNES */
+#define LUA_USE_C89 1
+#undef LUA_USE_WINDOWS
+#undef LUA_USE_POSIX
+#undef LUA_USE_DLOPEN
+#undef LUA_DL_DLL
+
+/* Custom memory allocation for SNES */
+#define LUA_USE_SNES_MEMORY
+
+/* Disable file I/O for embedded system */
+#define LUA_USE_READONLYTABLE
+
+/* Disable additional features to save memory */
+#define LUA_USE_UTF8 0
+#define LUA_USE_UTF8_DEBUG 0
+#define LUA_USE_UTF8_OPTIMIZATION 0
+
+/* Reduce stack size for embedded system - even smaller for SNES */
+#define LUAI_MAXSTACK 500
+
+/* Disable debug features to save memory */
+#ifndef LUA_USE_APICHECK
+#define LUA_USE_APICHECK 0
+#endif
+
+/* Additional memory optimizations for SNES */
+/* Reduce string table size */
+#define MINSTRTABSIZE 64
+
+/* Reduce minimum string buffer size */
+#define LUA_MINBUFFER 16
+
+/* Reduce auxiliary library buffer size */
+#define LUAL_BUFFERSIZE ((int)(8 * sizeof(void*) * sizeof(lua_Number)))
+
+/* Reduce function name size for debug info */
+#define LUA_IDSIZE 32
+
+/* Disable garbage collection statistics to save memory */
+#define LUA_USE_GC_DEBUG 0
+
+/* Disable string interning optimization (saves memory but may be slower) */
+#define LUA_USE_STRING_INTERNING 0
+
 
 /*
 ** {====================================================================
@@ -122,7 +179,9 @@
 /*
 @@ LUA_32BITS enables Lua with 32-bit integers and 32-bit floats.
 */
+#ifndef LUA_32BITS
 #define LUA_32BITS	0
+#endif
 
 
 /*
@@ -745,10 +804,12 @@
 ** space (and to reserve some numbers for pseudo-indices).
 ** (It must fit into max(size_t)/32 and max(int)/2.)
 */
+#ifndef LUAI_MAXSTACK
 #if LUAI_IS32INT
 #define LUAI_MAXSTACK		1000000
 #else
 #define LUAI_MAXSTACK		15000
+#endif
 #endif
 
 
@@ -793,6 +854,41 @@
 ** Local configuration. You can use this space to add your redefinitions
 ** without modifying the main part of the file.
 */
+
+#ifdef LUA_USE_SNES_MEMORY
+/*
+** SNES Memory Manager Integration
+** Custom memory allocation functions for SNES homebrew
+*/
+#include "../snes_memory_manager.h"
+
+/* Override Lua's memory allocation functions */
+#define luaM_reallocv(L, b, on, n, e) \
+  ((b) ? (void *)((char *)snes_realloc_pool3((b), (on) * (e), (n) * (e)) - \
+                  (on) * (e)) : snes_malloc_pool3((n) * (e)))
+
+#define luaM_realloc(L, b, on, n) \
+  ((b) ? snes_realloc_pool3((b), (on), (n)) : snes_malloc_pool3((n)))
+
+#define luaM_malloc(L, s) snes_malloc_pool3((s))
+
+#define luaM_free(L, b) snes_free((b))
+
+/* Disable Lua's built-in memory management */
+#define luaM_new(L, t) ((t *)luaM_malloc(L, sizeof(t)))
+#define luaM_newvector(L, n, t) ((t *)luaM_malloc(L, (n) * sizeof(t)))
+#define luaM_newvectorchecked(L, n, t) ((t *)luaM_malloc(L, (n) * sizeof(t)))
+#define luaM_newuserdata(L, s) ((void *)luaM_malloc(L, (s)))
+
+/* Memory error handling */
+#define luaM_checksize(L, n, s) \
+  ((void)((n) <= (MAX_SIZET / (s)) ? 0 : luaM_toobig(L)))
+
+/* Disable garbage collection statistics for embedded system */
+#define luaC_condGC(L, pre, pos) pre; pos
+#define luaC_checkGC(L) ((void)0)
+
+#endif /* LUA_USE_SNES_MEMORY */
 
 
 

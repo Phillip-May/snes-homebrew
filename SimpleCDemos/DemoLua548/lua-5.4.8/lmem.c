@@ -22,6 +22,10 @@
 #include "lobject.h"
 #include "lstate.h"
 
+#ifdef LUA_USE_SNES_MEMORY
+#include "../snes_memory_manager.h"
+#endif
+
 
 
 /*
@@ -104,6 +108,14 @@ void *luaM_growaux_ (lua_State *L, void *block, int nelems, int *psize,
   char limit_str[16];
   char temp[16];
   int size_val, limit_val, temp_i, i, j;
+  
+  /* Debug: Print the actual values being compared */
+  /* This will help us understand what's happening */
+  if (strcmp(what, "opcodes") == 0) {
+    /* Only debug opcodes to avoid spam */
+    /* Debug output removed for SNES build */
+  }
+  
   if (nelems + 1 <= size)  /* does one extra element still fit? */
     return block;  /* nothing to be done */
   if (size >= limit / 2) {  /* cannot double it? */
@@ -242,6 +254,21 @@ static void *tryagain (lua_State *L, void *block,
 ** Generic allocation routine.
 */
 void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
+#ifdef LUA_USE_SNES_MEMORY
+  /* Use SNES memory manager for all allocations */
+  void *newblock;
+  if (nsize == 0) {
+    if (block != NULL) {
+      snes_free(block);
+    }
+    return NULL;
+  } else if (block == NULL) {
+    newblock = snes_malloc_pool3(nsize);
+  } else {
+    newblock = snes_realloc_pool3(block, osize, nsize);
+  }
+  return newblock;
+#else
   void *newblock;
   global_State *g = G(L);
   lua_assert((osize == 0) == (block == NULL));
@@ -254,6 +281,7 @@ void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
   lua_assert((nsize == 0) == (newblock == NULL));
   g->GCdebt = (g->GCdebt + nsize) - osize;
   return newblock;
+#endif
 }
 
 

@@ -31,6 +31,7 @@ FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 FUNCTIONATR void LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize);
 void initOAMCopy(unsigned char *pSource);			
+void initSA1(void);
 
 
 #endif

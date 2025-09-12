@@ -598,3 +598,22 @@ void init_tcc816_interrupts(void) {
     nmiSet(snesXC_nmi);
 }
 #endif
+
+/* Initialize SA1 BW-RAM mapping for F0:0000-FF:FFFF */
+void initSA1(void) {
+    /* Enable BW-RAM for both SNES and SA-1 CPUs */
+    SA1_SBWE = 0x80;  /* Enable SNES CPU BW-RAM write access */
+    SA1_CBWE = 0x80;  /* Enable SA-1 CPU BW-RAM write access */
+    
+    /* Map BW-RAM to SNES CPU address space */
+    SA1_BMAPS = 0x00; /* Map BW-RAM to $00-3F:$6000-$7FFF and $80-BF:$6000-$7FFF */
+    
+    /* Map BW-RAM to SA-1 CPU address space */
+    SA1_BMAP = 0x00;  /* Map BW-RAM to SA-1 CPU $00-3F:$6000-$7FFF and $80-BF:$6000-$7FFF */
+    
+    /* Configure Super MMC Bank F to map BW-RAM to F0:0000-FF:FFFF */
+    SA1_FXB = 0x07;   /* Set Super MMC Bank F to BW-RAM (B=0, AAA=111) */
+    
+    /* Configure BW-RAM write protection area (optional) */
+    SA1_BPWA = 0x00;  /* No write protection for BW-RAM area */
+}
