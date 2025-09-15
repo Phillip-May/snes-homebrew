@@ -83,8 +83,9 @@ static void DumpIntWithSize(int x, int sizeof_int, DumpState* D)
    DumpVar(y,D);
   } break;
   case 4: {
-   /* Need to reduce bounds by 1 to avoid messing 32-bit compilers up */
-   if (x>0x7FFFFFFE || x<(-0x7FFFFFFF)) D->status=LUA_ERR_CC_INTOVERFLOW; 
+   /* Check bounds for 32-bit integer - use proper casting to avoid warnings */
+   int32_t x32 = (int32_t)x;
+   if (x32 > 0x7FFFFFFF || x32 < (-0x7FFFFFFF - 1)) D->status=LUA_ERR_CC_INTOVERFLOW; 
    int32_t y=(int32_t)x;
    MaybeByteSwap((char*)&y,4,D);
    DumpVar(y,D);

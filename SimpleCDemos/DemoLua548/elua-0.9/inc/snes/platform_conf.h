@@ -37,6 +37,9 @@
 // Minimize memory usage
 #define LUAI_MAXCCALLS 200
 
+// Set memory optimization level for SNES
+#define LUA_OPTIMIZE_MEMORY 0
+
 // Platform-specific includes
 #include "type.h"
 

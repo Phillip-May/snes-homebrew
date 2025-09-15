@@ -57,6 +57,8 @@ static void save (LexState *ls, int c) {
     newsize = b->buffsize * 2;
     luaZ_resizebuffer(ls->L, b, newsize);
   }
+  
+  
   b->buffer[b->n++] = cast(char, c);
 }
 
@@ -98,6 +100,8 @@ void luaX_lexerror (LexState *ls, const char *msg, int token) {
   msg = luaO_pushfstring(ls->L, "%s:%d: %s", buff, ls->linenumber, msg);
   if (token)
     luaO_pushfstring(ls->L, "%s near " LUA_QS, msg, txtToken(ls, token));
+  
+  
   luaD_throw(ls->L, LUA_ERRSYNTAX);
 }
 
@@ -140,6 +144,7 @@ void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source) {
   ls->lastline = 1;
   ls->source = source;
   luaZ_resizebuffer(ls->L, ls->buff, LUA_MINBUFFER);  /* initialize buffer */
+  
   next(ls);  /* read first char */
 }
 
@@ -156,7 +161,8 @@ void luaX_setinput (lua_State *L, LexState *ls, ZIO *z, TString *source) {
 static int check_next (LexState *ls, const char *set) {
   if (!strchr(set, ls->current))
     return 0;
-  save_and_next(ls);
+  save(ls, ls->current);
+  next(ls);
   return 1;
 }
 
@@ -187,12 +193,17 @@ static void trydecpoint (LexState *ls, SemInfo *seminfo) {
 static void read_numeral (LexState *ls, SemInfo *seminfo) {
   lua_assert(isdigit(ls->current));
   do {
-    save_and_next(ls);
+    /* Replace macro with explicit calls */
+    save(ls, ls->current);
+    next(ls);
   } while (isdigit(ls->current) || ls->current == '.');
   if (check_next(ls, "Ee"))  /* `E'? */
     check_next(ls, "+-");  /* optional exponent sign */
-  while (isalnum(ls->current) || ls->current == '_')
-    save_and_next(ls);
+  while (isalnum(ls->current) || ls->current == '_') {
+    /* Replace macro with explicit calls */
+    save(ls, ls->current);
+    next(ls);
+  }
   save(ls, '\0');
   buffreplace(ls, '.', ls->decpoint);  /* follow locale for decimal point */
   if (!luaO_str2d(luaZ_buffer(ls->buff), &seminfo->r))  /* format error? */
@@ -204,9 +215,11 @@ static int skip_sep (LexState *ls) {
   int count = 0;
   int s = ls->current;
   lua_assert(s == '[' || s == ']');
-  save_and_next(ls);
+  save(ls, ls->current);
+  next(ls);
   while (ls->current == '=') {
-    save_and_next(ls);
+    save(ls, ls->current);
+  next(ls);
     count++;
   }
   return (ls->current == s) ? count : (-count) - 1;
@@ -216,7 +229,8 @@ static int skip_sep (LexState *ls) {
 static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
   int cont = 0;
   (void)(cont);  /* avoid warnings when `cont' is not used */
-  save_and_next(ls);  /* skip 2nd `[' */
+  save(ls, ls->current);
+  next(ls);  /* skip 2nd `[' */
   if (currIsNewline(ls))  /* string starts with a newline? */
     inclinenumber(ls);  /* skip it */
   for (;;) {
@@ -228,7 +242,8 @@ static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
 #if defined(LUA_COMPAT_LSTR)
       case '[': {
         if (skip_sep(ls) == sep) {
-          save_and_next(ls);  /* skip 2nd `[' */
+          save(ls, ls->current);
+  next(ls);  /* skip 2nd `[' */
           cont++;
 #if LUA_COMPAT_LSTR == 1
           if (sep == 0)
@@ -240,7 +255,8 @@ static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
 #endif
       case ']': {
         if (skip_sep(ls) == sep) {
-          save_and_next(ls);  /* skip 2nd `]' */
+          save(ls, ls->current);
+  next(ls);  /* skip 2nd `]' */
 #if defined(LUA_COMPAT_LSTR) && LUA_COMPAT_LSTR == 2
           cont--;
           if (sep == 0 && cont >= 0) break;
@@ -269,7 +285,8 @@ static void read_long_string (LexState *ls, SemInfo *seminfo, int sep) {
 
 
 static void read_string (LexState *ls, int del, SemInfo *seminfo) {
-  save_and_next(ls);
+  save(ls, ls->current);
+  next(ls);
   while (ls->current != del) {
     switch (ls->current) {
       case EOZ:
@@ -294,8 +311,10 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
           case '\r': save(ls, '\n'); inclinenumber(ls); continue;
           case EOZ: continue;  /* will raise an error next loop */
           default: {
-            if (!isdigit(ls->current))
-              save_and_next(ls);  /* handles \\, \", \', and \? */
+            if (!isdigit(ls->current)) {
+              save(ls, ls->current);
+              next(ls);  /* handles \\, \", \', and \? */
+            }
             else {  /* \xxx */
               int i = 0;
               c = 0;
@@ -315,10 +334,12 @@ static void read_string (LexState *ls, int del, SemInfo *seminfo) {
         continue;
       }
       default:
-        save_and_next(ls);
+        save(ls, ls->current);
+  next(ls);
     }
   }
-  save_and_next(ls);  /* skip delimiter */
+  save(ls, ls->current);
+  next(ls);  /* skip delimiter */
   seminfo->ts = luaX_newstring(ls, luaZ_buffer(ls->buff) + 1,
                                    luaZ_bufflen(ls->buff) - 2);
 }
@@ -387,7 +408,8 @@ static int llex (LexState *ls, SemInfo *seminfo) {
         return TK_STRING;
       }
       case '.': {
-        save_and_next(ls);
+        save(ls, ls->current);
+  next(ls);
         if (check_next(ls, ".")) {
           if (check_next(ls, "."))
             return TK_DOTS;   /* ... */
@@ -416,14 +438,21 @@ static int llex (LexState *ls, SemInfo *seminfo) {
           /* identifier or reserved word */
           TString *ts;
           int i;
+          
           do {
-            save_and_next(ls);
+            /* Replace macro with explicit calls */
+            save(ls, ls->current);
+            next(ls);
           } while (isalnum(ls->current) || ls->current == '_');
           /* look for reserved word */
           save(ls, '\0');
-          for (i = 0; i < NUM_RESERVED; i++)
-            if (!strcmp(luaX_tokens[i], luaZ_buffer(ls->buff)))
+          
+          
+          for (i = 0; i < NUM_RESERVED; i++) {
+            if (!strcmp(luaX_tokens[i], luaZ_buffer(ls->buff))) {
               return i + FIRST_RESERVED;
+            }
+          }
           ts = luaX_newstring(ls, luaZ_buffer(ls->buff),
                                   luaZ_bufflen(ls->buff) - 1);
           seminfo->ts = ts;

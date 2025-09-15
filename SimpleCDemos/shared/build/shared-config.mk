@@ -41,16 +41,18 @@ endif
 
 # VBCC65816 Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+	# Use the existing batch file approach but with direct calls
 	CC = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
 	AS = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
-	LD = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
-	CCFLAGS = +snes-his -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__
-	ASFLAGS = 
-	LDFLAGS = +snes-his -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt
+	LD = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vlink_direct.bat"
+	
+	# Compiler flags for incremental compilation
+	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__ -c
+	ASFLAGS = -816 -quiet -nowarn=62 -opt-branch -ldots -Fvobj
+	LDFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__
 	INCLUDES = 
 	OUTPUT_EXT = .smc
 	POST_LINK = 
-	VBCC_PATH = C:\vbcc65816\vbcc65816\vbcc65816_win\vbcc
 	COMPILER_NAME = vbcc65816
 endif
 
@@ -291,9 +293,12 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
 	$(POST_LINK)
 else
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
-	@echo "Compiling with VBCC65816 (all sources in one command)..."
-	@echo "C_SOURCES: $(C_SOURCES)"
-	@$(CC) $(CCFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
+	@echo "Compiling with VBCC65816 (incremental compilation)..."
+	@$(MAKE) $(OBJECTS)
+	@echo "Linking object files with vbcc..."
+	@echo "OBJECTS variable: $(OBJECTS)"
+	@echo "Compiling and linking all sources together..."
+	$(CC) $(LDFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
 	@echo "Compilation completed successfully"
 	$(POST_LINK)
 else
@@ -346,7 +351,12 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 # Compile C sources (pattern rule) - compile to object files for incremental linking
 $(BUILD_DIR)/%.o: %.c
 	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
-	$(CC) $(CCFLAGS) $(INCLUDES) -c -o $@ $<
+	$(CC) $(CCFLAGS) $(INCLUDES) -o $@ $<
+
+# Assemble ASM sources (pattern rule) - if needed
+$(BUILD_DIR)/%.o: %.s
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(AS) $(ASFLAGS) -o $@ $<
 endif
 
 # CC65 specific rules

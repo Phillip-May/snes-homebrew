@@ -127,7 +127,18 @@ int luaD_rawrunprotected (lua_State *L, Pfunc f, void *ud) {
   (*f)(L, ud);
   
   L->errorJmp = lj.previous;  /* restore old error handler */
-  return lj.status;  /* Will be 0 if successful */
+  
+  /* Check if an error occurred during the function call */
+  if (lj.status != 0) {
+    return lj.status;  /* Return the error status */
+  }
+  
+  /* Also check if the Lua state has an error status */
+  if (L->status != 0) {
+    return L->status;  /* Return the Lua state error status */
+  }
+  
+  return 0;  /* Success */
 }
 
 /* }====================================================== */
@@ -549,6 +560,7 @@ static void f_parser (lua_State *L, void *ud) {
   Proto *tf;
   Closure *cl;
   struct SParser *p = cast(struct SParser *, ud);
+  
   int c = luaZ_lookahead(p->z);
   luaC_checkGC(L);
   set_block_gc(L);  /* stop collector during parsing */
@@ -567,6 +579,7 @@ static void f_parser (lua_State *L, void *ud) {
 int luaD_protectedparser (lua_State *L, ZIO *z, const char *name) {
   struct SParser p;
   int status;
+  
   p.z = z; p.name = name;
   luaZ_initbuffer(L, &p.buff);
   status = luaD_pcall(L, f_parser, &p, savestack(L, L->top), L->errfunc);

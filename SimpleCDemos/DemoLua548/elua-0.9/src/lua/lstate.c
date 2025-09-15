@@ -30,8 +30,6 @@
 #include "platform.h"
 #endif
 
-/* Debug function declaration */
-extern void termM0PrintStringXY_scroll(const char* str, int x, int y);
 // BogdanM: linenoise clenaup
 #include "linenoise.h"
 
@@ -51,93 +49,23 @@ typedef struct LG {
 
 
 static void stack_init (lua_State *L1, lua_State *L) {
-  /* Debug: Add external debug function declaration */
-  extern void termM0PrintStringXY_scroll(const char* str, int x, int y);
-  static int debug_line = 10;
-  
-  termM0PrintStringXY_scroll("stack_init: start", 0, debug_line++);
-  
-  /* Check for stack corruption - verify L1 pointer is valid */
-  if (L1 == NULL) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: L1 NULL!", 0, debug_line++);
-    return;
-  }
-  
-  /* Check for stack corruption - verify L pointer is valid */
-  if (L == NULL) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: L NULL!", 0, debug_line++);
-    return;
-  }
-  
-  /* Check for stack corruption - verify L1 is in valid memory range (SA-1 SRAM) */
-  if (L1 < (lua_State*)0x400000 || L1 > (lua_State*)0x500000) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: L1 BAD!", 0, debug_line++);
-    return;
-  }
-  
   /* initialize CallInfo array */
-  termM0PrintStringXY_scroll("stack_init: luaM_newvector ci", 0, debug_line++);
   L1->base_ci = luaM_newvector(L, BASIC_CI_SIZE, CallInfo);
-  
-  /* Check if allocation succeeded */
-  if (L1->base_ci == NULL) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: CI ALLOC FAIL!", 0, debug_line++);
-    return;
-  }
-  
-  /* Check if allocated pointer is valid (SA-1 SRAM range) */
-  if (L1->base_ci < (CallInfo*)0x400000 || L1->base_ci > (CallInfo*)0x500000) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: CI BAD PTR!", 0, debug_line++);
-    return;
-  }
-  
-  termM0PrintStringXY_scroll("stack_init: ci alloc done", 0, debug_line++);
-  
   L1->ci = L1->base_ci;
   L1->size_ci = BASIC_CI_SIZE;
   L1->end_ci = L1->base_ci + L1->size_ci - 1;
   
-  /* Check for stack corruption - verify ci pointer is valid */
-  if (L1->ci == NULL) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: CI NULL!", 0, debug_line++);
-    return;
-  }
-  
   /* initialize stack array */
-  termM0PrintStringXY_scroll("stack_init: luaM_newvector stack", 0, debug_line++);
   L1->stack = luaM_newvector(L, BASIC_STACK_SIZE + EXTRA_STACK, TValue);
-  
-  /* Check if allocation succeeded */
-  if (L1->stack == NULL) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: STACK ALLOC FAIL!", 0, debug_line++);
-    return;
-  }
-  
-  /* Check if allocated pointer is valid (SA-1 SRAM range) */
-  if (L1->stack < (TValue*)0x400000 || L1->stack > (TValue*)0x500000) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: STACK BAD PTR!", 0, debug_line++);
-    return;
-  }
-  
-  termM0PrintStringXY_scroll("stack_init: stack alloc done", 0, debug_line++);
-  
   L1->stacksize = BASIC_STACK_SIZE + EXTRA_STACK;
   L1->top = L1->stack;
   L1->stack_last = L1->stack+(L1->stacksize - EXTRA_STACK)-1;
-  
-  /* Check for stack corruption - verify stack pointers are valid */
-  if (L1->top == NULL || L1->stack_last == NULL) {
-    termM0PrintStringXY_scroll("STACK CORRUPT: STACK PTRS NULL!", 0, debug_line++);
-    return;
-  }
   
   /* initialize first ci */
   L1->ci->func = L1->top;
   setnilvalue(L1->top++);  /* `function' entry for this `ci' */
   L1->base = L1->ci->base = L1->top;
   L1->ci->top = L1->top + LUA_MINSTACK;
-  
-  termM0PrintStringXY_scroll("stack_init: complete", 0, debug_line++);
 }
 
 
@@ -154,45 +82,14 @@ static void f_luaopen (lua_State *L, void *ud) {
   global_State *g = G(L);
   UNUSED(ud);
   
-  /* Debug: Add external debug function declaration */
-  extern void termM0PrintStringXY_scroll(const char* str, int x, int y);
-  static int debug_line = 0;
-  
-  termM0PrintStringXY_scroll("f_luaopen: start", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: stack_init", 0, debug_line++);
   stack_init(L, L);  /* init stack */
-  termM0PrintStringXY_scroll("f_luaopen: stack_init OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: luaH_new globals", 0, debug_line++);
   sethvalue(L, gt(L), luaH_new(L, 0, 2));  /* table of globals */
-  termM0PrintStringXY_scroll("f_luaopen: luaH_new globals OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: luaH_new registry", 0, debug_line++);
   sethvalue(L, registry(L), luaH_new(L, 0, 2));  /* registry */
-  termM0PrintStringXY_scroll("f_luaopen: luaH_new registry OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: luaS_resize", 0, debug_line++);
   luaS_resize(L, MINSTRTABSIZE);  /* initial size of string table */
-  termM0PrintStringXY_scroll("f_luaopen: luaS_resize OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: luaT_init", 0, debug_line++);
   luaT_init(L);
-  termM0PrintStringXY_scroll("f_luaopen: luaT_init OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: luaX_init", 0, debug_line++);
   luaX_init(L);
-  termM0PrintStringXY_scroll("f_luaopen: luaX_init OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: luaS_fix", 0, debug_line++);
   luaS_fix(luaS_newliteral(L, MEMERRMSG));
-  termM0PrintStringXY_scroll("f_luaopen: luaS_fix OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: GCthreshold", 0, debug_line++);
   g->GCthreshold = 4*g->totalbytes;
-  termM0PrintStringXY_scroll("f_luaopen: GCthreshold OK", 0, debug_line++);
-  
-  termM0PrintStringXY_scroll("f_luaopen: complete", 0, debug_line++);
 }
 
 
@@ -259,42 +156,15 @@ void luaE_freethread (lua_State *L, lua_State *L1) {
 
 
 LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
-  static int debug_line = 30;
-  
-  termM0PrintStringXY_scroll("lua_newstate: start", 0, debug_line++);
-  
   int i;
   lua_State *L;
   global_State *g;
   
-  termM0PrintStringXY_scroll("lua_newstate: alloc LG", 0, debug_line++);
   void *l = (*f)(ud, NULL, 0, state_size(LG));
-  if (l == NULL) {
-    termM0PrintStringXY_scroll("lua_newstate: alloc failed", 0, debug_line++);
-    return NULL;
-  }
-  termM0PrintStringXY_scroll("lua_newstate: alloc OK", 0, debug_line++);
-  
-  /* Check for corruption - verify allocated pointer is valid (SA-1 SRAM range) */
-  if (l < (void*)0x400000 || l > (void*)0x500000) {
-    termM0PrintStringXY_scroll("CORRUPT: l bad ptr!", 0, debug_line++);
-    return NULL;
-  }
+  if (l == NULL) return NULL;
   
   L = tostate(l);
   g = &((LG *)L)->g;
-  
-  /* Check for corruption - verify L pointer is valid */
-  if (L == NULL) {
-    termM0PrintStringXY_scroll("CORRUPT: L NULL!", 0, debug_line++);
-    return NULL;
-  }
-  
-  /* Check for corruption - verify g pointer is valid */
-  if (g == NULL) {
-    termM0PrintStringXY_scroll("CORRUPT: g NULL!", 0, debug_line++);
-    return NULL;
-  }
   
   L->next = NULL;
   L->tt = LUA_TTHREAD;
@@ -303,9 +173,7 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
   L->marked = luaC_white(g);
   set2bits(L->marked, FIXEDBIT, SFIXEDBIT);
   
-  termM0PrintStringXY_scroll("lua_newstate: preinit_state", 0, debug_line++);
   preinit_state(L, g);
-  termM0PrintStringXY_scroll("lua_newstate: preinit_state OK", 0, debug_line++);
   
   g->frealloc = f;
   g->ud = ud;
@@ -346,28 +214,24 @@ LUA_API lua_State *lua_newstate (lua_Alloc f, void *ud) {
 #else
   g->egcmode = 0;
 #endif
-  
+
 #ifdef EGC_INITIAL_MEMLIMIT
   g->memlimit = EGC_INITIAL_MEMLIMIT;
 #else
   g->memlimit = 0;
 #endif
-  
+
   for (i=0; i<NUM_TAGS; i++) g->mt[i] = NULL;
   
-  termM0PrintStringXY_scroll("lua_newstate: call f_luaopen", 0, debug_line++);
   if (luaD_rawrunprotected(L, f_luaopen, NULL) != 0) {
-    termM0PrintStringXY_scroll("lua_newstate: f_luaopen failed", 0, debug_line++);
     /* memory allocation error: free partial state */
     close_state(L);
     L = NULL;
   }
   else {
-    termM0PrintStringXY_scroll("lua_newstate: f_luaopen OK", 0, debug_line++);
     luai_userstateopen(L);
   }
   
-  termM0PrintStringXY_scroll("lua_newstate: return", 0, debug_line++);
   return L;
 }
 

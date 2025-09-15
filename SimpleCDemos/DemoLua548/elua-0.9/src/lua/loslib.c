@@ -37,7 +37,8 @@ static int os_pushresult (lua_State *L, int i, const char *filename) {
 
 
 static int os_execute (lua_State *L) {
-  lua_pushinteger(L, system(luaL_optstring(L, 1, NULL)));
+  /* system() not available on SNES - return error code */
+  lua_pushinteger(L, -1);
   return 1;
 }
 
@@ -217,6 +218,7 @@ static int os_setlocale (lua_State *L) {
 
 static int os_exit (lua_State *L) {
   exit(luaL_optint(L, 1, EXIT_SUCCESS));
+  return 0;  /* Never reached, but satisfies compiler */
 }
 
 #define MIN_OPT_LEVEL 1

@@ -12,6 +12,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* SNES-specific stubs for missing functions */
+#ifndef LUA_CROSS_COMPILER
+/* Stub for dm_getaddr - not available on SNES */
+static const char* dm_getaddr(int fd) {
+    (void)fd;  /* Suppress unused parameter warning */
+    return NULL;  /* Always return NULL on SNES */
+}
+
+/* Stub for fileno - not available on SNES */
+static int fileno(FILE *stream) {
+    (void)stream;  /* Suppress unused parameter warning */
+    return -1;  /* Always return -1 on SNES */
+}
+#endif
+
 
 /* This file uses only the official API of Lua.
 ** Any function declared here could be written as an application function.
@@ -635,11 +650,14 @@ LUALIB_API int luaL_loadfile (lua_State *L, const char *filename) {
     lf.f = fopen(filename, "r");
     if (lf.f == NULL) return errfile(L, "open", fnameindex);
 #ifndef LUA_CROSS_COMPILER
-    srcp = dm_getaddr(fileno(lf.f));
-    if (srcp) {
-      fseek(lf.f, 0, SEEK_END);
-      lf.totsize = ftell(lf.f);
-      fseek(lf.f, 0, SEEK_SET);
+    {
+      int fd = fileno(lf.f);
+      srcp = dm_getaddr(fd);
+      if (srcp) {
+        fseek(lf.f, 0, SEEK_END);
+        lf.totsize = ftell(lf.f);
+        fseek(lf.f, 0, SEEK_SET);
+      }
     }
 #endif
   }
@@ -653,7 +671,9 @@ LUALIB_API int luaL_loadfile (lua_State *L, const char *filename) {
     lf.f = freopen(filename, "rb", lf.f);  /* reopen in binary mode */
     if (lf.f == NULL) return errfile(L, "reopen", fnameindex);
     /* skip eventual `#!...' */
-   while ((c = getc(lf.f)) != EOF && c != LUA_SIGNATURE[0]) ;
+    while ((c = getc(lf.f)) != EOF && c != LUA_SIGNATURE[0]) {
+        /* Empty body - intentionally skip characters */
+    }
     lf.extraline = 0;
   }
   ungetc(c, lf.f);
@@ -697,6 +717,7 @@ LUALIB_API int luaL_loadbuffer (lua_State *L, const char *buff, size_t size,
   LoadS ls;
   ls.s = buff;
   ls.size = size;
+  
   return lua_load(L, getS, &ls, name);
 }
 
@@ -732,7 +753,9 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
   void *nptr;
 
   if (nsize == 0) {
-    free(ptr);
+    if (ptr != NULL) {
+      luaM_free(L, ptr);
+    }
     return NULL;
   }
   if (L != NULL && (mode & EGC_ALWAYS)) /* always collect memory if requested */
@@ -744,10 +767,10 @@ static void *l_alloc (void *ud, void *ptr, size_t osize, size_t nsize) {
     if(G(L)->memlimit > 0 && (mode & EGC_ON_MEM_LIMIT) && l_check_memlimit(L, nsize - osize))
       return NULL;
   }
-  nptr = realloc(ptr, nsize);
+  nptr = luaM_realloc_(L, ptr, osize, nsize);
   if (nptr == NULL && L != NULL && (mode & EGC_ON_ALLOC_FAILURE)) {
     luaC_fullgc(L); /* emergency full collection. */
-    nptr = realloc(ptr, nsize); /* try allocation again */
+    nptr = luaM_realloc_(L, ptr, osize, nsize); /* try allocation again */
   }
   return nptr;
 }

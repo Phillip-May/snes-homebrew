@@ -24,7 +24,6 @@
 #include <inttypes.h>
 #endif
 
-
 /* Define if should use homemade str* functions. */
 
 /*#define MYSTRFNS */
