@@ -393,5 +393,9 @@ const LUA_REG_TYPE dblib[] = {
 };
 
 LUALIB_API int luaopen_debug (lua_State *L) {
+#if defined(TEST_DEBUG_RETURN_0)
+  return 0;  // Test: Force debug library to return 0
+#else
   LREGISTER(L, LUA_DBLIBNAME, dblib);
+#endif
 }

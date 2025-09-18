@@ -345,7 +345,7 @@ LUA_API int lua_toboolean (lua_State *L, int idx) {
 }
 
 
-LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
+LUA_API const char *lua_tolstring (lua_State *L, int idx, uint32_t *len) {
   StkId o = index2adr(L, idx);
   if (!ttisstring(o)) {
     lua_lock(L);  /* `luaV_tostring' may create a new string */
@@ -363,7 +363,7 @@ LUA_API const char *lua_tolstring (lua_State *L, int idx, size_t *len) {
 }
 
 
-LUA_API size_t lua_objlen (lua_State *L, int idx) {
+LUA_API uint32_t lua_objlen (lua_State *L, int idx) {
   StkId o = index2adr(L, idx);
   switch (ttype(o)) {
     case LUA_TSTRING: return tsvalue(o)->len;
@@ -451,7 +451,7 @@ LUA_API void lua_pushinteger (lua_State *L, lua_Integer n) {
 }
 
 
-LUA_API void lua_pushlstring (lua_State *L, const char *s, size_t len) {
+LUA_API void lua_pushlstring (lua_State *L, const char *s, uint32_t len) {
   lua_lock(L);
   luaC_checkGC(L);
   setsvalue2s(L, L->top, luaS_newlstr(L, s, len));
@@ -460,7 +460,7 @@ LUA_API void lua_pushlstring (lua_State *L, const char *s, size_t len) {
 }
 
 
-LUA_API void lua_pushrolstring (lua_State *L, const char *s, size_t len) {
+LUA_API void lua_pushrolstring (lua_State *L, const char *s, uint32_t len) {
   lua_lock(L);
   luaC_checkGC(L);
   setsvalue2s(L, L->top, luaS_newrolstr(L, s, len));
@@ -1097,7 +1097,7 @@ LUA_API void lua_setallocf (lua_State *L, lua_Alloc f, void *ud) {
 }
 
 
-LUA_API void *lua_newuserdata (lua_State *L, size_t size) {
+LUA_API void *lua_newuserdata (lua_State *L, uint32_t size) {
   Udata *u;
   lua_lock(L);
   luaC_checkGC(L);

@@ -503,7 +503,7 @@ static int f_flush (lua_State *L) {
 
 #define MIN_OPT_LEVEL 2
 #include "lrodefs.h"
-#if LUA_OPTIMIZE_MEMORY == 2
+#if LUA_OPTIMIZE_MEMORY == 2 || defined(ENABLE_IO_OPTIMIZATIONS)
 const LUA_REG_TYPE iolib_funcs[] = {
 #else
 const LUA_REG_TYPE iolib[] = {
@@ -522,7 +522,7 @@ const LUA_REG_TYPE iolib[] = {
   {LNILKEY, LNILVAL}
 };
 
-#if LUA_OPTIMIZE_MEMORY == 2
+#if LUA_OPTIMIZE_MEMORY == 2 || defined(ENABLE_IO_OPTIMIZATIONS)
 static int luaL_index(lua_State *L)
 {
   return luaR_findfunction(L, iolib_funcs);

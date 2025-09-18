@@ -43,6 +43,7 @@ extern const luaR_entry syslib[];
 extern const luaR_entry tab_funcs[];
 extern const luaR_entry dblib[];
 extern const luaR_entry co_funcs[];
+extern const luaR_entry math_map[];
 #if defined(LUA_PLATFORM_LIBS_ROM) && LUA_OPTIMIZE_MEMORY == 2
 #undef _ROM
 #define _ROM( name, openf, table ) extern const luaR_entry table[];
@@ -55,7 +56,7 @@ const luaR_table lua_rotable[] =
   {LUA_TABLIBNAME, tab_funcs},
   {LUA_DBLIBNAME, dblib},
   {LUA_COLIBNAME, co_funcs},
-#if defined(LUA_PLATFORM_LIBS_ROM) && LUA_OPTIMIZE_MEMORY == 2
+#if defined(LUA_PLATFORM_LIBS_ROM) && LUA_OPTIMIZE_MEMORY > 0
 #undef _ROM
 #define _ROM( name, openf, table ) { name, table },
   LUA_PLATFORM_LIBS_ROM

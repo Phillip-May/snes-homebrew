@@ -58,18 +58,18 @@ endif
 
 # Calypsi Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
-	CC = "C:\calypsi-65816-5.11\bin\cc65816"
-	AS = "C:\calypsi-65816-5.11\bin\cc65816"
-	LD = "C:\calypsi-65816-5.11\bin\ln65816"
+	CC = "C:\calypsi-65816-5.12\bin\cc65816"
+	AS = "C:\calypsi-65816-5.12\bin\cc65816"
+	LD = "C:\calypsi-65816-5.12\bin\ln65816"
 	# Check for huge model - requires --enable-huge-attribute with large data model
 	ifeq ($(ROM_TYPE),huge)
-#		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=huge --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
-		CCFLAGS = --core=65816 -O0 --code-model=large --data-model=huge --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
-		STDLIB = C:/calypsi-65816-5.11/lib-huge/clib-huge.a
+#		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=huge --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		CCFLAGS += --core=65816 -O0 --code-model=large --data-model=huge --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		STDLIB = C:/calypsi-65816-5.12/lib-huge/clib-huge.a
 		LDFLAGS = --raw-multiple-memories --rom-code --no-tree-shaking --no-copy-initialize huge
 	else
-		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
-		STDLIB = C:/calypsi-65816-5.11/lib/clib-lc-ld-f256.a
+		CCFLAGS += --core=65816 -O2 --speed --code-model=large --data-model=large --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		STDLIB = C:/calypsi-65816-5.12/lib/clib-lc-ld-f256.a
 		LDFLAGS = --raw-multiple-memories --rom-code
 	endif
 	ASFLAGS =
@@ -93,7 +93,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_LoROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
 		endif
 	endif
-	CALYPSI_PATH = C:\calypsi-65816-5.11
+	CALYPSI_PATH = C:\calypsi-65816-5.12
 	COMPILER_NAME = calypsi
 endif
 

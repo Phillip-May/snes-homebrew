@@ -6,6 +6,7 @@
 
 
 #include <string.h>
+#include <stdint.h>  /* For uint32_t */
 
 #define lstring_c
 #define LUA_CORE
@@ -80,11 +81,11 @@ static TString *newlstr (lua_State *L, const char *str, size_t l,
 }
 
 
-static TString *luaS_newlstr_helper (lua_State *L, const char *str, size_t l, int readonly) {
+static TString *luaS_newlstr_helper (lua_State *L, const char *str, uint32_t l, int readonly) {
   GCObject *o;
   unsigned int h = cast(unsigned int, l);  /* seed */
-  size_t step = (l>>5)+1;  /* if string is too long, don't hash all its chars */
-  size_t l1;
+  uint32_t step = (l>>5)+1;  /* if string is too long, don't hash all its chars */
+  uint32_t l1;
   for (l1=l; l1>=step; l1-=step)  /* compute hash */
     h = h ^ ((h<<5)+(h>>2)+cast(unsigned char, str[l1-1]));
   for (o = G(L)->strt.hash[lmod(h, G(L)->strt.size)];
@@ -111,7 +112,7 @@ static int lua_is_ptr_in_ro_area(const char *p) {
 #endif
 }
 
-TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
+TString *luaS_newlstr (lua_State *L, const char *str, uint32_t l) {
   // If the pointer is in a read-only memory and the string is at least 4 chars in length,
   // create it as a read-only string instead
   if(lua_is_ptr_in_ro_area(str) && l+1 > sizeof(char**) && l == strlen(str))
@@ -121,7 +122,7 @@ TString *luaS_newlstr (lua_State *L, const char *str, size_t l) {
 }
 
 
-LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, size_t l) {
+LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, uint32_t l) {
   if(l+1 > sizeof(char**) && l == strlen(str))
     return luaS_newlstr_helper(L, str, l, LUAS_READONLY_STRING);
   else // no point in creating a RO string, as it would actually be larger
@@ -129,7 +130,7 @@ LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, size_t l) {
 }
 
 
-Udata *luaS_newudata (lua_State *L, size_t s, Table *e) {
+Udata *luaS_newudata (lua_State *L, uint32_t s, Table *e) {
   Udata *u;
   if (s > MAX_SIZET - sizeof(Udata))
     luaM_toobig(L);

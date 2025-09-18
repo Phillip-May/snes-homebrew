@@ -7,9 +7,9 @@ BUILD_DIR = build
 ROM_TYPE = huge
 ROM_MAPPING = HiROM
 
-# Enable floating point support for WDC816CC
-# WDC816CC now supports floating point with both math and standard libraries
-USE_FLOATING_POINT = 1
+# Disable floating point support for SNES optimization
+# Use integer-only arithmetic for better performance and memory usage
+USE_FLOATING_POINT = 0
 
 # Paths to shared build system
 SHARED_BUILD_DIR = ../shared/build
@@ -50,6 +50,11 @@ C_SOURCES = mainBankZero.c snes_memory_manager.c $(LUA_ESSENTIAL_SOURCES) $(SHAR
 # Add eLua include directories
 INCLUDES += -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib"
 
+# Disable floating-point support at compiler level
+# Note: Calypsi uses CCFLAGS, not CFLAGS
+# CRITICAL: Define LUA_NUMBER_INTEGRAL at compiler level to ensure it's processed before luaconf.h
+CCFLAGS += -DLUA_NUMBER_INTEGRAL -DNO_FLOAT -DNO_DOUBLE -D__STRICT_ANSI__ -DLUA_ANSI
+
 # Override STDLIB for huge mode - we don't need the huge library since we built successfully without it
 ifeq ($(ROM_TYPE),huge)
 	STDLIB = 
@@ -70,7 +75,7 @@ vpath %.c $(LUA_SRC_DIR) $(PLATFORM_SRC_DIR) elua-0.9/src $(SHARED_SRC_DIR) .
 # Custom build rule for problematic files (compile without huge attribute due to compiler bug)
 # $(BUILD_DIR)/lstate.o: $(LUA_SRC_DIR)/lstate.c
 #	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
-#	"C:\calypsi-65816-5.11\bin\cc65816" --core=65816 -O2 --speed --code-model=large --data-model=large --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1 -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -o $@ $<
+#	"C:\calypsi-65816-5.12\bin\cc65816" --core=65816 -O2 --speed --code-model=large --data-model=large --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1 -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -o $@ $<
 
 # Target to copy pre-compiled files from build-backup-huge
 copy-huge-files:

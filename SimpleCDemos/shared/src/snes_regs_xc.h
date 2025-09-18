@@ -633,6 +633,27 @@ HDMA Line Counter Register          $43xA ; rccc cccc, r = Repeat, c = Line coun
 #define SA1_VDA       ((vu8)0x2259) // Use as array: [0]=low, [1]=mid, [2]=high
 
 
+
+// MSU1 Register Definitions
+#define MSU1_STATUS     (*(volatile uint8_t*)0x2000)
+#define MSU1_DATA       (*(volatile uint8_t*)0x2001)
+#define MSU1_IDENT      (*(volatile uint8_t*)0x2002)
+#define MSU1_OFFSET     (*(volatile uint32_t*)0x2000)
+#define MSU1_TRACK      (*(volatile uint16_t*)0x2004)
+#define MSU1_VOLUME     (*(volatile uint8_t*)0x2006)
+#define MSU1_CONTROL    (*(volatile uint8_t*)0x2007)
+
+// MSU1 Status Bits
+#define MSU1_STATUS_DATA_BUSY    (1 << 7)
+#define MSU1_STATUS_AUDIO_BUSY  (1 << 6)
+#define MSU1_STATUS_AUDIO_REPEAT (1 << 5)
+#define MSU1_STATUS_AUDIO_PLAY  (1 << 4)
+
+// MSU1 Control Bits
+#define MSU1_CONTROL_PLAY       (1 << 0)
+#define MSU1_CONTROL_REPEAT     (1 << 1)
+
+
 //A union structure for OAM duplicates so the compiler creates less warnings.
 //Table 2 consists of 2 32 bytes with 2 bit entries
 //Fist bit is the X flag

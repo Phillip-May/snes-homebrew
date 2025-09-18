@@ -374,6 +374,8 @@ const LUA_REG_TYPE math_map[] = {
 LUALIB_API int luaopen_math (lua_State *L) {
 #if LUA_OPTIMIZE_MEMORY > 0
   return 0;
+#elif defined(TEST_MATH_RETURN_0)
+  return 0;  // Test: Force math library to return 0
 #else
   luaL_register(L, LUA_MATHLIBNAME, math_map);
 # if defined LUA_NUMBER_INTEGRAL

@@ -7,6 +7,7 @@
 #ifndef lstring_h
 #define lstring_h
 
+#include <stdint.h>  /* For uint32_t */
 
 #include "lgc.h"
 #include "lobject.h"
@@ -27,8 +28,8 @@
 #define luaS_isreadonly(s) testbit((s)->marked, READONLYBIT)
 
 LUAI_FUNC void luaS_resize (lua_State *L, int newsize);
-LUAI_FUNC Udata *luaS_newudata (lua_State *L, size_t s, Table *e);
-LUAI_FUNC TString *luaS_newlstr (lua_State *L, const char *str, size_t l);
-LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, size_t l);
+LUAI_FUNC Udata *luaS_newudata (lua_State *L, uint32_t s, Table *e);
+LUAI_FUNC TString *luaS_newlstr (lua_State *L, const char *str, uint32_t l);
+LUAI_FUNC TString *luaS_newrolstr (lua_State *L, const char *str, uint32_t l);
 
 #endif

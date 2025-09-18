@@ -7,6 +7,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <stdint.h>  /* For uint32_t */
 
 #define lmem_c
 #define LUA_CORE
@@ -23,7 +24,7 @@
 
 /*
 ** About the realloc function:
-** void * frealloc (void *ud, void *ptr, size_t osize, size_t nsize);
+** void * frealloc (void *ud, void *ptr, uint32_t osize, uint32_t nsize);
 ** (`osize' is the old size, `nsize' is the new size)
 **
 ** Lua ensures that (ptr == NULL) iff (osize == 0).
@@ -44,24 +45,29 @@
 #define MINSIZEARRAY	4
 
 
-void *luaM_growaux_ (lua_State *L, void *block, int *size, size_t size_elems,
+void *luaM_growaux_ (lua_State *L, void *block, int *size, uint32_t size_elems,
                      int limit, const char *errormsg) {
   void *newblock;
-  int newsize;
+  uint32_t newsize;  /* Use 32-bit to prevent overflow */
   
   if (*size >= limit/2) {  /* cannot double it? */
     if (*size >= limit)  /* cannot grow even a little? */
       luaG_runerror(L, errormsg);
-    newsize = limit;  /* still have at least one free place */
+    newsize = (uint32_t)limit;  /* still have at least one free place */
   }
   else {
-    newsize = (*size)*2;
+    newsize = (uint32_t)(*size) * 2;  /* Explicit 32-bit arithmetic */
     if (newsize < MINSIZEARRAY)
       newsize = MINSIZEARRAY;  /* minimum size */
+    
+    /* CRITICAL: Cap buffer growth to prevent 65KB allocations on SNES */
+    if (newsize > 32768) {  /* Cap at 32KB - fits in largest blocks */
+      newsize = 32768;
+    }
   }
   
-  newblock = luaM_reallocv(L, block, *size, newsize, size_elems);
-  *size = newsize;  /* update only when everything else is OK */
+  newblock = luaM_reallocv(L, block, *size, (int)newsize, size_elems);
+  *size = (int)newsize;  /* update only when everything else is OK - cast back to int */
   return newblock;
 }
 
@@ -71,8 +77,8 @@ void *luaM_toobig (lua_State *L) {
   return NULL;  /* to avoid warnings */
 }
 
-void *luaM_reallocv_impl (lua_State *L, void *block, int oldn, int n, size_t size_elem) {
-  void* result = luaM_realloc_(L, block, oldn * size_elem, n * size_elem);
+void *luaM_reallocv_impl (lua_State *L, void *block, int oldn, int n, uint32_t size_elem) {
+  void* result = luaM_realloc_(L, block, (uint32_t)oldn * size_elem, (uint32_t)n * size_elem);
   return result;
 }
 
@@ -81,14 +87,14 @@ void *luaM_reallocv_impl (lua_State *L, void *block, int oldn, int n, size_t siz
 /*
 ** generic allocation routine.
 */
-void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
+void *luaM_realloc_ (lua_State *L, void *block, uint32_t osize, uint32_t nsize) {
   global_State *g = G(L);
 
   lua_assert((osize == 0) == (block == NULL));
 
   /* Call our allocator directly to bypass calling convention issues */
   extern void* snes_lua_alloc(void *ud, void *ptr, size_t osize, size_t nsize);
-  block = snes_lua_alloc(g->ud, block, osize, nsize);
+  block = snes_lua_alloc(g->ud, block, (size_t)osize, (size_t)nsize);
 
   if (block == NULL && nsize > 0) {
     luaD_throw(L, LUA_ERRMEM);

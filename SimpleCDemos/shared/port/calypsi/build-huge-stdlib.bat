@@ -2,7 +2,7 @@
 REM Build Calypsi Standard Library with Huge Attribute
 REM This script rebuilds the C runtime library with --enable-huge-attribute
 
-set CALYPSI_ROOT=C:\calypsi-65816-5.11
+set CALYPSI_ROOT=C:\calypsi-65816-5.12
 set SRC_DIR=%CALYPSI_ROOT%\src
 set BUILD_DIR=%CALYPSI_ROOT%\lib-huge
 set CC=%CALYPSI_ROOT%\bin\cc65816

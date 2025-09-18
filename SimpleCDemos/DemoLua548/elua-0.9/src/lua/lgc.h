@@ -7,6 +7,7 @@
 #ifndef lgc_h
 #define lgc_h
 
+#include <stdint.h>  /* For uint32_t */
 
 #include "lobject.h"
 
@@ -120,7 +121,7 @@
 #define luaC_objbarriert(L,t,o)  \
    { if (iswhite(obj2gco(o)) && isblack(obj2gco(t))) luaC_barrierback(L,t); }
 
-LUAI_FUNC size_t luaC_separateudata (lua_State *L, int all);
+LUAI_FUNC uint32_t luaC_separateudata (lua_State *L, int all);
 LUAI_FUNC void luaC_callGCTM (lua_State *L);
 LUAI_FUNC void luaC_freeall (lua_State *L);
 LUAI_FUNC void luaC_step (lua_State *L);

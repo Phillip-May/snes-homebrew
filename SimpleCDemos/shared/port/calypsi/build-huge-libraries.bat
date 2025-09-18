@@ -3,7 +3,7 @@ REM Build Calypsi C libraries with huge attribute enabled
 REM This script builds the C runtime library with --enable-huge-attribute
 REM for use with the huge data/code model
 
-set CALYPSI_PATH=C:\calypsi-65816-5.11
+set CALYPSI_PATH=C:\calypsi-65816-5.12
 set SRC_DIR=%CALYPSI_PATH%\src
 set LIB_DIR=%CALYPSI_PATH%\lib
 set BUILD_DIR=%CALYPSI_PATH%\library-build

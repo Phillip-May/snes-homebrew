@@ -19,20 +19,28 @@ typedef struct {
     uint32_t total_freed;
 } snes_memory_manager_t;
 
-/* Function declarations */
+/* Function declarations - NO size_t, use explicit uint32_t */
 void snes_memory_init(void);
 int snes_test_sa1_sram(void);
 uint8_t* snes_find_sa1_sram_end(void);
-void* snes_malloc(size_t size);
+void* snes_malloc(uint32_t size);
 void snes_free(void* ptr);
-void* snes_realloc(void* ptr, size_t old_size, size_t new_size);
+void* snes_realloc(void* ptr, uint32_t old_size, uint32_t new_size);
 void snes_memory_stats(void);
+uint32_t snes_get_free_memory(void);
+uint32_t snes_get_largest_free_block(void);
+void snes_force_coalesce(void);
+void snes_debug_free_list(void);
 
-/* Pool3-specific allocation functions for Lua */
-void* snes_malloc_pool3(size_t size);
-void* snes_realloc_pool3(void* ptr, size_t old_size, size_t new_size);
+/* Pool3-specific allocation functions for Lua - NO size_t */
+void* snes_malloc_pool3(uint32_t size);
+void* snes_realloc_pool3(void* ptr, uint32_t old_size, uint32_t new_size);
 
 /* Global memory manager instance */
 extern snes_memory_manager_t g_mem_manager;
+
+/* Free list head for debugging */
+struct mem_block;
+extern struct mem_block *free_list_head;
 
 #endif /* SNES_MEMORY_MANAGER_H */

@@ -5,6 +5,7 @@
 */
 
 #include <string.h>
+#include <stdint.h>  /* For uint32_t */
 
 #define lgc_c
 #define LUA_CORE
@@ -125,9 +126,9 @@ static void marktmu (global_State *g) {
 
 
 /* move `dead' udata that need finalization to list `tmudata' */
-size_t luaC_separateudata (lua_State *L, int all) {
+uint32_t luaC_separateudata (lua_State *L, int all) {
   global_State *g = G(L);
-  size_t deadmem = 0;
+  uint32_t deadmem = 0;
   GCObject **p = &g->mainthread->next;
   GCObject *curr;
   while ((curr = *p) != NULL) {
@@ -288,8 +289,8 @@ static l_mem propagatemark (global_State *g) {
       g->gray = h->gclist;
       if (traversetable(g, h))  /* table is weak? */
         black2gray(o);  /* keep it gray */
-      return sizeof(Table) + sizeof(TValue) * h->sizearray +
-                             sizeof(Node) * sizenode(h);
+      return (uint32_t)sizeof(Table) + (uint32_t)sizeof(TValue) * (uint32_t)h->sizearray +
+                             (uint32_t)sizeof(Node) * (uint32_t)sizenode(h);
     }
     case LUA_TFUNCTION: {
       Closure *cl = gco2cl(o);
@@ -305,27 +306,27 @@ static l_mem propagatemark (global_State *g) {
       g->grayagain = o;
       black2gray(o);
       traversestack(g, th);
-      return sizeof(lua_State) + sizeof(TValue) * th->stacksize +
-                                 sizeof(CallInfo) * th->size_ci;
+      return (uint32_t)sizeof(lua_State) + (uint32_t)sizeof(TValue) * (uint32_t)th->stacksize +
+                                 (uint32_t)sizeof(CallInfo) * (uint32_t)th->size_ci;
     }
     case LUA_TPROTO: {
       Proto *p = gco2p(o);
       g->gray = p->gclist;
       traverseproto(g, p);
-      return sizeof(Proto) + sizeof(Proto *) * p->sizep +
-                             sizeof(TValue) * p->sizek + 
-                             sizeof(LocVar) * p->sizelocvars +
-                             sizeof(TString *) * p->sizeupvalues +
-                             (proto_is_readonly(p) ? 0 : sizeof(Instruction) * p->sizecode +
-                                                         sizeof(int) * p->sizelineinfo);
+      return (uint32_t)sizeof(Proto) + (uint32_t)sizeof(Proto *) * p->sizep +
+                             (uint32_t)sizeof(TValue) * p->sizek + 
+                             (uint32_t)sizeof(LocVar) * p->sizelocvars +
+                             (uint32_t)sizeof(TString *) * p->sizeupvalues +
+                             (proto_is_readonly(p) ? 0 : (uint32_t)sizeof(Instruction) * p->sizecode +
+                                                         (uint32_t)sizeof(int) * p->sizelineinfo);
     }
     default: lua_assert(0); return 0;
   }
 }
 
 
-static size_t propagateall (global_State *g) {
-  size_t m = 0;
+static uint32_t propagateall (global_State *g) {
+  uint32_t m = 0;
   while (g->gray) m += propagatemark(g);
   return m;
 }
@@ -440,7 +441,7 @@ static void checkSizes (lua_State *L) {
   if (luaZ_bufflen(&g->buff) > 0) return;
   /* check size of buffer */
   if (luaZ_sizebuffer(&g->buff) > LUA_MINBUFFER*2) {  /* buffer too big? */
-    size_t newsize = luaZ_sizebuffer(&g->buff) / 2;
+    uint32_t newsize = (uint32_t)luaZ_sizebuffer(&g->buff) / 2;
     luaZ_resizebuffer(L, &g->buff, newsize);
   }
 }
@@ -528,7 +529,7 @@ static void remarkupvals (global_State *g) {
 
 static void atomic (lua_State *L) {
   global_State *g = G(L);
-  size_t udsize;  /* total size of userdata to be finalized */
+  uint32_t udsize;  /* total size of userdata to be finalized */
   /* remark occasional upvalues of (maybe) dead threads */
   remarkupvals(g);
   /* traverse objects cautch by write barrier and by 'remarkupvals' */

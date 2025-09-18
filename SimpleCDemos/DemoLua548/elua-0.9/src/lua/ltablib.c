@@ -283,5 +283,9 @@ const LUA_REG_TYPE tab_funcs[] = {
 };
 
 LUALIB_API int luaopen_table (lua_State *L) {
+#if defined(TEST_TABLE_RETURN_0)
+  return 0;  // Test: Force table library to return 0
+#else
   LREGISTER(L, LUA_TABLIBNAME, tab_funcs);
+#endif
 }

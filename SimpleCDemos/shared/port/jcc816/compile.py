@@ -57,6 +57,16 @@ def main():
         else:
             print(f"Warning: Source file not found: {source_path}")
     
+    # Copy all folders except build directory to build directory
+    for item in os.listdir(work_dir):
+        item_path = os.path.join(work_dir, item)
+        if os.path.isdir(item_path) and item != "build":
+            dest_folder = os.path.join(build_dir, item)
+            if os.path.exists(dest_folder):
+                shutil.rmtree(dest_folder)
+            shutil.copytree(item_path, dest_folder)
+            print(f"Copied folder: {item} -> {dest_folder}")
+    
     # Copy header files that the source code needs
     header_files = [
         ("snes_regs_xc.h", [os.path.join(work_dir, "..", "shared", "src", "snes_regs_xc.h")]),

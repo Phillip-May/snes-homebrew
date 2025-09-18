@@ -857,7 +857,7 @@ const LUA_REG_TYPE strlib[] = {
 };
 
 
-#if LUA_OPTIMIZE_MEMORY != 2
+#if LUA_OPTIMIZE_MEMORY != 2 && !defined(DISABLE_STRING_METATABLE)
 static void createmetatable (lua_State *L) {
   lua_createtable(L, 0, 1);  /* create metatable for strings */
   lua_pushliteral(L, "");  /* dummy string */
@@ -880,7 +880,9 @@ LUALIB_API int luaopen_string (lua_State *L) {
   lua_getfield(L, -1, "gmatch");
   lua_setfield(L, -2, "gfind");
 #endif
+#if !defined(DISABLE_STRING_METATABLE)
   createmetatable(L);
+#endif
   return 1;
 #else
   lua_pushliteral(L,"");

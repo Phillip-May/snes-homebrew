@@ -10,6 +10,7 @@
 
 
 #include <stdarg.h>
+#include <stdint.h>  /* For uint32_t */
 
 
 #include "llimits.h"
@@ -361,7 +362,7 @@ typedef union TString {
   struct {
     CommonHeader;
     unsigned int hash;
-    size_t len;
+    uint32_t len;
   } tsv;
 } TString;
 
@@ -377,7 +378,7 @@ typedef union Udata {
     CommonHeader;
     struct Table *metatable;
     struct Table *env;
-    size_t len;
+    uint32_t len;
   } uv;
 } Udata;
 
@@ -396,12 +397,12 @@ typedef struct Proto {
   struct LocVar *locvars;  /* information about local variables */
   TString **upvalues;  /* upvalue names */
   TString  *source;
-  int sizeupvalues;
-  int sizek;  /* size of `k' */
-  int sizecode;
-  int sizelineinfo;
-  int sizep;  /* size of `p' */
-  int sizelocvars;
+  uint32_t sizeupvalues;
+  uint32_t sizek;  /* size of `k' */
+  uint32_t sizecode;
+  uint32_t sizelineinfo;
+  uint32_t sizep;  /* size of `p' */
+  uint32_t sizelocvars;
   int linedefined;
   int lastlinedefined;
   GCObject *gclist;

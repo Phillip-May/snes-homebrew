@@ -245,5 +245,9 @@ const LUA_REG_TYPE syslib[] = {
 
 
 LUALIB_API int luaopen_os (lua_State *L) {
+#if defined(TEST_OS_RETURN_0)
+  return 0;  // Test: Force os library to return 0
+#else
   LREGISTER(L, LUA_OSLIBNAME, syslib);
+#endif
 }
