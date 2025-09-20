@@ -163,7 +163,10 @@ void initSNES(uint8_t ROMSPEED){
     REG_VTIMEL = 0x00; // V-Count Timer Setting (Lower 8-Bit) = 0 ($4209)
     REG_VTIMEH = 0x00; // V-Count Timer Setting (Upper 1-Bit) = 0 ($420A)
     REG_MDMAEN = 0x00; // Select General Purpose DMA Channels & Start Transfer = 0 ($420B)
-    REG_HDMAEN = 0x00; // Select H-Blank DMA (H-DMA) Channels = 0 ($420C)	
+    REG_HDMAEN = 0x00; // Select H-Blank DMA (H-DMA) Channels = 0 ($420C)
+    
+    // Initialize interrupt enable register - disable all interrupts initially
+    REG_NMITIMEN = 0x00; // Disable NMI, V-IRQ, H-IRQ, and Auto-Joypad Read ($4200)	
 	
     //Clear OAM
 	for(i = 0; i < 0x80; i++){
@@ -483,7 +486,7 @@ void initOAMCopy(unsigned char *pSource){
 }
 
 // Cross-compiler interrupt handler implementations
-// Users MUST define snesXC_irq() and snesXC_nmi() in their code
+// Users MUST define snesXC_nmi() and CO in their code
 // If they don't, the linker will fail with undefined symbols
 // This ensures users are explicit about their interrupt handling
 
@@ -506,9 +509,13 @@ void far snesXC_nmi_wrapper(void) {
 	snesXC_nmi();
 }
 
-void far snesXC_irq_wrapper(void) {
-	snesXC_irq();
-}
+#endif
+
+#ifdef __JCC__
+[[interrupt_COP, no_ISR1]] void snesXC_cop(void);   // COP (Coprocessor) interrupt
+[[interrupt_BRK, no_ISR1]] void snesXC_brk(void);   // BRK (Break) interrupt
+[[interrupt_ABORT, no_ISR1]] void snesXC_abort(void); // ABORT interrupt
+[[interrupt_NMI, no_ISR1]] void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
 #else
 void snesXC_cop_wrapper(void) {
 	snesXC_cop();
@@ -526,13 +533,17 @@ void snesXC_nmi_wrapper(void) {
 	snesXC_nmi();
 }
 
-void snesXC_irq_wrapper(void) {
-	snesXC_irq();
-}
+
 #endif
 
 // VBCC-specific interrupt handlers
 #ifdef __VBCC__
+extern void snesXC_cop(void);   // COP (Coprocessor) interrupt
+extern void snesXC_brk(void);   // BRK (Break) interrupt  
+extern void snesXC_abort(void); // ABORT interrupt
+extern void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
+
+
 __near __interrupt void __irq_cop(void) {
 	snesXC_cop();
 }
@@ -545,8 +556,11 @@ __near __interrupt void __irq_vblank(void) {
 	snesXC_nmi();
 }
 
-__near __interrupt void __irq_ext(void) {
-	snesXC_irq();
+// Point to a bit of ram where code can be generated for the irq handler
+__near unsigned char __irq_ext[64] = {0xEA, 0xEA, 0xEA};
+
+unsigned char* snesXC_getIRQ_ASM_Buffer(void) {
+    return __irq_ext;
 }
 
 __near __interrupt void __irq_cop6502(void) {
@@ -557,9 +571,6 @@ __near __interrupt void __irq_nmi6502(void) {
 	snesXC_nmi();
 }
 
-__near __interrupt void __irq_ext6502(void) {
-	snesXC_irq();
-}
 #endif
 
 // Calypsi-specific interrupt handlers
@@ -584,10 +595,6 @@ void snesXC_nmi_handler(void) {
 	snesXC_nmi();
 }
 
-__attribute__((section("CODE_IN_BANK0"), interrupt(0xFFEE)))
-void snesXC_irq_handler(void) {
-	snesXC_irq();
-}
 #endif
 
 #ifdef __TCC816__
@@ -598,6 +605,22 @@ void init_tcc816_interrupts(void) {
     nmiSet(snesXC_nmi);
 }
 #endif
+
+void emitWAI(void) {
+#ifdef __VBCC__
+    __asm("\twai\n");
+#else
+#endif
+}
+
+void emitCLI(void) {
+	#ifdef __VBCC__
+		__asm("\tcli\n");
+	#else
+	#endif
+}
+
+
 
 /* Initialize SA1 BW-RAM mapping for F0:0000-FF:FFFF */
 void initSA1(void) {

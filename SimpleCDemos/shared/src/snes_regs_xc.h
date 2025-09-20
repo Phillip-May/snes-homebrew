@@ -1224,11 +1224,11 @@ union uOAMCopy{
 // Users MUST define these functions in their code for interrupt handling
 // If not defined, the linker will fail with undefined symbols
 // All interrupts (both emulation and native mode) use the same functions
-void snesXC_cop(void);   // COP (Coprocessor) interrupt
-void snesXC_brk(void);   // BRK (Break) interrupt  
-void snesXC_abort(void); // ABORT interrupt
-void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
-void snesXC_irq(void);   // IRQ (Interrupt Request)
+//void snesXC_cop(void);   // COP (Coprocessor) interrupt
+//void snesXC_brk(void);   // BRK (Break) interrupt  
+//void snesXC_abort(void); // ABORT interrupt
+//void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
+//void snesXC_irq(void);   // IRQ (Interrupt Request)
 
 #endif //__SNES_REGS_H
 

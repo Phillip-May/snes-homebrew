@@ -31,6 +31,11 @@ FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 FUNCTIONATR void LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestination,
 				uint16_t cSize);
 void initOAMCopy(unsigned char *pSource);			
+
+unsigned char* snesXC_getIRQ_ASM_Buffer(void);
+void emitWAI(void);
+void emitCLI(void);
+
 void initSA1(void);
 
 
