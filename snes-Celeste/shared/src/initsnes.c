@@ -101,8 +101,7 @@ void* farMalloc(uint32_t size) {
 void initSNES(uint8_t ROMSPEED){
 
 	int i;
-	volatile uint16_t cCONSTZERO = 0;
-	volatile uint16_t* pCONSTZERO = &cCONSTZERO;
+	volatile unsigned char cCONSTZERO[2] = {0, 0};
 	REG_MEMSEL = ROMSPEED;  // Access Cycle Designation (Slow ROM / Fast ROM)
 
 	REG_INIDISP = 0x8F;// Display Control 1: Brightness & Screen Enable Register ($2100)
@@ -202,13 +201,13 @@ void initSNES(uint8_t ROMSPEED){
 
 	// Clear CGRAM
 	for(i = 0; i < 256; i++) {
-		LoadCGRam((const unsigned char*)pCONSTZERO, i, sizeof(cCONSTZERO));
+		LoadCGRam((const unsigned char*)cCONSTZERO, i, sizeof(cCONSTZERO));
 	}
 
 	// Clear VRAM using existing ClearVram function in chunks
 	// Clear VRAM in 32KB chunks (0x8000 bytes each) to avoid DMA size issues
 	for(i = 0; i < 2; i++) {
-		ClearVram((const unsigned char*)pCONSTZERO, i * 0x4000, 0x8000);
+		ClearVram((const unsigned char*)cCONSTZERO, i * 0x4000, 0x8000);
 	}
 	
 #ifdef __TCC816__
@@ -241,17 +240,15 @@ FUNCTIONATR void LoadCGRam(const unsigned char *pSource, uint16_t pCGRAMDestinat
 	REG_MDMAEN = 0x01;
 #elif defined(__SNESXC_16BIT_POINTERS__)
 	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	REG_CGADD = pCGRAMDestination;
 	
 	// Always use channel 0
 	REG_DMAP0 = 0x00;
 	REG_BBAD0 = 0x22;
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_DAS0L = (uint8_t)(cSize & 0xFF);
 	REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
 	REG_MDMAEN = 0x01;
@@ -299,17 +296,15 @@ FUNCTIONATR void LoadVram(const unsigned char *pSource, uint16_t pVRAMDestinatio
 	REG_MDMAEN = 0x01;
 #elif defined(__SNESXC_16BIT_POINTERS__)
 	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x80;
 	REG_VMADD = (pVRAMDestination >> 1);
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	
 	// Always use channel 0
 	REG_DMAP0 = 0x01;
 	REG_BBAD0 = 0x18;
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_DAS0 = cSize;
 	REG_MDMAEN = 0x01;
 #else
@@ -354,17 +349,15 @@ FUNCTIONATR void LoadLoVram(const unsigned char *pSource, uint16_t pVRAMDestinat
 	REG_MDMAEN = 0x01;
 #elif defined(__SNESXC_16BIT_POINTERS__)
 	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x00;
 	REG_VMADD = (pVRAMDestination >> 1);	
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	
 	// Always use channel 0
 	REG_DMAP0 = 0x00;
 	REG_BBAD0 = 0x18;
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_DAS0 = cSize;
 	REG_MDMAEN = 0x01;
 #else
@@ -403,17 +396,15 @@ FUNCTIONATR void LoadHiVram(const unsigned char *pSource, uint16_t pVRAMDestinat
 	REG_MDMAEN = 0x01;
 #elif defined(__SNESXC_16BIT_POINTERS__)
 	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	REG_VMAIN = 0x80;
 	REG_VMADD = (pVRAMDestination >> 1);
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	
 	// Always use channel 0
 	REG_DMAP0 = 0x00;
 	REG_BBAD0 = 0x19;
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_DAS0L = (uint8_t)(cSize & 0xFF);
 	REG_DAS0H = (uint8_t)((cSize >> 8) & 0xFF);
 	REG_MDMAEN = 0x01;
@@ -477,7 +468,6 @@ FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 	REG_MDMAEN = 0x01;
 #elif defined(__SNESXC_16BIT_POINTERS__)
 	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	uint16_t regWrite3;
 
 	regWrite3 = (pVRAMDestination >> 1);
@@ -485,13 +475,12 @@ FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 	REG_VMAIN = 0x00;
 	REG_VMADD = regWrite3;
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	
 	// Always use channel 0
 	REG_DMAP0 = 0x08;
 	REG_BBAD0 = 0x18;
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_DAS0 = cSize;
 	REG_MDMAEN = 0x01;
 	
@@ -499,11 +488,10 @@ FUNCTIONATR void ClearVram(const unsigned char *pSource, uint16_t pVRAMDestinati
 	REG_VMAIN = 0x80;
 	REG_VMADD = regWrite3;
 	regWrite1 = (uint16_t) ((uint32_t)pSource+1);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	
 	REG_BBAD0 = 0x19;
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_DAS0 = cSize;
 	REG_MDMAEN = 0x01;
 #else
@@ -563,9 +551,7 @@ FUNCTIONATR void LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestina
 	REG_MDMAEN = 0x01;
 #elif defined(__SNESXC_16BIT_POINTERS__)
 	uint16_t regWrite1; //Variable for storing hardware registers
-	uint8_t  regWrite2; //Variable for storing hardware registers				 
 	regWrite1 = (uint16_t) ((uint32_t)pSource);
-	regWrite2 = snesXC_dataBank; // Use global bank variable
 	
 	// Always use channel 0
 	REG_OAMADD = pVRAMDestination;
@@ -573,7 +559,7 @@ FUNCTIONATR void LoadOAMCopy(const unsigned char *pSource, uint16_t pVRAMDestina
 	REG_DMAP0 = 0x02;
 	REG_BBAD0 = 0x04; //0x2104
 	REG_A1T0 = regWrite1;
-	REG_A1B0 = regWrite2;
+	REG_A1B0 = snesXC_dataBank; // Use global bank variable
 	REG_MDMAEN = 0x01;
 #else
 	uint16_t regWrite1; //Variable for storing hardware registers

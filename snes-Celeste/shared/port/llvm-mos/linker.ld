@@ -36,21 +36,7 @@ ENTRY(_start)
 SECTIONS {
   INCLUDE c.ld
   
-  /* Ensure startup code is first */
-  .text.startup : { *(.text.startup) } >rom_bank_0
-
-  /* Ensure data initialization is properly handled
-   * Data goes in RAM, but initialization values go in rom_bank_1 */
-  .data : {
-    *(.data .data.*)
-    . = ALIGN(2);
-  } > ram AT >rom_bank_1
-  
-  .bss : {
-    *(.bss .bss.*)
-    *(COMMON)
-    . = ALIGN(2);
-  } >ram  
+  /* Custom sections for ROM bank placement - these come AFTER c.ld sections */  
   
   /* Code section for rom_bank_0_fixed - placed before vectors */
   .text.rom_bank_0_fixed : { *(.text.rom_bank_0_fixed .text.rom_bank_0_fixed.*) } >rom_bank_0_fixed

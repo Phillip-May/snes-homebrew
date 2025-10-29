@@ -99,16 +99,16 @@ endif
 
 # LLVM-Mos Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+	LLVM_MOS_PATH = C:\llvm-mos
 	CC = mos-common-clang
 	AS = mos-common-clang
 	LD = mos-common-clang
-	CCFLAGS = -mcpu=mosw65816 -I$(SHARED_SRC_DIR) -Iinclude -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector -fdata-sections -ffunction-sections
+	CCFLAGS = -mcpu=mosw65816 -I$(SHARED_SRC_DIR) -Iinclude -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector -fdata-sections -ffunction-sections
 	ASFLAGS = 
-	LDFLAGS = -lexit-loop
+	LDFLAGS = -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -L$(LLVM_MOS_PATH)/mos-platform/common/lib -lzero-bss -lcopy-data -lcopy-zp-data -linit-stack -lc -lexit-loop
 	INCLUDES = 
 	OUTPUT_EXT = .smc
 	POST_LINK = 
-	LLVM_MOS_PATH = C:\llvm-mos
 	COMPILER_NAME = llvm-mos
 endif
 
@@ -208,7 +208,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
-	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/vectors.s $(SHARED_PORT_DIR)/llvm-mos/startup.s
+	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/startup.s $(SHARED_PORT_DIR)/llvm-mos/vectors.s
 	OBJECTS = 
 	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
 	vpath %.s $(SHARED_PORT_DIR)/llvm-mos
