@@ -65,11 +65,17 @@ static inline fix16_t fix16_from_float(float a)
 
 static inline fix16_t fix16_from_dbl(double a)
 {
+#ifdef __TCC816__
+    /* TCC816 has issues with floating point operations - use simple truncation */
+    /* This loses precision but avoids compiler bugs */
+    return (fix16_t)((int32_t)(a * 65536.0));
+#else
     double temp = a * fix16_one;
 #ifndef FIXMATH_NO_ROUNDING
-    temp += (temp >= 0) ? 0.5f : -0.5f;
+    temp += (temp >= 0) ? 0.5 : -0.5;
 #endif
     return (fix16_t)temp;
+#endif
 }
 
 /* Subtraction and addition with (optional) overflow detection. */
@@ -165,3 +171,4 @@ extern fix16_t fix16_exp(fix16_t inValue) FIXMATH_FUNC_ATTRS;
 #endif
 
 #endif
+

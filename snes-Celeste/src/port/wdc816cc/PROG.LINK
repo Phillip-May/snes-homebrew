@@ -1,4 +1,4 @@
--C008100,000100 src\mainBankZero.obj lib\initsnes.obj src\port\wdc816cc\kernel.obj src\celesteSimple.obj  src\port\wdc816cc\vectors.obj -Lml -Lcl
+-C008100,000100 src\mainBankZero.obj shared\src\initsnes.obj src\port\wdc816cc\kernel.obj src\celesteSimple.obj  src\port\wdc816cc\vectors.obj -Lml -Lcl
 -ACEL_K_00=018000,08000
 -ACEL_K_01=028000,10000
 -ACEL_K_02=038000,18000

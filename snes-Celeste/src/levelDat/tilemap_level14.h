@@ -112,6 +112,7 @@ const unsigned char object_level14[] = {
 #define OBJECT_LEVEL14_COUNT 4
 
 // Player start location for layer 'level14'
-const unsigned char spawn_level14[] = { 0, 13 };
+#define SPAWN_X_LEVEL14 0
+#define SPAWN_Y_LEVEL14 13
 
 #endif // TILEMAP_LEVEL14_H

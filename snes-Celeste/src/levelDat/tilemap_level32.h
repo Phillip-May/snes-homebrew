@@ -106,10 +106,11 @@ const unsigned char collision_level32[] = {
 
 #define COLLISION_LEVEL32_COUNT 256
 
-const unsigned char object_level32[];
+const unsigned char object_level32[1] = { 0 };
 #define OBJECT_LEVEL32_COUNT 0
 
 // Player start location for layer 'level32'
-const unsigned char spawn_level32[] = { 0, 0 };
+#define SPAWN_X_LEVEL32 0
+#define SPAWN_Y_LEVEL32 0
 
 #endif // TILEMAP_LEVEL32_H

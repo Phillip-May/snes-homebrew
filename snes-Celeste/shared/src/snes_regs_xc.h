@@ -4,7 +4,90 @@
 
 #ifndef __SNES_REGS_H
 #define __SNES_REGS_H
-#include "int.h"
+
+// For all compilers, use our custom SNES register definitions
+#include "int_snes_xc.h"
+
+// Compiler identification macro
+#ifdef __WDC816CC__
+#define SNES_XC_COMPILER_NAME "WDC816CC"
+#elif __VBCC__
+#define SNES_XC_COMPILER_NAME "VBCC816"
+#elif __CC65__
+#define SNES_XC_COMPILER_NAME "CC65"
+#elif __TCC816__
+#define SNES_XC_COMPILER_NAME "TCC816"
+#elif __CALYPSI__
+#define SNES_XC_COMPILER_NAME "Calypsi"
+#elif __mos__
+#define SNES_XC_COMPILER_NAME "LLVM-MOS"
+#elif __JCC__
+#define SNES_XC_COMPILER_NAME "JCC816"
+#else
+#define SNES_XC_COMPILER_NAME "Unknown"
+#endif
+
+// Stub malloc functions for compilers that don't support them
+#ifdef __TCC816__
+// TCC816 doesn't have malloc support, provide stubs
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+#endif
+
+#ifdef __VBCC__
+// VBCC816 doesn't have malloc support, provide declarations
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+// Function declarations for vbcc816 stubs
+void* farMalloc(uint32_t size);
+void* nearMalloc(uint32_t size);
+
+#endif
+
+#ifdef __CC65__
+// CC65 has malloc support, include the header
+#include <stdlib.h>
+#include <stdio.h>
+
+// Function declaration for cc65
+void* farMalloc(uint32_t size);
+#endif
+
+#ifdef __WDC816CC__
+// WDC816CC has malloc support, include the header
+#include <malloc.h>
+#include <stdio.h>
+#endif
+
+#ifdef __CALYPSI__
+// Calypsi has malloc support, include the header
+#include <stdlib.h>
+#include <stdio.h>
+#endif
+
+#ifdef __mos__
+// LLVM-MOS has malloc support, include the header
+#include <stdlib.h>
+#include <stdio.h>
+// Function declaration for farmalloc stub
+void* farmalloc(uint32_t size);
+#endif
+
+#ifdef __JCC__
+// JCC816 doesn't have malloc support, provide declarations
+#ifndef NULL
+#define NULL ((void*)0)
+#endif
+
+// Function declarations for JCC816 stubs
+void* farMalloc(uint32_t size);
+void* nearMalloc(uint32_t size);
+void free(void* ptr);
+#endif
 
 #define u8_reg(addr) (*(vu8)addr)
 #define u16_reg(addr) (*(vu16)addr)
@@ -469,6 +552,106 @@ HDMA Line Counter Register          $43xA ; rccc cccc, r = Repeat, c = Line coun
     Note that if a game wishes to begin HDMA during the frame, it will most likely have to initalize this register.
 */
 
+
+// SA-1 registers
+
+// $2200 - SA-1 CPU Control
+#define SA1_CCNT      (*(vu8)0x2200)
+// $2201 - SNES CPU Interrupt Enable
+#define SA1_SIE       (*(vu8)0x2201)
+// $2202 - SNES CPU Interrupt Clear
+#define SA1_SIC       (*(vu8)0x2202)
+// $2203/$2204 - SA-1 CPU Reset Vector (2 bytes)
+#define SA1_CRV       (*(vu16)0x2203)
+// $2205/$2206 - SA-1 CPU NMI Vector (2 bytes)
+#define SA1_CNV       (*(vu16)0x2205)
+// $2207/$2208 - SA-1 CPU IRQ Vector (2 bytes)
+#define SA1_CIV       (*(vu16)0x2207)
+// $2209 - SNES CPU Control
+#define SA1_SCNT      (*(vu8)0x2209)
+// $220A - SA-1 CPU Interrupt Enable
+#define SA1_CIE       (*(vu8)0x220A)
+// $220B - SA-1 CPU Interrupt Clear
+#define SA1_CIC       (*(vu8)0x220B)
+// $220C/$220D - SNES CPU NMI Vector (2 bytes)
+#define SA1_SNV       (*(vu16)0x220C)
+// $220E/$220F - SNES CPU IRQ Vector (2 bytes)
+#define SA1_SIV       (*(vu16)0x220E)
+// $2210 - H/V Timer Control
+#define SA1_TMC       (*(vu8)0x2210)
+// $2211 - SA-1 CPU Timer Restart
+#define SA1_CTR       (*(vu8)0x2211)
+// $2212/$2213 - Set H-Count (2 bytes)
+#define SA1_HCNT      (*(vu16)0x2212)
+// $2214/$2215 - Set V-Count (2 bytes)
+#define SA1_VCNT      (*(vu16)0x2214)
+// $2220 - Set Super MMC Bank C
+#define SA1_CXB       (*(vu8)0x2220)
+// $2221 - Set Super MMC Bank D
+#define SA1_DXB       (*(vu8)0x2221)
+// $2222 - Set Super MMC Bank E
+#define SA1_EXB       (*(vu8)0x2222)
+// $2223 - Set Super MMC Bank F
+#define SA1_FXB       (*(vu8)0x2223)
+// $2224 - SNES CPU BW-RAM Address Mapping
+#define SA1_BMAPS     (*(vu8)0x2224)
+// $2225 - SA-1 CPU BW-RAM Address Mapping
+#define SA1_BMAP      (*(vu8)0x2225)
+// $2226 - SNES CPU BW-RAM Write Enable
+#define SA1_SBWE      (*(vu8)0x2226)
+// $2227 - SA-1 CPU BW-RAM Write Enable
+#define SA1_CBWE      (*(vu8)0x2227)
+// $2228 - BW-RAM Write-Protected Area
+#define SA1_BPWA      (*(vu8)0x2228)
+// $2229 - SA-1 I-RAM Write Protection
+#define SA1_SIWP      (*(vu8)0x2229)
+// $222A - SA-1 I-RAM Write Protection
+#define SA1_CIWP      (*(vu8)0x222A)
+// $2230 - DMA Control
+#define SA1_DCNT      (*(vu8)0x2230)
+// $2231 - Character Conversion OMA Parameters
+#define SA1_CDMA      (*(vu8)0x2231)
+// $2232/$2233/$2234 - DMA Source Device Start Address (3 bytes)
+#define SA1_SDA       ((vu8)0x2232) // Use as array: [0]=low, [1]=mid, [2]=high
+// $2235/$2236/$2237 - DMA Destination Start Address (3 bytes)
+#define SA1_DDA       ((vu8)0x2235) // Use as array: [0]=low, [1]=mid, [2]=high
+// $2238/$2239 - DMA Terminal Counter (2 bytes)
+#define SA1_DTC       (*(vu16)0x2238)
+// $223F - BW-RAM Bit Map Format
+#define SA1_BBF       (*(vu8)0x223F)
+// $2240-$224F - Bit Map Register File (16 bytes)
+#define SA1_BRF       ((vu8)0x2240) // Use as array: [0]...[15]
+// $2250 - Arithmetic Control
+#define SA1_MCNT      (*(vu8)0x2250)
+// $2251/$2252 - Arithmetic Parameters: Multiplicand/Dividend (2 bytes)
+#define SA1_MA        (*(vu16)0x2251)
+// $2253/$2254 - Arithmetic Parameters: Multiplier/Divisor (2 bytes)
+#define SA1_MB        (*(vu16)0x2253)
+// $2258 - Variable-Length Bit Processing
+#define SA1_VBD       (*(vu8)0x2258)
+// $2259/$225A/$225B - Variable-Length Bit Game Pak ROM Start Address (3 bytes)
+#define SA1_VDA       ((vu8)0x2259) // Use as array: [0]=low, [1]=mid, [2]=high
+
+
+
+// MSU1 Register Definitions
+#define MSU1_STATUS     (*(volatile uint8_t*)0x2000)
+#define MSU1_DATA       (*(volatile uint8_t*)0x2001)
+#define MSU1_IDENT      (*(volatile uint8_t*)0x2002)
+#define MSU1_OFFSET     (*(volatile uint32_t*)0x2000)
+#define MSU1_TRACK      (*(volatile uint16_t*)0x2004)
+#define MSU1_VOLUME     (*(volatile uint8_t*)0x2006)
+#define MSU1_CONTROL    (*(volatile uint8_t*)0x2007)
+
+// MSU1 Status Bits
+#define MSU1_STATUS_DATA_BUSY    (1 << 7)
+#define MSU1_STATUS_AUDIO_BUSY  (1 << 6)
+#define MSU1_STATUS_AUDIO_REPEAT (1 << 5)
+#define MSU1_STATUS_AUDIO_PLAY  (1 << 4)
+
+// MSU1 Control Bits
+#define MSU1_CONTROL_PLAY       (1 << 0)
+#define MSU1_CONTROL_REPEAT     (1 << 1)
 
 
 //A union structure for OAM duplicates so the compiler creates less warnings.
@@ -1036,6 +1219,16 @@ union uOAMCopy{
 		unsigned char OAMTable2[32];
 	} arr;
 };
+
+// Cross-compiler interrupt handler declarations
+// Users MUST define these functions in their code for interrupt handling
+// If not defined, the linker will fail with undefined symbols
+// All interrupts (both emulation and native mode) use the same functions
+//void snesXC_cop(void);   // COP (Coprocessor) interrupt
+//void snesXC_brk(void);   // BRK (Break) interrupt  
+//void snesXC_abort(void); // ABORT interrupt
+//void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
+//void snesXC_irq(void);   // IRQ (Interrupt Request)
 
 #endif //__SNES_REGS_H
 

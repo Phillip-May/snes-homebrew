@@ -1,0 +1,457 @@
+# Shared SNES C Compiler Build Configuration
+# This file contains all compiler configurations, source definitions, and build rules
+
+# Set default paths (can be overridden by individual projects)
+SHARED_SRC_DIR ?= ../src
+SHARED_PORT_DIR ?= ../port
+BUILD_DIR ?= build
+
+# Check if compiler is specified (skip for help, clean, and convenience targets)
+ifneq ($(filter help clean wdc vbcc calypsi llvm-mos cc65 jcc816 tcc816,$(MAKECMDGOALS)),)
+# Skip compiler check for help, clean, and convenience targets
+else
+ifeq ($(COMPILER),)
+$(error Please specify a compiler. Usage: make COMPILER=wdc816cc, make COMPILER=vbcc65816, make COMPILER=calypsi, make COMPILER=llvm-mos, make COMPILER=cc65, make COMPILER=jcc816, or make COMPILER=tcc816 (case-insensitive))
+endif
+endif
+
+# =============================================================================
+# COMPILER CONFIGURATIONS
+# =============================================================================
+
+# WDC816CC Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+	CC = wdc816cc
+	AS = wdc816as
+	LD = wdcln
+	CCFLAGS = -WL -SM -MK -MT -ML -WP -MU -MV -SI -SP -D__WDC816CC__=1
+	ASFLAGS = 
+	# Use floating point math library if USE_FLOATING_POINT is set
+	# WDC816CC requires both -Lml (math library) and -Lcl (standard library) for floating point
+	ifeq ($(USE_FLOATING_POINT),1)
+		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(PROJECT_OBJECTS) $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lml -Lcl -O$(BUILD_DIR)/mainBankZero.bin
+	else
+		LDFLAGS = -HB -ML -B -E -T -C018000,008000 $(PROJECT_OBJECTS) $(BUILD_DIR)/vectors.obj -C028000,010000 $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj -D7E2000,18000 -K048000,20000 -Lcl -O$(BUILD_DIR)/mainBankZero.bin
+	endif
+	INCLUDES = -I "C:\wdc\Tools\include" -I "$(SHARED_SRC_DIR)" -I "lib" -I "include"
+	OUTPUT_EXT = .bin
+	POST_LINK = @powershell -Command "if (Test-Path '$(BUILD_DIR)/mainBankZero.bin') { Copy-Item '$(BUILD_DIR)/mainBankZero.bin' '$(BUILD_DIR)/mainBankZero_wdc816cc.smc' }"
+	COMPILER_NAME = wdc816cc
+endif
+
+# VBCC65816 Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+	# Use the existing batch file approach but with direct calls
+	CC = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
+	AS = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vc_env.bat"
+	LD = "C:\Users\Admin\Documents\snes-homebrew\SimpleCDemos\shared\port\vbcc816\vlink_direct.bat"
+	
+	# Compiler flags for incremental compilation
+	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__ -c
+	ASFLAGS = -816 -quiet -nowarn=62 -opt-branch -ldots -Fvobj
+	LDFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__
+	INCLUDES = 
+	OUTPUT_EXT = .smc
+	POST_LINK = 
+	COMPILER_NAME = vbcc65816
+endif
+
+# Calypsi Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+	CC = "C:\calypsi-65816-5.12\bin\cc65816"
+	AS = "C:\calypsi-65816-5.12\bin\cc65816"
+	LD = "C:\calypsi-65816-5.12\bin\ln65816"
+	# Check for huge model - requires --enable-huge-attribute with large data model
+	ifeq ($(ROM_TYPE),huge)
+#		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=huge --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		CCFLAGS += --core=65816 -O0 --code-model=large --data-model=huge --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		STDLIB = C:/calypsi-65816-5.12/lib-huge/clib-huge.a
+		LDFLAGS = --raw-multiple-memories --rom-code --no-tree-shaking --no-copy-initialize huge
+	else
+		CCFLAGS += --core=65816 -O2 --speed --code-model=large --data-model=large --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		STDLIB = C:/calypsi-65816-5.12/lib/clib-lc-ld-snes.a
+		LDFLAGS = --raw-multiple-memories --rom-code
+	endif
+	ASFLAGS =
+	INCLUDES = -I"$(SHARED_SRC_DIR)" -I"lib" -I"include"
+	OUTPUT_EXT = .smc
+	# ROM type selection: huge, HiROM, or default LoROM
+	ifeq ($(ROM_TYPE),huge)
+		ifeq ($(ROM_MAPPING),HiROM)
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-large-large-HiROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_HiROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		else
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-large-large-LoROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_LoROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		endif
+	else
+		ifeq ($(ROM_TYPE),HiROM)
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-large-large-HiROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_HiROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		else
+			LINKER_SCRIPT = $(SHARED_PORT_DIR)/calypsi/linker-large-large-LoROM.scm
+			POST_LINK = @C:\Python310\python.exe $(SHARED_PORT_DIR)/calypsi/ConvertIntelHex_LoROM.py $(BUILD_DIR)/calypsi.hex $(BUILD_DIR)/mainBankZero_calypsi.smc
+		endif
+	endif
+	CALYPSI_PATH = C:\calypsi-65816-5.12
+	COMPILER_NAME = calypsi
+endif
+
+# LLVM-Mos Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+	CC = mos-common-clang
+	AS = mos-common-clang
+	LD = mos-common-clang
+	CCFLAGS = -mcpu=mosw65816 -I$(SHARED_SRC_DIR) -Iinclude -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector -fdata-sections -ffunction-sections
+	ASFLAGS = 
+	LDFLAGS = -lexit-loop
+	INCLUDES = 
+	OUTPUT_EXT = .smc
+	POST_LINK = 
+	LLVM_MOS_PATH = C:\llvm-mos
+	COMPILER_NAME = llvm-mos
+endif
+
+# CC65 Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+	CC = C:\cc65-2.19\bin\cc65
+	AS = C:\cc65-2.19\bin\ca65
+	LD = C:\cc65-2.19\bin\ld65
+	CCFLAGS = -t none -O -I$(SHARED_SRC_DIR) -Iinclude -D__CC65__=1
+	ASFLAGS = -t none
+	LDFLAGS = -C $(SHARED_PORT_DIR)/cc65/snes.cfg -o -m $(BUILD_DIR)/mainBankZero_cc65.map --no-smc
+	INCLUDES = 
+	OUTPUT_EXT = .smc
+	POST_LINK = 
+	CC65_PATH = C:\cc65-2.19
+	COMPILER_NAME = cc65
+endif
+
+# JCC816 Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
+	CC = python $(SHARED_PORT_DIR)/jcc816/compile.py
+	AS = python $(SHARED_PORT_DIR)/jcc816/compile.py
+	LD = python $(SHARED_PORT_DIR)/jcc816/compile.py
+	CCFLAGS = -l example=$(SHARED_PORT_DIR)/jcc816/exampleHeader.xml -O 0 -D 2 -V 2 -r build
+	ASFLAGS = 
+	LDFLAGS = 
+	INCLUDES = 
+	OUTPUT_EXT = .sfc
+	POST_LINK = 
+	JCC816_PATH = C:\Users\Admin\Documents\JCC816
+	COMPILER_NAME = jcc816
+endif
+
+# TCC816 (pvsneslib) Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+	CC = python $(SHARED_PORT_DIR)/tcc816/compile.py
+	AS = python $(SHARED_PORT_DIR)/tcc816/compile.py
+	LD = python $(SHARED_PORT_DIR)/tcc816/compile.py
+	CCFLAGS = -c -I$(SHARED_SRC_DIR) -Iinclude -I.
+	ASFLAGS = 
+	LDFLAGS = 
+	INCLUDES = 
+	OUTPUT_EXT = .obj
+	POST_LINK = 
+	TCC816_PATH = C:\pvsneslib
+	COMPILER_NAME = tcc816
+endif
+
+# =============================================================================
+# SOURCE CONFIGURATIONS
+# =============================================================================
+
+# WDC816CC Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_PORT_DIR)/wdc816cc/lorom/kernel.c $(SHARED_SRC_DIR)/initsnes.c
+	ASM_SOURCES = $(SHARED_PORT_DIR)/wdc816cc/lorom/vectors.asm
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .obj,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/kernel.obj $(BUILD_DIR)/initsnes.obj $(BUILD_DIR)/vectors.obj
+	vpath %.c $(SHARED_PORT_DIR)/wdc816cc/lorom $(SHARED_SRC_DIR) .
+	vpath %.asm $(SHARED_PORT_DIR)/wdc816cc/lorom
+	vpath %.h .
+endif
+
+# VBCC65816 Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
+	ASM_SOURCES = 
+	# Generate object file names from C sources for incremental linking
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o
+	vpath %.c $(SHARED_SRC_DIR) .
+	vpath %.asm 
+	vpath %.h .
+endif
+
+# Calypsi Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
+	ASM_SOURCES = 
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o
+	vpath %.c $(SHARED_SRC_DIR) .
+	vpath %.asm 
+	vpath %.h .
+endif
+
+# LLVM-Mos Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
+	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/vectors.s $(SHARED_PORT_DIR)/llvm-mos/startup.s
+	OBJECTS = 
+	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
+	vpath %.s $(SHARED_PORT_DIR)/llvm-mos
+	vpath %.asm 
+	vpath %.h .
+endif
+
+# CC65 Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/cc65/putchar_stub.c
+	ASM_SOURCES = $(SHARED_PORT_DIR)/cc65/snes_header.s $(SHARED_PORT_DIR)/cc65/runtime_stubs.s
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o $(BUILD_DIR)/putchar_stub.o $(BUILD_DIR)/snes_header.o $(BUILD_DIR)/runtime_stubs.o
+	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/cc65 .
+	vpath %.asm $(SHARED_PORT_DIR)/cc65
+	vpath %.h .
+endif
+
+# JCC816 Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
+	ASM_SOURCES = 
+	OBJECTS = 
+	vpath %.c $(SHARED_SRC_DIR) .
+	vpath %.asm 
+	vpath %.h .
+endif
+
+# TCC816 Source Configuration
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+	# Automatically include all C files in current directory
+	PROJECT_C_FILES = $(wildcard *.c)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
+	ASM_SOURCES = 
+	# Generate object file names from C sources
+	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(PROJECT_C_FILES))))
+	OBJECTS = $(PROJECT_OBJECTS)
+	vpath %.c $(SHARED_SRC_DIR) .
+	vpath %.asm 
+	vpath %.h .
+endif
+
+# =============================================================================
+# BUILD RULES
+# =============================================================================
+
+# Default target
+all: $(BUILD_DIR)
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+	@$(MAKE) $(OBJECTS)
+	$(LD) $(LDFLAGS)
+	$(POST_LINK)
+else
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+	@$(MAKE) $(OBJECTS)
+	$(LD) $(LDFLAGS) $(OBJECTS) $(LINKER_SCRIPT) $(STDLIB) --list-file=$(BUILD_DIR)/calypsi.lst --cross-reference --output-format=intel-hex -o $(BUILD_DIR)/calypsi.hex
+	$(POST_LINK)
+else
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+	@echo "Compiling with LLVM-MOS..."
+	@echo "$(CC) $(CCFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT) $(C_SOURCES) $(ASM_SOURCES)"
+	@powershell -Command "& '$(SHARED_PORT_DIR)/llvm-mos/compile.bat' '$(CC)' $(CCFLAGS) $(LDFLAGS) -o '$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)' $(C_SOURCES) $(ASM_SOURCES)"
+	@echo "Compilation completed successfully"
+	$(POST_LINK)
+else
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+	@$(MAKE) $(OBJECTS)
+	$(LD) -C $(SHARED_PORT_DIR)/cc65/snes.cfg -o $(BUILD_DIR)/mainBankZero_cc65$(OUTPUT_EXT) -m $(BUILD_DIR)/mainBankZero_cc65.map $(OBJECTS) C:\cc65-2.19\lib\none.lib
+	$(POST_LINK)
+else
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
+	$(CC) $(CCFLAGS) $(LDFLAGS) $(C_SOURCES)
+	$(POST_LINK)
+else
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+	$(CC) $(CCFLAGS) $(INCLUDES) $(C_SOURCES)
+	$(POST_LINK)
+else
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+	@echo "Compiling with VBCC65816 (incremental compilation)..."
+	@$(MAKE) $(OBJECTS)
+	@echo "Linking object files with vbcc..."
+	@echo "OBJECTS variable: $(OBJECTS)"
+	@echo "Compiling and linking all sources together..."
+	$(CC) $(LDFLAGS) $(C_SOURCES) -o $(BUILD_DIR)/mainBankZero_vbcc65816$(OUTPUT_EXT)
+	@echo "Compilation completed successfully"
+	$(POST_LINK)
+else
+	@echo "Unknown compiler: $(COMPILER)"
+	@echo "Available compilers: wdc816cc, vbcc65816, calypsi, llvm-mos, cc65, jcc816, tcc816"
+	@exit 1
+endif
+endif
+endif
+endif
+endif
+endif
+endif
+
+# Create build directory
+$(BUILD_DIR):
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory created
+
+# WDC816CC specific rules
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+# Compile C sources (pattern rule)
+$(BUILD_DIR)/%.obj: %.c
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(CC) $(CCFLAGS) $(INCLUDES) -o $@ $<
+
+# Assemble ASM sources (pattern rule)
+$(BUILD_DIR)/%.obj: %.asm
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(AS) $(ASFLAGS) -o $@ $<
+endif
+
+# Calypsi specific rules
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+# Compile C sources (pattern rule)
+$(BUILD_DIR)/%.o: %.c
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(CC) $(CCFLAGS) $(INCLUDES) -o $@ $<
+endif
+
+# TCC816 specific rules
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+# Compile C sources (pattern rule) - don't pass -o for ROM creation
+$(BUILD_DIR)/%.o: %.c
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(CC) $(CCFLAGS) $(INCLUDES) $<
+endif
+
+# VBCC65816 specific rules
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+# Compile C sources (pattern rule) - compile to object files for incremental linking
+$(BUILD_DIR)/%.o: %.c
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(CC) $(CCFLAGS) $(INCLUDES) -o $@ $<
+
+# Assemble ASM sources (pattern rule) - if needed
+$(BUILD_DIR)/%.o: %.s
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(AS) $(ASFLAGS) -o $@ $<
+endif
+
+# CC65 specific rules
+ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+# Compile C sources (pattern rule)
+$(BUILD_DIR)/%.o: %.c
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(CC) $(CCFLAGS) $(INCLUDES) -o $(BUILD_DIR)/$*.s $<
+	$(AS) $(ASFLAGS) -o $@ $(BUILD_DIR)/$*.s
+
+# Assemble ASM sources (pattern rule)
+$(BUILD_DIR)/%.o: %.s
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(AS) $(ASFLAGS) -o $@ $<
+
+# Specific rule for snes_header.s
+$(BUILD_DIR)/snes_header.o: $(SHARED_PORT_DIR)/cc65/snes_header.s
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(AS) $(ASFLAGS) -o $@ $<
+
+# Specific rule for runtime_stubs.s
+$(BUILD_DIR)/runtime_stubs.o: $(SHARED_PORT_DIR)/cc65/runtime_stubs.s
+	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
+	$(AS) $(ASFLAGS) -o $@ $<
+endif
+
+# Clean target
+clean:
+	@powershell -Command "if (Test-Path '$(BUILD_DIR)') { Remove-Item -Recurse -Force '$(BUILD_DIR)' }"
+	@powershell -Command "if (Test-Path '*.obj') { Remove-Item '*.obj' }"
+	@powershell -Command "if (Test-Path '*.bin') { Remove-Item '*.bin' }"
+	@powershell -Command "if (Test-Path '*.bnk') { Remove-Item '*.bnk' }"
+	@powershell -Command "if (Test-Path '*.map') { Remove-Item '*.map' }"
+	@powershell -Command "if (Test-Path '*.smc') { Remove-Item '*.smc' }"
+	@powershell -Command "if (Test-Path 'PROG.LINK') { Remove-Item 'PROG.LINK' }"
+	@echo Clean complete!
+
+# Convenience targets
+wdc: clean
+	@$(MAKE) COMPILER=wdc816cc
+
+vbcc65816: clean
+	@$(MAKE) COMPILER=vbcc65816
+
+calypsi: clean
+	@$(MAKE) COMPILER=calypsi
+
+llvm-mos: clean
+	@$(MAKE) COMPILER=llvm-mos
+
+cc65: clean
+	@$(MAKE) COMPILER=cc65
+
+jcc816: clean
+	@$(MAKE) COMPILER=jcc816
+
+tcc816: clean
+	@$(MAKE) COMPILER=tcc816
+
+# Show current compiler
+info:
+	@echo Current compiler: $(COMPILER)
+	@echo C sources: $(C_SOURCES)
+	@echo Objects: $(OBJECTS)
+
+# Help target
+help:
+	@echo Available targets:
+	@echo "  make COMPILER=wdc816cc  - Build with WDC816CC compiler"
+	@echo "  make COMPILER=vbcc65816 - Build with VBCC65816 compiler"
+	@echo "  make COMPILER=calypsi   - Build with Calypsi compiler"
+	@echo "  make COMPILER=llvm-mos  - Build with LLVM-Mos compiler"
+	@echo "  make COMPILER=cc65      - Build with CC65 compiler"
+	@echo "  make COMPILER=jcc816    - Build with JCC816 compiler"
+	@echo "  make COMPILER=tcc816    - Build with TCC816 (pvsneslib) compiler"
+	@echo "  make wdc                - Build with WDC816CC (convenience)"
+	@echo "  make vbcc65816          - Build with VBCC65816 (convenience)"
+	@echo "  make calypsi            - Build with Calypsi (convenience)"
+	@echo "  make llvm-mos           - Build with LLVM-Mos (convenience)"
+	@echo "  make cc65               - Build with CC65 (convenience)"
+	@echo "  make jcc816             - Build with JCC816 (convenience)"
+	@echo "  make tcc816             - Build with TCC816 (convenience)"
+	@echo "  make clean              - Clean build artifacts"
+	@echo "  make info               - Show current compiler info"
+	@echo "  make help               - Show this help message"
+	@echo ""
+	@echo Calypsi ROM type options:
+	@echo "  ROM_TYPE=HiROM          - Use HiROM mapping (default: LoROM)"
+	@echo "  ROM_TYPE=huge           - Use huge data/code model with --enable-huge-attribute"
+	@echo "  ROM_MAPPING=HiROM       - Use HiROM mapping when ROM_TYPE=huge (default: LoROM)"
+	@echo ""
+	@echo Examples:
+	@echo "  make COMPILER=calypsi ROM_TYPE=HiROM"
+	@echo "  make COMPILER=calypsi ROM_TYPE=huge"
+	@echo "  make COMPILER=calypsi ROM_TYPE=huge ROM_MAPPING=HiROM"
+
+# Phony targets
+.PHONY: all clean wdc vbcc65816 calypsi llvm-mos cc65 jcc816 tcc816 info help

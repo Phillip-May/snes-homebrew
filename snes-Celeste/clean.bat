@@ -7,5 +7,5 @@ rm src\mainBankZero.bin -f
 rm src\mainBankZero.smc -f
 rm src\port\wdc816cc\vectors.obj -f
 rm src\port\wdc816cc\kernel.obj -f
-rm lib\initsnes.obj -f
+rm shared\src\initsnes.obj -f
 rm build\mainBankZero.smc

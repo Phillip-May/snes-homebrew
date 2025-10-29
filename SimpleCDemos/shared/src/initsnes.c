@@ -517,6 +517,11 @@ void far snesXC_nmi_wrapper(void) {
 [[interrupt_ABORT, no_ISR1]] void snesXC_abort(void); // ABORT interrupt
 [[interrupt_NMI, no_ISR1]] void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
 #else
+void snesXC_cop();
+void snesXC_brk();
+void snesXC_abort();
+void snesXC_nmi();
+
 void snesXC_cop_wrapper(void) {
 	snesXC_cop();
 }
@@ -533,6 +538,12 @@ void snesXC_nmi_wrapper(void) {
 	snesXC_nmi();
 }
 
+// Point to a bit of ram where code can be generated for the irq handler
+unsigned char snesXC_irq[64] = {0xEA, 0xEA, 0xEA};
+
+unsigned char* snesXC_getIRQ_ASM_Buffer(void) {
+    return snesXC_irq;
+}
 
 #endif
 
