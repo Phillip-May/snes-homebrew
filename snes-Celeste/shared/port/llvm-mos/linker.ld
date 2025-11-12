@@ -11,16 +11,16 @@ ASSERT(__rc31 == 0x001f, "Inconsistent zero page map.")
 
 MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
-    ram (rw) : ORIGIN = 0x0200, LENGTH = 0x1C00
-    rom_bank_0 (rx)  : ORIGIN = 0x008000,  LENGTH = 0x7E00
-    rom_bank_1 (rx)  : ORIGIN = 0x018000,  LENGTH = 0x7E00
-    rom_bank_2 (rx)  : ORIGIN = 0x028000,  LENGTH = 0x7E00
-    rom_bank_3 (rx)  : ORIGIN = 0x038000,  LENGTH = 0x7E00
-    rom_bank_4 (rx)  : ORIGIN = 0x048000,  LENGTH = 0x7E00
-    rom_bank_5 (rx)  : ORIGIN = 0x058000,  LENGTH = 0x7E00
-    rom_bank_6 (rx)  : ORIGIN = 0x068000,  LENGTH = 0x7E00
-    rom_bank_7 (rx)  : ORIGIN = 0x078000,  LENGTH = 0x7E00
-    rom_bank_0_fixed : ORIGIN = 0x00FE00,  LENGTH = 0x0200
+    ram (rw) : ORIGIN = 0x0200, LENGTH = 0x1E00
+    rom_bank_0 (rx)  : ORIGIN = 0x008000,  LENGTH = 0x7FE0
+    rom_bank_1 (rx)  : ORIGIN = 0x018000,  LENGTH = 0x7FE0
+    rom_bank_2 (rx)  : ORIGIN = 0x028000,  LENGTH = 0x7FE0
+    rom_bank_3 (rx)  : ORIGIN = 0x038000,  LENGTH = 0x7FE0
+    rom_bank_4 (rx)  : ORIGIN = 0x048000,  LENGTH = 0x7FE0
+    rom_bank_5 (rx)  : ORIGIN = 0x058000,  LENGTH = 0x7FE0
+    rom_bank_6 (rx)  : ORIGIN = 0x068000,  LENGTH = 0x7FE0
+    rom_bank_7 (rx)  : ORIGIN = 0x078000,  LENGTH = 0x7FE0
+    rom_bank_0_fixed : ORIGIN = 0x00FFE0,  LENGTH = 0x0020
 }
 
 REGION_ALIAS("c_writeable", ram)

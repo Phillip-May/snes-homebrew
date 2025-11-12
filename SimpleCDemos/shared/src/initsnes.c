@@ -567,13 +567,6 @@ __near __interrupt void __irq_vblank(void) {
 	snesXC_nmi();
 }
 
-// Point to a bit of ram where code can be generated for the irq handler
-__near unsigned char __irq_ext[64] = {0xEA, 0xEA, 0xEA};
-
-unsigned char* snesXC_getIRQ_ASM_Buffer(void) {
-    return __irq_ext;
-}
-
 __near __interrupt void __irq_cop6502(void) {
 	snesXC_cop();
 }

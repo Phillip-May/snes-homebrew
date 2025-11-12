@@ -127,6 +127,3 @@ void snesXC_nmi(void) {
     // NMI (Non-Maskable Interrupt) handler
 }
 
-void snesXC_irq(void) {
-    // IRQ (Interrupt Request) handler
-}

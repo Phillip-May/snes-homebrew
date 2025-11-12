@@ -12,74 +12,9 @@
 
 #include "../shared/src/snes_regs_xc.h"
 #include "../shared/src/initsnes.h"
+#include "port/port.h"
 
 // 60fps vs 30fps physics scaling factor
-
-//Thank you llvm mos
-//making me micro manage where my graphics data in ROM
-#ifdef __SNESXC_16BIT_POINTERS__
-#pragma clang section rodata="rom_bank_1"
-#endif
-#include "clouds.h"
-#include "sprite_data.h"
-#include "snes_font.h"
-
-//Level data, ideally place these ocntiguiously in the same bank
-//Each one is 2347 bytes pre object data
-//32 levels, 2347 * 32 = 75104 bytes
-//So it'll need to be split into 3 banks
-//13 ish levels per bank
-#pragma SECTION CONST=CEL_K_00
-#ifdef __SNESXC_16BIT_POINTERS__
-#pragma clang section rodata="rom_bank_2"
-#endif
-#include "levelDat/tilemap_level1.h"
-#include "levelDat/tilemap_level2.h"
-#include "levelDat/tilemap_level3.h"
-#include "levelDat/tilemap_level4.h"
-#include "levelDat/tilemap_level5.h"
-#include "levelDat/tilemap_level6.h"
-#include "levelDat/tilemap_level7.h"
-#include "levelDat/tilemap_level8.h"
-#include "levelDat/tilemap_level9.h"
-#include "levelDat/tilemap_level10.h"
-#include "levelDat/tilemap_level11.h"
-#include "levelDat/tilemap_level12.h"
-#pragma SECTION CONST=CEL_K_01
-#ifdef __SNESXC_16BIT_POINTERS__
-#pragma clang section rodata="rom_bank_3"
-#endif
-#include "levelDat/tilemap_level13.h"
-#include "levelDat/tilemap_level14.h"
-#include "levelDat/tilemap_level15.h"
-#include "levelDat/tilemap_level16.h"
-#include "levelDat/tilemap_level17.h"
-#include "levelDat/tilemap_level18.h"
-#include "levelDat/tilemap_level19.h"
-#include "levelDat/tilemap_level20.h"
-#include "levelDat/tilemap_level21.h"
-#include "levelDat/tilemap_level22.h"
-#include "levelDat/tilemap_level23.h"
-#include "levelDat/tilemap_level24.h"
-#pragma SECTION CONST=CEL_K_02
-#ifdef __SNESXC_16BIT_POINTERS__
-#pragma clang section rodata="rom_bank_4"
-#endif
-
-#include "levelDat/tilemap_level25.h"
-#include "levelDat/tilemap_level26.h"
-#include "levelDat/tilemap_level27.h"
-#include "levelDat/tilemap_level28.h"
-#include "levelDat/tilemap_level29.h"
-#include "levelDat/tilemap_level30.h"
-#include "levelDat/tilemap_level31.h"
-#include "levelDat/tilemap_level32.h"
-
-//These I've manually set, ideally a map editor would set these
-#ifdef __SNESXC_16BIT_POINTERS__
-#pragma clang section rodata="rom_bank_0"
-#endif
-#pragma SECTION CONST=CONST
 
 //8x8 sprites, 4bpp indexed sprite data
 //16x4 sprite sheet is stored sequentially
@@ -87,14 +22,9 @@
 //Bank number macros
 #define BANK_00  0  // Default/current bank (where code runs)
 #define BANK_01  1  // rom_bank_1 (fonts, sprites, clouds)
-#define BANK_02  2  // rom_bank_2 (levels 1-12)
-#define BANK_03  3  // rom_bank_3 (levels 13-24)
-#define BANK_04  4  // rom_bank_4 (levels 25-32)
 
 //Prototypes
 int16_t randint16(int16_t min, int16_t max);
-void drawTextBG1(const unsigned char *text,uint8_t x, uint8_t y);
-void LoadInitialGraphics(void);
 
 //Basic math functions that a compiler should have
 static int16_t sign(int16_t v) {
@@ -123,142 +53,25 @@ void playSoundEffect(enum eSoundEffect soundEffect){
 }
 
 
-//Black and white by default
-bool GLOBAL_RELOADBG1VRAM = false;
-uint8_t GLOBAL_BG1Pal[16];
-bool GLOBAL_SwapCloudPal = false;
-uint8_t GLBOAL_M0BG1TileMap[32*32];
 
-union uOAMCopy GLOBAL_OAMCopy;
 uint8_t GLOBAL_InputLo = 0;
 uint8_t GLOBAL_InputHi = 0;
-
-
-
-typedef struct {
-    fixed_t x;
-    fixed_t y;
-} VEC_F;
-
-typedef struct {
-    int16_t x;
-    int16_t y;
-} VEC_I;
+uint8_t GLOBAL_InputState = 0;
 
 enum smokeStates {SMOKE_SPRITE_1 = 0x62,SMOKE_SPRITE_2 = 0x64,SMOKE_SPRITE_3 = 0x66};
 
-typedef struct {
-    VEC_I pos;
-    enum eOBJType {
-        OBJ_UNUSED = 0,
-        OBJ_PLAYER,
-        OBJ_SMOKE,
-        OBJ_DOUBLE_JUMP_ORB,
-        //Map placed objects
-        OBJ_KEY = 8,
-        OBJ_PLATMOV_R = 11,
-        OBJ_PLATMOV_L = 12,
-        OBJ_SPRING = 18,
-        OBJ_CHEST = 20,
-        OBJ_BALLOON = 22,
-        OBJ_COLLAPSE_TILE = 23,
-        OBJ_STRAWBERRY = 26,
-        OBJ_FLYING_BERRY = 28,
-        OBJ_DECO_TREE = 60,
-        OBJ_DECO_FLOWER = 62,
-        OBJ_BREAKABLE_WALL = 64,
-        OBJ_MONUMENT = 70,
-        OBJ_BIG_CHEST = 96,
-        OBJ_BIG_CHEST_2 = 97
-    } eType;
-    union sOBJData{
-        struct sSmokeData{
-            uint8_t frameCount;
-            uint8_t smokeSpriteState;
-            uint8_t speedX;
-            uint8_t speedY;
-            bool flipX;
-            bool flipY;
-        } smoke;
-        struct sStrawberryData{
-            uint8_t startY;
-            uint16_t frameCount;
-            uint8_t isCollected;    
-            uint8_t bgTextX;
-            uint8_t bgTextY;
-        } strawberry;
-        struct sSpringData{
-            bool isDisabled;
-            uint8_t frameCount;
-            int8_t linkedCollapseTileIndex;
-        } spring;
-        struct sCollapseTileData{
-            uint8_t state;
-            uint8_t frameCount;
-            int8_t linkedSpringIndex;
-        } collapseTile;
-        struct sBalloonData{
-            uint8_t state;
-            uint8_t frameCount;
-            uint16_t yTableIndex;
-            uint8_t hideFrameCount;
-        } balloon;
-        struct sPlatMovData{
-            uint8_t acc;
-            uint8_t hitboxIndex;
-            bool isMovingLeft;
-        } platMov;
-        struct sKeyData{
-            uint8_t linkedChestIndex;
-            bool isFlipped;
-            uint8_t spriteValue;
-            uint8_t frameCount;
-            uint8_t state;
-        } key;
-        struct sChestData {
-            bool keyIsCollected;
-            uint8_t frameCount;
-            uint8_t state;
-        } chest;
-        struct sMonumentData {
-            uint8_t state;
-        } monument;
-        struct sBigChestData {
-            uint8_t state;
-            uint8_t frameCount;
-        } bigChest;
-        struct sDoubleJumpOrbData {
-            int8_t frameCount;
-        } doubleJumpOrb;
-    } data;
-    
-} OBJ_DATA;
-
 #define GLBOAL_OBJ_LIST_SIZE 30
 OBJ_DATA GLOBAL_OBJList[GLBOAL_OBJ_LIST_SIZE] = {0};
-struct gameStateData {
-    uint16_t currentRoomID;
-} GLOBAL_GameState;
 
-//Global data used to update hardware registers
-uint16_t GLOBAL_ScrollBG1X = 0;
-uint16_t GLOBAL_ScrollBG1Y = 0;
 
-uint16_t GLOBAL_ScrollBG2X = 0;
-uint16_t GLOBAL_ScrollBG2Y = 0;
 
-uint16_t GLOBAL_ScrollBG3X = 0;
-uint16_t GLOBAL_ScrollBG3Y = 0;
 
-uint16_t GLOBAL_ScrollBG4X = 0;
-uint16_t GLOBAL_ScrollBG4Y = 0;
 
 
 uint16_t GLOBAL_FrameCountVBLANK = 0;
 uint16_t GLOBAL_FrameCount = 0;
 
 uint8_t GLOBAL_FreezeFrames = 0;
-uint8_t GLOBAL_ShakeFrames = 0;
 
 uint8_t GLOBAL_PausePlayerFrames = 0;
 //Game state globals
@@ -267,66 +80,9 @@ bool GLOBAL_DoubleDashUnlocked = false;
 
 enum eMovingPlatformDir {MOVING_PLATFORM_DIR_IDLE = 0, MOVING_PLATFORM_DIR_LEFT = 1, MOVING_PLATFORM_DIR_RIGHT = 2};
 
-struct sActiveLevelData
-{
-    //Setup data
-    uint16_t roomSizeX, roomSizeY;
+struct sActiveLevelData GLOBAL_ActiveLevel;
 
-    // Tilemaps: 512 entries of 2 bytes each = 1024 bytes
-    uint16_t tilemapBg2[512];
-    uint16_t tilemapBg3[512];
-    
-    // Palette: max 8 entries of 8 bytes each = 64 bytes
-    uint8_t paletteBg[64];
-
-    //Runtime data
-    uint8_t collisionFlagsReset[256]; // Original collision flags (reset state)
-    uint8_t collisionFlagsArr[256];
-
-    //List of moving platform hitboxes
-    //StartX, StartY, EndX, EndY
-    uint8_t movingPlatformCount;
-    uint8_t movingPlatformDir[16];
-    uint8_t movingPlatformHitboxes[16*4];
-
-    uint8_t scrollPointY;
-    uint8_t playerSpawnX, playerSpawnY;
-    // Object data: max 64 objects
-    uint8_t objectCount;
-    uint8_t objectData[64];
-    bool isLevelLoadedVRAM;
-} GLOBAL_ActiveLevel;
-
-struct sPlayerData
-{
-    OBJ_DATA objData;
-    VEC_F posF;
-    int8_t movingPlatformIndex;
-
-    VEC_F spd;
-
-    enum ePlayerSprite {PLAYER_SPRITE_IDLE = 0,
-        PLAYER_SPRITE_WALK_1 = 2,
-        PLAYER_SPRITE_WALK_2 = 4,
-        PLAYER_SPRITE_WALK_3 = 6,
-        PLAYER_SPRITE_WALL = 8,
-        PLAYER_SPRITE_DOWN = 10,
-        PLAYER_SPRITE_UP = 12
-    } eSriteState;
-    uint8_t graceTimer;
-
-    bool doubleDashUnlocked;
-    VEC_F dashTarget;
-    VEC_F dashAccel;
-    uint8_t dashesLeft;
-    int8_t dashCounter;
-
-
-    bool isFliped;
-} GLOBAL_PlayerData;
-
-#define CALC_OAM_TABLE2_BYTE(index, sizeBit, xBit, currentByte) \
-    (((currentByte) & ~(0x03 << (((index) % 4) * 2))) | ((((sizeBit) << 1) | (xBit)) << (((index) % 4) * 2)))
+struct sPlayerData GLOBAL_PlayerData;
 
 void initObject(enum eOBJType eType, int16_t x, int16_t y);
 
@@ -342,46 +98,39 @@ void smokeInit(uint8_t index) {
     GLOBAL_OBJList[index].data.smoke.speedY = randint16(3,5);
     GLOBAL_OBJList[index].data.smoke.flipX = randint16(0,1);
     GLOBAL_OBJList[index].data.smoke.flipY = randint16(0,1);    
-    { //One time setup of the sprite
-        uint8_t properties = 0;
-        uint8_t table2Index = index / 4; //4 entries per byte
-        uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-        GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-
-        properties |= 0x30; //Set priority to 3
-        properties |= 0x04; //Set palette to 2
+    {
+        uint8_t properties = 0x30u; // priority 3
+        properties |= 0x04u; // palette 2
         properties |= ((uint8_t)GLOBAL_OBJList[index].data.smoke.flipX) << 6;
         properties |= ((uint8_t)GLOBAL_OBJList[index].data.smoke.flipY) << 7;
-        GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
+        GLOBAL_OBJList[index].oamTile = SMOKE_SPRITE_1;
+        GLOBAL_OBJList[index].oamProps = properties;
+        GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
     }
 }
 
 void smokeUpdate(uint8_t index) {
-    uint8_t properties = 0;
-    uint8_t table2Write = 0;
-    GLOBAL_OBJList[index].data.smoke.frameCount++;
+    OBJ_DATA *smoke = &GLOBAL_OBJList[index];
+    smoke->data.smoke.frameCount++;
     // 1/3 of it's time per state
-    GLOBAL_OBJList[index].data.smoke.smokeSpriteState = SMOKE_SPRITE_1 + ((GLOBAL_OBJList[index].data.smoke.frameCount / 10) * 2);
+    smoke->data.smoke.smokeSpriteState = SMOKE_SPRITE_1 + ((smoke->data.smoke.frameCount / 10) * 2);
     // 0.5 seconds
-    if (GLOBAL_OBJList[index].data.smoke.frameCount >= 30) {
+    if (smoke->data.smoke.frameCount >= 30) {
         //Destroy self
-        GLOBAL_OBJList[index].eType = OBJ_UNUSED;
-        // Hide the sprite by moving it off-screen
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;        
+        smoke->eType = OBJ_UNUSED;
+        smoke->flags |= OBJ_FLAG_DIRTY;
         return;
     }
 
-    //Drawing code
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = GLOBAL_OBJList[index].data.smoke.smokeSpriteState;
-
+    smoke->oamTile = smoke->data.smoke.smokeSpriteState;
+    smoke->flags |= OBJ_FLAG_DIRTY;
 }
 
 
 #define COLLISION_FLAG_INDEX_FROM_TILE_XY(x,y) ((x) + (y) * 16)
 void breakableWallInit(uint8_t index) {
     enum eBreakableWallSprite {BREAKABLE_WALL_SPRITE_1 = 0x82};
+    OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
     uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
@@ -394,35 +143,17 @@ void breakableWallInit(uint8_t index) {
     properties |= 0x02; //Set palette to 1
     properties |= 0x00; //Set flipX to 0
     properties |= 0x00; //Set flipY to 0
-    { //One time setup of the sprite
-        uint8_t i;
-        uint8_t properties = 0;
-        uint8_t table2Index = index / 4; //4 entries per byte
-        uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-        GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-        //Coop some slots for the rest of this object
-        for (i = 1; i < 4; i++) {
-            table2Index = (GLBOAL_OBJ_LIST_SIZE+i) / 4; //4 entries per byte
-            byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+i, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-            GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-        }
-    }
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = BREAKABLE_WALL_SPRITE_1;
-    //Coop some slots for the rest of this object
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+1].CHARNUM = BREAKABLE_WALL_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+1].PROPERTIES = properties | 0xC0; //Set XY and flip to 1
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+2].PROPERTIES = properties | 0x40; //Set flipY to 1
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+2].CHARNUM = BREAKABLE_WALL_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+3].PROPERTIES = properties | 0x80; //Set flipX to 1
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+3].CHARNUM = BREAKABLE_WALL_SPRITE_1;
+    wall->oamTile = BREAKABLE_WALL_SPRITE_1;
+    wall->oamProps = properties;
+    wall->flags |= OBJ_FLAG_DIRTY;
 
 }
 
 void breakableWallUpdate(uint8_t index) {
     //Check if player is touching the wall
-    uint8_t thisX = GLOBAL_OBJList[index].pos.x;
-    uint8_t thisY = GLOBAL_OBJList[index].pos.y;
+    OBJ_DATA *wall = &GLOBAL_OBJList[index];
+    uint8_t thisX = wall->pos.x;
+    uint8_t thisY = wall->pos.y;
     uint8_t playerX = GLOBAL_PlayerData.objData.pos.x;
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
 
@@ -443,11 +174,8 @@ void breakableWallUpdate(uint8_t index) {
         initObject(OBJ_STRAWBERRY, thisX + 8, thisY + 8);
 
         //Destroy the object
-        GLOBAL_OBJList[index].eType = OBJ_UNUSED;
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240; //Hide the sprite
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+1].OBJY = 240; //Hide the sprite
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+2].OBJY = 240; //Hide the sprite
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+3].OBJY = 240; //Hide the sprite
+        wall->eType = OBJ_UNUSED;
+        wall->flags |= OBJ_FLAG_DIRTY;
         //Restore the original collision data
         GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)];
         GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)]   = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)];
@@ -455,41 +183,28 @@ void breakableWallUpdate(uint8_t index) {
         GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY+1)] = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY+1)];
         return;
     }
-    
-    //Drawing code
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+1].OBJX = thisX+16;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+1].OBJY = thisY+16 - GLOBAL_ScrollBG2Y;
+    wall->flags |= OBJ_FLAG_DIRTY;
+}
 
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+2].OBJX = thisX+16;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+2].OBJY = thisY - GLOBAL_ScrollBG2Y;
+static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t properties) {
+    OBJ_DATA *decor = &GLOBAL_OBJList[index];
+    decor->oamTile = tile;
+    decor->oamProps = properties;
+    decor->flags |= OBJ_FLAG_DIRTY;
+}
 
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+3].OBJX = thisX;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+3].OBJY = thisY+16 - GLOBAL_ScrollBG2Y;
-
+static void updateSimpleDecorSprite(uint8_t index) {
+    GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
 }
 
 enum eFlowerSprite {FLOWER_SPRITE_1 = 0x80};
 
 void flowerInit(uint8_t index) {
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x02; //Set palette to 1
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = FLOWER_SPRITE_1;
+    initSimpleDecorSprite(index, FLOWER_SPRITE_1, 0x32); // priority 3, palette 1
 }
 
 void flowerUpdate(uint8_t index) {
-    //Drawing code
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
+    updateSimpleDecorSprite(index);
 }
 
 enum eCollapseTileSprite {
@@ -506,8 +221,6 @@ enum eCollapseTileState {
 
 void collapseTileInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
     uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
     uint8_t i;
@@ -532,9 +245,9 @@ void collapseTileInit(uint8_t index) {
         }
     }
 
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = COLLAPSE_TILE_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = 0x32; //Set palette to 7
+    this->oamTile = COLLAPSE_TILE_SPRITE_1;
+    this->oamProps = 0x32; //Set palette to 7
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 void collapseTileUpdate(uint8_t index) {
@@ -545,6 +258,9 @@ void collapseTileUpdate(uint8_t index) {
     uint16_t playerY = GLOBAL_PlayerData.objData.pos.y;
     bool isPlayerTouching = (thisX <= playerX + 20 && thisX + 20 >= playerX && 
                             thisY <= playerY + 20 && thisY + 20 >= playerY);
+
+    this->oamProps = 0x32; //Ensure consistent properties
+    this->flags |= OBJ_FLAG_DIRTY;
 
     // State machine for collapse tile
     switch (this->data.collapseTile.state) {
@@ -557,6 +273,7 @@ void collapseTileUpdate(uint8_t index) {
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_COLLAPSING;
                 this->data.collapseTile.frameCount = 30;
             }
+            this->oamTile = COLLAPSE_TILE_SPRITE_1;
             break;
             
         case COLLAPSE_TILE_STATE_COLLAPSING:
@@ -567,15 +284,13 @@ void collapseTileUpdate(uint8_t index) {
                 GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)] &= ~0x01; //Unset the solid flag
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_HIDDEN;
                 this->data.collapseTile.frameCount = 120;
-                GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
-                GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = COLLAPSE_TILE_SPRITE_1;
+                this->oamTile = COLLAPSE_TILE_SPRITE_1;
                 return;
             }
-            GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = COLLAPSE_TILE_SPRITE_1 + (2 - (this->data.collapseTile.frameCount / 10)) * 2;
+            this->oamTile = COLLAPSE_TILE_SPRITE_1 + (uint8_t)((2 - (this->data.collapseTile.frameCount / 10)) * 2);
             break;
             
         case COLLAPSE_TILE_STATE_HIDDEN:
-            GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
             if (this->data.collapseTile.linkedSpringIndex > 0) {
                 OBJ_DATA *linkedSpringTile = &GLOBAL_OBJList[this->data.collapseTile.linkedSpringIndex];
                 linkedSpringTile->data.spring.isDisabled = true;
@@ -596,29 +311,19 @@ void collapseTileUpdate(uint8_t index) {
         default:
             break;
     }
-
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
 }
 
 enum eSpringSprite {SPRING_SPRITE_1 = 0x2E, SPRING_SPRITE_2 = 0x40};
 
 void springInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
     this->data.spring.frameCount = 0;
     this->data.spring.isDisabled = false;
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
     this->data.spring.linkedCollapseTileIndex = -1;
 
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x02; //Set palette to 2
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = SPRING_SPRITE_1;
+    this->oamTile = SPRING_SPRITE_1;
+    this->oamProps = 0x32; // priority 3, palette 2
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 void springUpdate(uint8_t index) {
@@ -628,12 +333,13 @@ void springUpdate(uint8_t index) {
     uint8_t thisY = this->pos.y;
     uint8_t playerX = GLOBAL_PlayerData.objData.pos.x;
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
-    uint8_t properties = 0;
     bool isPlayerTouching = false;
 
     if (this->data.spring.isDisabled) {
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
         this->data.spring.frameCount = 0;
+        this->oamTile = SPRING_SPRITE_1;
+        this->oamProps = 0x32;
+        this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
 
@@ -668,59 +374,33 @@ void springUpdate(uint8_t index) {
             }
         }
     }
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-
     //Spring animation state machine
     if (this->data.spring.frameCount > 0) {
         this->data.spring.frameCount--;
-        properties |= 0x06; //Set palette to 6
-        GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = SPRING_SPRITE_2;
-        GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;        
+        this->oamTile = SPRING_SPRITE_2;
+        this->oamProps = 0x36; // priority 3, palette 6
     }
     else {
-        properties |= 0x02; //Set palette to 2
-        GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = SPRING_SPRITE_1;
-        GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;        
+        this->oamTile = SPRING_SPRITE_1;
+        this->oamProps = 0x32; // priority 3, palette 2
     }
 
-    //Drawing code
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 enum eBalloonSprite {BALLOON_SPRITE_1 = 0x46, BALLOON_STRING_1 = 0x28, BALLOON_STRING_2 = 0x2A, BALLOON_STRING_3 = 0x2C};
 enum eBalloonState {BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1};
 void balloonInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t stringIndex = GLBOAL_OBJ_LIST_SIZE+16+index;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    uint8_t properties = 0;
     this->data.balloon.state = BALLOON_STATE_IDLE;
     this->data.balloon.frameCount = 0;
     this->data.balloon.yTableIndex = 0;
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x06; //Set palette to 0
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = BALLOON_SPRITE_1;
-    //Coop a slot for the string
-    table2Index = stringIndex / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(stringIndex, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties = 0;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x04; //Set palette to 4
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-    GLOBAL_OAMCopy.arr.OAMArray[stringIndex].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[stringIndex].CHARNUM = BALLOON_STRING_1;
-
+    this->data.balloon.hideFrameCount = 0;
+    this->data.balloon.spriteYOffset = 0;
+    this->data.balloon.stringTile = BALLOON_STRING_1;
+    this->oamTile = BALLOON_SPRITE_1;
+    this->oamProps = 0x36; // priority 3, palette 0
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 
@@ -757,7 +437,6 @@ void balloonUpdate(uint8_t index) {
 
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     int8_t yOffset = balloon_ytable[this->data.balloon.yTableIndex];
-    uint8_t stringIndex = GLBOAL_OBJ_LIST_SIZE+16+index;
     bool isPlayerTouching = false;
 
     this->data.balloon.frameCount += 1;
@@ -769,53 +448,41 @@ void balloonUpdate(uint8_t index) {
     if (this->data.balloon.yTableIndex >= BALLON_YTABLE_SIZE) {
         this->data.balloon.yTableIndex = 0;
     }
-    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x-16) && 
-                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) && 
-                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y-8) && 
+
+    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x-16) &&
+                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) &&
+                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y-8) &&
                        (GLOBAL_PlayerData.objData.pos.y < this->pos.y+18);
 
     if (isPlayerTouching && this->data.balloon.state == BALLOON_STATE_IDLE) {
         this->data.balloon.state = BALLOON_STATE_POPPED;
-        this->data.balloon.hideFrameCount = 60*2;
+        this->data.balloon.hideFrameCount = 60 * 2;
         GLOBAL_PlayerData.dashesLeft = GLOBAL_PlayerData.doubleDashUnlocked ? 2 : 1;
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
-        GLOBAL_OAMCopy.arr.OAMArray[stringIndex].OBJY = 240;
         playSoundEffect(SOUND_EFFECT_BALLOON_POP);
+        this->flags |= OBJ_FLAG_DIRTY;
+        return;
     }
 
     if (this->data.balloon.state == BALLOON_STATE_POPPED) {
         if (this->data.balloon.hideFrameCount > 0) {
             this->data.balloon.hideFrameCount -= 1;
+            this->flags |= OBJ_FLAG_DIRTY;
+            return;
         }
-        if (this->data.balloon.hideFrameCount == 0) {
-            this->data.balloon.state = BALLOON_STATE_IDLE;
-        }
-        return;
+        this->data.balloon.state = BALLOON_STATE_IDLE;
     }
 
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y + yOffset;
-    //Draw the string
-    GLOBAL_OAMCopy.arr.OAMArray[stringIndex].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[stringIndex].OBJY = this->pos.y - GLOBAL_ScrollBG2Y + 14 + yOffset;
-    GLOBAL_OAMCopy.arr.OAMArray[stringIndex].CHARNUM = balloonStringFrames[this->data.balloon.frameCount];
+    this->data.balloon.spriteYOffset = yOffset;
+    this->data.balloon.stringTile = balloonStringFrames[this->data.balloon.frameCount];
+    this->oamTile = BALLOON_SPRITE_1;
+    this->oamProps = 0x36; // priority 3, palette 0
+    this->flags |= OBJ_FLAG_DIRTY;
 }
-
 
 enum ePlatMovSprite {PLATMOV_SPRITE_1 = 0x24, PLATMOV_SPRITE_2 = 0x26};
 void platMovInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->pos.y -= 2;
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    uint8_t rightSpriteIndex = index + GLBOAL_OBJ_LIST_SIZE + 20;
-    uint8_t extraSpriteIndex = index + GLBOAL_OBJ_LIST_SIZE + 20 + GLBOAL_OBJ_LIST_SIZE;
-
-    uint8_t table2IndexRight = rightSpriteIndex / 4;
-    uint8_t byteWriteRight = CALC_OAM_TABLE2_BYTE(rightSpriteIndex, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2IndexRight]);
-    uint8_t table2IndexExtra = extraSpriteIndex / 4;
-    uint8_t byteWriteExtra = CALC_OAM_TABLE2_BYTE(extraSpriteIndex, 1, 1, GLOBAL_OAMCopy.arr.OAMTable2[table2IndexExtra]);
     uint8_t hitboxIndex;    
     if (this->eType == OBJ_PLATMOV_L) {
         this->data.platMov.isMovingLeft = false;
@@ -827,31 +494,19 @@ void platMovInit(uint8_t index) {
         this->pos.x -= 16;
     }
     
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    GLOBAL_OAMCopy.arr.OAMTable2[table2IndexRight] = byteWriteRight;
-    GLOBAL_OAMCopy.arr.OAMTable2[table2IndexExtra] = byteWriteExtra;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x04; //Set palette to 2
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = PLATMOV_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[rightSpriteIndex].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[rightSpriteIndex].CHARNUM = PLATMOV_SPRITE_2;
-    //So the extra sprite is for the left side transition
-    GLOBAL_OAMCopy.arr.OAMArray[extraSpriteIndex].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[extraSpriteIndex].CHARNUM = PLATMOV_SPRITE_2;
+    this->oamTile = PLATMOV_SPRITE_1;
+    this->oamProps = 0x34; // priority 3, palette 2
     //Add the hitbox to the list
     hitboxIndex = GLOBAL_ActiveLevel.movingPlatformCount * 4;
     this->data.platMov.hitboxIndex = hitboxIndex;
     GLOBAL_ActiveLevel.movingPlatformCount++;
     this->data.platMov.acc = 0;
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 void platMovUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t rightSpriteIndex = index + GLBOAL_OBJ_LIST_SIZE + 20;
-    uint8_t extraSpriteIndex = index + GLBOAL_OBJ_LIST_SIZE + 20 + GLBOAL_OBJ_LIST_SIZE;
     uint8_t hitboxIndex = this->data.platMov.hitboxIndex;
-    bool isPlayerTouching = false;
 
     //Fixed point math too expensive, trickery ensues, 0.65f speed is cursed
     this->data.platMov.acc += 65; // numerator
@@ -885,38 +540,7 @@ void platMovUpdate(uint8_t index) {
     }
 
 
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[rightSpriteIndex].OBJX = GLOBAL_OBJList[index].pos.x + 16;
-    GLOBAL_OAMCopy.arr.OAMArray[rightSpriteIndex].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
-    
-    {
-    uint8_t x = this->pos.x;
-    int16_t xMod = x % 256;
-    int16_t extraX = 0;
-    uint8_t charNum = 0;
-    
-    if ((xMod > 240)  && (!this->data.platMov.isMovingLeft)) { // Right side transition
-        extraX = x - 256;
-        charNum = PLATMOV_SPRITE_1;
-    } else if (((xMod + 16) > 240) && (!this->data.platMov.isMovingLeft)) {
-        extraX = x - 256 + 16;
-        charNum = PLATMOV_SPRITE_2;
-    } else if ((xMod > 240) && this->data.platMov.isMovingLeft) { // Left side transition
-        extraX = x + 256;
-        charNum = PLATMOV_SPRITE_1;     
-    } else if ((xMod > 224) && this->data.platMov.isMovingLeft) { // Left side transition
-        extraX = x + 256 + 16;
-        charNum = PLATMOV_SPRITE_2;     
-    } else {
-        GLOBAL_OAMCopy.arr.OAMArray[extraSpriteIndex].OBJY = 240;
-        return;
-    }
-    
-    GLOBAL_OAMCopy.arr.OAMArray[extraSpriteIndex].OBJX = extraX;
-    GLOBAL_OAMCopy.arr.OAMArray[extraSpriteIndex].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[extraSpriteIndex].CHARNUM = charNum;
-    }
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 enum eKeySprite {KEY_SPRITE_1 = 0x0E, KEY_SPRITE_2 = 0x20, KEY_SPRITE_3 = 0x22};
@@ -925,13 +549,12 @@ enum eKeyState {KEY_STATE_1 = 0, KEY_STATE_2 = 1, KEY_STATE_3 = 2, KEY_STATE_4 =
 void keyInit(uint8_t index) {
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = KEY_SPRITE_1;
+
     this->data.key.frameCount = 0;
-    this->data.key.linkedChestIndex = -1;
+    this->data.key.linkedChestIndex = (uint8_t)-1;
     this->data.key.state = KEY_STATE_1;
+    this->data.key.isFlipped = false;
+    this->data.key.spriteValue = KEY_SPRITE_1;
 
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_CHEST) {
@@ -939,24 +562,27 @@ void keyInit(uint8_t index) {
         }
     }
 
+    this->oamTile = KEY_SPRITE_1;
+    this->oamProps = 0x32; // priority 3, palette 2
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 void keyUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t properties = 0;
+    uint8_t properties = 0x30; // priority 3 baseline
     bool isPlayerTouching = false;
     this->data.key.frameCount += 1;
-    
-    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x-16) && 
-                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) && 
-                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y-18) && 
-                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y+2);
+
+    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 16) &&
+                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 16) &&
+                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 18) &&
+                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y + 2);
 
     if (isPlayerTouching) {
         OBJ_DATA *chest = &GLOBAL_OBJList[this->data.key.linkedChestIndex];
         chest->data.chest.keyIsCollected = true;
         this->eType = OBJ_UNUSED;
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
+        this->flags |= OBJ_FLAG_DIRTY;
         playSoundEffect(SOUND_EFFECT_KEY_COLLECT);
         return;
     }
@@ -980,8 +606,8 @@ void keyUpdate(uint8_t index) {
             }
             break;
         case KEY_STATE_3:
-        properties |= 0x04; //Set palette to 3
-        this->data.key.spriteValue = KEY_SPRITE_3;
+            properties |= 0x04; //Set palette to 3
+            this->data.key.spriteValue = KEY_SPRITE_3;
             if (this->data.key.frameCount > 18) {
                 this->data.key.frameCount = 0;
                 this->data.key.state = KEY_STATE_4;
@@ -998,12 +624,10 @@ void keyUpdate(uint8_t index) {
             break;
     }
 
-    properties |= 0x30; //Set priority to 3
     properties |= this->data.key.isFlipped ? 0x40 : 0x00; //Set flipX
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = this->data.key.spriteValue;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
+    this->oamProps = properties;
+    this->oamTile = this->data.key.spriteValue;
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 enum eChestSprite {CHEST_SPRITE_1 = 0x42};
@@ -1012,9 +636,6 @@ enum eChestState {CHEST_STATE_IDLE = 0, CHEST_STATE_SHAKING = 1, CHEST_STATE_OPE
 void chestInit(uint8_t index) {   
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
     this->pos.x -= 8;
 
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
@@ -1027,10 +648,9 @@ void chestInit(uint8_t index) {
     this->data.chest.frameCount = 0;
     this->data.chest.state = CHEST_STATE_IDLE;
 
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x02; //Set palette to 2
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
+    this->oamTile = CHEST_SPRITE_1;
+    this->oamProps = 0x32; // priority 3, palette 2
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 void chestUpdate(uint8_t index) {
@@ -1054,47 +674,27 @@ void chestUpdate(uint8_t index) {
             break;
         case CHEST_STATE_OPEN:
             initObject(OBJ_STRAWBERRY, this->pos.x, this->pos.y - 8);
-            GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
             this->eType = OBJ_UNUSED;
+            this->flags |= OBJ_FLAG_DIRTY;
             return;
             break;
         default:
             break;
     }
 
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = CHEST_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
+    this->oamTile = CHEST_SPRITE_1;
+    this->oamProps = 0x32; // priority 3, palette 2
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 enum eMonumentSprite {MONUMENT_SPRITE_1 = 0x84, MONUMENT_SPRITE_2 = 0x86, MONUMENT_SPRITE_3 = 0x88, MONUMENT_SPRITE_4 = 0x8A};
 void monumentInit(uint8_t index) {
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x06; //Set palette to 5
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = MONUMENT_SPRITE_1;
-    //Coop some slots for the rest of the monument
-    table2Index = (GLBOAL_OBJ_LIST_SIZE+20) / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+20, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    table2Index = (GLBOAL_OBJ_LIST_SIZE+21) / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+21, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    table2Index = (GLBOAL_OBJ_LIST_SIZE+22) / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+22, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+20].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+20].CHARNUM = MONUMENT_SPRITE_2;
-    properties = 0x32; //Set palette to 5
-
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+21].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+21].CHARNUM = MONUMENT_SPRITE_3;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+22].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+22].CHARNUM = MONUMENT_SPRITE_4;   
+    OBJ_DATA *this = &GLOBAL_OBJList[index];
+    this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+    this->extraSpriteCount = 0;
+    this->oamTile = MONUMENT_SPRITE_1;
+    this->oamProps = 0x36; // priority 3, palette 5
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 
@@ -1111,16 +711,14 @@ void monumentUpdate(uint8_t index) {
     static uint8_t curLineCharCount = 0;
     static uint8_t curLineNum = 0;
 
+    this->flags |= OBJ_FLAG_DIRTY;
 
     isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) && 
                        (GLOBAL_PlayerData.objData.pos.x < this->pos.x+32) && 
                        (GLOBAL_PlayerData.objData.pos.y > this->pos.y) && 
                        (GLOBAL_PlayerData.objData.pos.y < this->pos.y+32);
 
-
     if (isPlayerTouching) {
-        //Print text, but only at 15fps, this is both to emulate the original,
-        //but also because I don't have enough spare time to do it at 60 anyway
         if (GLOBAL_FrameCount % 4 > 0) {        
             return;
         }
@@ -1139,112 +737,79 @@ void monumentUpdate(uint8_t index) {
             }
             strncpy(outputText, curLineStr, curLineCharCount);
             outputText[curLineCharCount] = '\0';
-            REG_TM = 0x1F;      
-            drawTextBG1(outputText, 40, 184 + (curLineNum * 8));
+            port_drawText((const unsigned char *)outputText, 40, (uint8_t)(184 + (curLineNum * 8)));
         }
     }
     else if (isTextDisplayed) {
         isTextDisplayed = false;
         curLineNum = 0;
-        drawTextBG1("                      ", 40, 184);
-        drawTextBG1("                      ", 40, 192);
-        drawTextBG1("                      ", 40, 200);  
-        REG_TM = 0x1E;      
+        port_drawText((const unsigned char *)"                      ", 40, 184);
+        port_drawText((const unsigned char *)"                      ", 40, 192);
+        port_drawText((const unsigned char *)"                      ", 40, 200);
     }
-
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+20].OBJX = this->pos.x + 16;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+20].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+21].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+21].OBJY = this->pos.y + 16 - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+22].OBJX = this->pos.x + 16;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+22].OBJY = this->pos.y + 16 - GLOBAL_ScrollBG2Y;
-}
-
-enum eBigChestSprite {BIG_CHEST_SPRITE_1 = 0x8C, BIG_CHEST_SPRITE_2 = 0x8E};
-void bigChestInit(uint8_t index) {
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    table2Index = (GLBOAL_OBJ_LIST_SIZE+10) / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+10, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x08; //Set palette to 4
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = BIG_CHEST_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].CHARNUM = BIG_CHEST_SPRITE_2;
 }
 
 enum eBigChestState {BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2};
 
+enum eBigChestSprite {BIG_CHEST_SPRITE_1 = 0x8C, BIG_CHEST_SPRITE_2 = 0x8E};
+void bigChestInit(uint8_t index) {
+    OBJ_DATA *this = &GLOBAL_OBJList[index];
+    this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+    this->extraSpriteCount = 0;
+    this->data.bigChest.state = BIG_CHEST_STATE_IDLE;
+    this->data.bigChest.frameCount = 0;
+    this->oamTile = BIG_CHEST_SPRITE_1;
+    this->oamProps = 0x38; // priority 3, palette 4
+    this->flags |= OBJ_FLAG_DIRTY;
+}
 
 void bigChestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    static uint16_t curColour = 0;
     bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) && 
                             (GLOBAL_PlayerData.objData.pos.x < this->pos.x+32) && 
                             (GLOBAL_PlayerData.objData.pos.y > this->pos.y) && 
                             (GLOBAL_PlayerData.objData.pos.y < this->pos.y+32);
+
+    this->oamTile = BIG_CHEST_SPRITE_1;
+    this->oamProps = 0x38; // priority 3, palette 4
+    this->flags |= OBJ_FLAG_DIRTY;
+
     switch (this->data.bigChest.state) {
         case BIG_CHEST_STATE_IDLE:
-            GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-            GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
-            GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJX = this->pos.x + 16;
-            GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
             if (isPlayerTouching) {
-                //Stop music
                 playSoundEffect(SOUND_EFFECT_BIG_CHEST);
                 initObject(OBJ_SMOKE,this->pos.x,this->pos.y);
                 initObject(OBJ_SMOKE,this->pos.x+16,this->pos.y);
-                GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
-                GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJY = 240;
                 this->data.bigChest.state = BIG_CHEST_STATE_OPEN_ANIM;
                 this->data.bigChest.frameCount = 0;
-                curColour = 0;
-                GLOBAL_ShakeFrames = 120;
+                GLOBAL_ActiveLevel.shakeFrames = 120;
                 GLOBAL_PausePlayerFrames = 120;
             }
             break;
         case BIG_CHEST_STATE_OPEN_ANIM:
             this->data.bigChest.frameCount += 1;
-            curColour += 171;
-            GLOBAL_BG1Pal[0] = curColour;
-            GLOBAL_BG1Pal[1] = curColour >> 8;            
             if (this->data.bigChest.frameCount > 120) {
-                GLOBAL_BG1Pal[0] = 0x90;
-                GLOBAL_BG1Pal[1] = 0x28;
                 this->data.bigChest.state = BIG_CHEST_STATE_OPENED;
             }
             break;
         case BIG_CHEST_STATE_OPENED:
-            GLOBAL_SwapCloudPal = true;
+            GLOBAL_ActiveLevel.swapCloudPal = true;
             initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
-            GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
-            GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJY = 240;
             this->eType = OBJ_UNUSED;
+            this->flags |= OBJ_FLAG_DIRTY;
             return;
-            break;
     }
 }
 
 enum eDoubleJumpOrbSprite {DOUBLE_JUMP_ORB_SPRITE_1 = 0xA0};
 void doubleDashOrbInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x08; //Set palette to 4
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = DOUBLE_JUMP_ORB_SPRITE_1;
+    this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+    this->extraSpriteCount = 0;
+    this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
+    this->oamProps = 0x38; // priority 3, palette 4
     this->data.doubleJumpOrb.frameCount = 0;
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 void doubleDashOrbUpdate(uint8_t index) {
@@ -1253,6 +818,10 @@ void doubleDashOrbUpdate(uint8_t index) {
     //alternatively 1 every 2 frames
     static int16_t speedY = -4;  // -2 * 2 (initial speed)
     static int16_t accelAccumulator = 0;
+
+    this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
+    this->oamProps = 0x38; // priority 3, palette 4
+    this->flags |= OBJ_FLAG_DIRTY;
 
     // Every frame:
     accelAccumulator += 1;  // 0.5 * 2
@@ -1273,64 +842,35 @@ void doubleDashOrbUpdate(uint8_t index) {
             GLOBAL_DoubleDashUnlocked = true;
             GLOBAL_PlayerData.dashesLeft = 2;
             GLOBAL_PlayerData.doubleDashUnlocked = true;
-            GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
+            GLOBAL_ActiveLevel.swapActivePalette = true;
             this->eType = OBJ_UNUSED;
+            this->flags |= OBJ_FLAG_DIRTY;
             return;
         }
     }
     else {
         this->pos.y += speedY;
     }
-
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
 }
 
 void strawberryInit(uint8_t index) {
     enum eStrawberrySprite {STRAWBERRY_SPRITE_1 = 0x4E};
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OBJList[index].data.strawberry.startY = GLOBAL_OBJList[index].pos.y;
-    GLOBAL_OBJList[index].data.strawberry.frameCount = 0;
-    GLOBAL_OBJList[index].data.strawberry.isCollected = false;
+    OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
 
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x02; //Set palette to 2
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = STRAWBERRY_SPRITE_1;
+    strawberry->data.strawberry.startY = strawberry->pos.y;
+    strawberry->data.strawberry.frameCount = 0;
+    strawberry->data.strawberry.isCollected = false;
+    strawberry->oamTile = STRAWBERRY_SPRITE_1;
+    strawberry->oamProps = 0x32; // priority 3, palette 2
+    strawberry->flags |= OBJ_FLAG_DIRTY;
 }
-
-#define TEXT_X_Y_TO_BUFFER_OFFSET(x,y) ((y*32) + x)
-
-void drawTextBG1(const unsigned char *text,uint8_t x, uint8_t y) {
-    uint16_t bufferOffset = TEXT_X_Y_TO_BUFFER_OFFSET(x/8,y/8);
-    uint8_t i;
-    for (i = 0; i < (strlen(text)); i++) {
-        GLBOAL_M0BG1TileMap[bufferOffset+i] = text[i];
-    }
-    GLOBAL_RELOADBG1VRAM = true;
-}
-
 
 void decoTreeInit(uint8_t index) {
     enum eDecoTreeSprite {DECO_TREE_SPRITE_1 = 0x6E};
-    uint8_t properties = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x02; //Set palette to 2
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = DECO_TREE_SPRITE_1;
+    initSimpleDecorSprite(index, DECO_TREE_SPRITE_1, 0x32); // priority 3, palette 2
 }
 void decoTreeUpdate(uint8_t index) {
-    //Drawing code
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
+    updateSimpleDecorSprite(index);
 }
 
 void strawberryUpdate(uint8_t index) {
@@ -1354,24 +894,26 @@ void strawberryUpdate(uint8_t index) {
 
     if (this->data.strawberry.isCollected) {
         //Do the text display animation
+        if (this->data.strawberry.frameCount == 0) {
+            GLOBAL_ActiveLevel.textFlashActive = true;
+            GLOBAL_ActiveLevel.swapActivePalette = true;
+        }
         this->data.strawberry.frameCount += 1;
-        if ((this->data.strawberry.frameCount % 2) == 0) {
-            //White
-            GLOBAL_BG1Pal[2] = 0xFF;
-            GLOBAL_BG1Pal[3] = 0x7F;
-        }
-        else {
-            GLOBAL_BG1Pal[2] = 0x1F;
-            GLOBAL_BG1Pal[3] = 0x00;
-        }
         if ((this->data.strawberry.frameCount % 4) == 0) {
-            GLOBAL_ScrollBG1Y += 1;
+            if (GLOBAL_ActiveLevel.textScrollActive && GLOBAL_ActiveLevel.textScrollOffsetY < 0xFFu) {
+                GLOBAL_ActiveLevel.textScrollOffsetY += 1;
+            }
         }
 
         if (this->data.strawberry.frameCount > (30*2)) {
-            drawTextBG1("    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
-            REG_TM = 0x1E;
+            GLOBAL_ActiveLevel.textFlashActive = false;
+            GLOBAL_ActiveLevel.swapActivePalette = true;
+            GLOBAL_ActiveLevel.textScrollActive = false;
+            GLOBAL_ActiveLevel.textScrollOffsetX = 0;
+            GLOBAL_ActiveLevel.textScrollOffsetY = 0;
+            port_drawText((const unsigned char *)"    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
             this->eType = OBJ_UNUSED;
+            this->flags |= OBJ_FLAG_DIRTY;
             return;
         }
         //Draw code for this state
@@ -1392,11 +934,12 @@ void strawberryUpdate(uint8_t index) {
         //Draw the text for the next state
         this->data.strawberry.bgTextX = this->pos.x;
         this->data.strawberry.bgTextY = this->pos.y;
-        drawTextBG1("1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
-        REG_TM = 0x1F;
-        GLOBAL_ScrollBG1X = 8-remainderX;
-        GLOBAL_ScrollBG1Y = 8-remainderY;
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y = 240;
+        port_drawText((const unsigned char *)"1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+        GLOBAL_ActiveLevel.textScrollActive = true;
+        GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - remainderX);
+        GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - remainderY);
+        this->pos.y = 240;
+        this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
     this->data.strawberry.frameCount += 1;
@@ -1405,50 +948,20 @@ void strawberryUpdate(uint8_t index) {
     }
     this->pos.y = this->data.strawberry.startY + y_positions[this->data.strawberry.frameCount];
 
-    //Drawing code
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = this->pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y - GLOBAL_ScrollBG2Y;
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 enum eFlyingBerrySprite {FLYING_BERRY_SPRITE_1 = 0x60, WING_SPRITE_1 = 0x68,
                          WING_SPRITE_2 = 0x6A, WING_SPRITE_3 = 0x6C};
 
 void flyingBerryInit(uint8_t index) {
-    uint8_t properties = 0;
-    uint8_t propertiesWingLeft = 0;
-    uint8_t propertiesWingRight = 0;
-    uint8_t table2Index = index / 4; //4 entries per byte
-    uint8_t byteWrite = CALC_OAM_TABLE2_BYTE(index, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OBJList[index].data.strawberry.frameCount = 0;
-    GLOBAL_OBJList[index].data.strawberry.isCollected = false;
-    GLOBAL_OBJList[index].data.strawberry.startY = GLOBAL_OBJList[index].pos.y;
-
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    //Wings
-    table2Index = (GLBOAL_OBJ_LIST_SIZE+10) / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+10, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    table2Index = (GLBOAL_OBJ_LIST_SIZE+11) / 4;
-    byteWrite = CALC_OAM_TABLE2_BYTE(GLBOAL_OBJ_LIST_SIZE+11, 1, 0, GLOBAL_OAMCopy.arr.OAMTable2[table2Index]);
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = byteWrite;
-    properties |= 0x30; //Set priority to 3
-    properties |= 0x02; //Set palette to 0
-    properties |= 0x00; //Set flipX to 0
-    properties |= 0x00; //Set flipY to 0
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = properties;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = FLYING_BERRY_SPRITE_1;
-    //Coop some slots for the wings
-    propertiesWingLeft |= 0x30; //Set priority to 3
-    propertiesWingLeft |= 0x04; //Set palette to 1
-    propertiesWingRight |= 0x30; //Set priority to 3
-    propertiesWingRight |= 0x04; //Set palette to 1
-    propertiesWingRight |= 0x40; //Set flipX to 1
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].PROPERTIES = propertiesWingLeft;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].CHARNUM = WING_SPRITE_1;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].PROPERTIES = propertiesWingRight;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].CHARNUM = WING_SPRITE_1;
-
-
+    OBJ_DATA *berry = &GLOBAL_OBJList[index];
+    berry->data.strawberry.frameCount = 0;
+    berry->data.strawberry.isCollected = false;
+    berry->data.strawberry.startY = berry->pos.y;
+    berry->oamTile = FLYING_BERRY_SPRITE_1;
+    berry->oamProps = 0x32; // priority 3, palette 0
+    berry->flags |= OBJ_FLAG_DIRTY;
 }
 
 void flyingBerryUpdate(uint8_t index) {
@@ -1471,27 +984,30 @@ void flyingBerryUpdate(uint8_t index) {
 
     if (this->data.strawberry.isCollected) {
         //Do the text display animation
+        if (this->data.strawberry.frameCount == 0) {
+            GLOBAL_ActiveLevel.textFlashActive = true;
+            GLOBAL_ActiveLevel.swapActivePalette = true;
+        }
         this->data.strawberry.frameCount += 1;
-        if ((this->data.strawberry.frameCount % 2) == 0) {
-            //White
-            GLOBAL_BG1Pal[2] = 0xFF;
-            GLOBAL_BG1Pal[3] = 0x7F;
-        }
-        else {
-            GLOBAL_BG1Pal[2] = 0x1F;
-            GLOBAL_BG1Pal[3] = 0x00;
-        }
         if ((this->data.strawberry.frameCount % 4) == 0) {
-            GLOBAL_ScrollBG1Y += 1;
+            if (GLOBAL_ActiveLevel.textScrollActive && GLOBAL_ActiveLevel.textScrollOffsetY < 0xFFu) {
+                GLOBAL_ActiveLevel.textScrollOffsetY += 1;
+            }
         }
 
         if (this->data.strawberry.frameCount > (30*2)) {
-            drawTextBG1("    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
-            REG_TM = 0x1E;
+            GLOBAL_ActiveLevel.textFlashActive = false;
+            GLOBAL_ActiveLevel.swapActivePalette = true;
+            GLOBAL_ActiveLevel.textScrollActive = false;
+            GLOBAL_ActiveLevel.textScrollOffsetX = 0;
+            GLOBAL_ActiveLevel.textScrollOffsetY = 0;
+            port_drawText((const unsigned char *)"    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
             this->eType = OBJ_UNUSED;
+            this->flags |= OBJ_FLAG_DIRTY;
             return;
         }
         //Draw code for this state
+        this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
 
@@ -1510,13 +1026,12 @@ void flyingBerryUpdate(uint8_t index) {
         //Draw the text for the next state
         this->data.strawberry.bgTextX = this->pos.x;
         this->data.strawberry.bgTextY = this->pos.y;
-        drawTextBG1("1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
-        REG_TM = 0x1F;
-        GLOBAL_ScrollBG1X = 8-remainderX;
-        GLOBAL_ScrollBG1Y = 8-remainderY;
-        GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = this->pos.y = 240;
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJY = this->pos.y = 240;
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].OBJY = this->pos.y = 240;
+        port_drawText((const unsigned char *)"1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+        GLOBAL_ActiveLevel.textScrollActive = true;
+        GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - remainderX);
+        GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - remainderY);
+        this->pos.y = 240;
+        this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
 
@@ -1526,27 +1041,7 @@ void flyingBerryUpdate(uint8_t index) {
         this->data.strawberry.frameCount = 0;
     }
 
-    //Drawing code
-    if (this->pos.y < this->data.strawberry.startY) {
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].CHARNUM = WING_SPRITE_1;
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].CHARNUM = WING_SPRITE_1;
-    }
-    else  if (this->pos.y > this->data.strawberry.startY) {
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].CHARNUM = WING_SPRITE_3;
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].CHARNUM = WING_SPRITE_3;
-    }
-    else {
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].CHARNUM = WING_SPRITE_2;
-        GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].CHARNUM = WING_SPRITE_2;
-    }
-
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = GLOBAL_OBJList[index].pos.x;
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = GLOBAL_OBJList[index].pos.y - GLOBAL_ScrollBG2Y;
-    //Wings
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJX = GLOBAL_OBJList[index].pos.x + 14;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+10].OBJY = GLOBAL_OBJList[index].pos.y - 4 - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].OBJX = GLOBAL_OBJList[index].pos.x - 14;
-    GLOBAL_OAMCopy.arr.OAMArray[GLBOAL_OBJ_LIST_SIZE+11].OBJY = GLOBAL_OBJList[index].pos.y - 4 - GLOBAL_ScrollBG2Y;
+    this->flags |= OBJ_FLAG_DIRTY;
 }
 
 // Returns the index of the object in the list
@@ -1559,6 +1054,11 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
             GLOBAL_OBJList[i].eType = eType;
             GLOBAL_OBJList[i].pos.x = x;
             GLOBAL_OBJList[i].pos.y = y;
+            GLOBAL_OBJList[i].flags = OBJ_FLAG_DIRTY;
+            GLOBAL_OBJList[i].oamTile = 0;
+            GLOBAL_OBJList[i].oamProps = 0;
+            GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+            GLOBAL_OBJList[i].extraSpriteCount = 0;
             switch (eType)
             {
             case OBJ_SMOKE:
@@ -1609,6 +1109,8 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
                 break;            
             default:
                 GLOBAL_OBJList[i].eType = OBJ_UNUSED;
+                GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+                GLOBAL_OBJList[i].extraSpriteCount = 0;
                 break;
             }
             return;
@@ -1617,64 +1119,118 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
 }
 
 
-void updateAllObjects(void) {
-    uint8_t i;
-    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
-        if (GLOBAL_OBJList[i].eType != OBJ_UNUSED) {
-            switch (GLOBAL_OBJList[i].eType)
-            {
-            case OBJ_SMOKE:
-                smokeUpdate(i);
-                break;
-            case OBJ_BREAKABLE_WALL:
-                breakableWallUpdate(i);
-                break;
-            case OBJ_DECO_FLOWER:
-                flowerUpdate(i);
-                break;
-            case OBJ_STRAWBERRY:
-                strawberryUpdate(i);
-                break;
-            case OBJ_DECO_TREE:
-                decoTreeUpdate(i);
-                break;
-            case OBJ_SPRING:
-                springUpdate(i);
-                break;
-            case OBJ_FLYING_BERRY:
-                flyingBerryUpdate(i);
-                break;
-            case OBJ_COLLAPSE_TILE:
-                collapseTileUpdate(i);
-                break;
-            case OBJ_BALLOON:
-                balloonUpdate(i);
-                break;
-            case OBJ_PLATMOV_L:
-            case OBJ_PLATMOV_R:
-                platMovUpdate(i);
-                break;
-            case OBJ_KEY:
-                keyUpdate(i);
-                break;
-            case OBJ_CHEST:
-                chestUpdate(i);
-                break;
-            case OBJ_MONUMENT:
-                monumentUpdate(i);
-                break;
-            case OBJ_BIG_CHEST:
-                bigChestUpdate(i);
-                break;
-            case OBJ_DOUBLE_JUMP_ORB:
-                doubleDashOrbUpdate(i);
-                break;
-            default:
-                break;
+static void clearObjectDirtyFlag(uint8_t index)
+{
+    GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+}
+
+static void buildSpriteIfDirty(uint8_t index, void (*builder)(uint8_t))
+{
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
+    if ((obj->flags & OBJ_FLAG_DIRTY) == 0U) {
+        return;
+    }
+    if (index == 0U) {
+        clearObjectDirtyFlag(index);
+        return;
+    }
+    if (obj->eType == OBJ_UNUSED) {
+        port_buildUnused(index);
+        return;
+    }
+    builder(index);
+}
+
+static void processObject(uint8_t index)
+{
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
+    switch (obj->eType)
+    {
+    case OBJ_UNUSED:
+        if (obj->flags & OBJ_FLAG_DIRTY) {
+            if (index == 0U) {
+                clearObjectDirtyFlag(index);
+            } else {
+                port_buildUnused(index);
             }
         }
+        break;
+    case OBJ_SMOKE:
+        smokeUpdate(index);
+        buildSpriteIfDirty(index, port_buildSmoke);
+        break;
+    case OBJ_BREAKABLE_WALL:
+        breakableWallUpdate(index);
+        buildSpriteIfDirty(index, port_buildBreakableWall);
+        break;
+    case OBJ_DECO_FLOWER:
+        flowerUpdate(index);
+        buildSpriteIfDirty(index, port_buildStaticDecor);
+        break;
+    case OBJ_STRAWBERRY:
+        strawberryUpdate(index);
+        buildSpriteIfDirty(index, port_buildStrawberry);
+        break;
+    case OBJ_DECO_TREE:
+        decoTreeUpdate(index);
+        buildSpriteIfDirty(index, port_buildStaticDecor);
+        break;
+    case OBJ_SPRING:
+        springUpdate(index);
+        buildSpriteIfDirty(index, port_buildSpring);
+        break;
+    case OBJ_FLYING_BERRY:
+        flyingBerryUpdate(index);
+        buildSpriteIfDirty(index, port_buildFlyingBerry);
+        break;
+    case OBJ_COLLAPSE_TILE:
+        collapseTileUpdate(index);
+        buildSpriteIfDirty(index, port_buildCollapseTile);
+        break;
+    case OBJ_BALLOON:
+        balloonUpdate(index);
+        buildSpriteIfDirty(index, port_buildBalloon);
+        break;
+    case OBJ_PLATMOV_L:
+    case OBJ_PLATMOV_R:
+        platMovUpdate(index);
+        buildSpriteIfDirty(index, port_buildPlatMov);
+        break;
+    case OBJ_KEY:
+        keyUpdate(index);
+        buildSpriteIfDirty(index, port_buildKey);
+        break;
+    case OBJ_CHEST:
+        chestUpdate(index);
+        buildSpriteIfDirty(index, port_buildChest);
+        break;
+    case OBJ_MONUMENT:
+        monumentUpdate(index);
+        buildSpriteIfDirty(index, port_buildMonument);
+        break;
+    case OBJ_BIG_CHEST:
+        bigChestUpdate(index);
+        buildSpriteIfDirty(index, port_buildBigChest);
+        break;
+    case OBJ_DOUBLE_JUMP_ORB:
+        doubleDashOrbUpdate(index);
+        buildSpriteIfDirty(index, port_buildDoubleDashOrb);
+        break;
+    default:
+        if (obj->flags & OBJ_FLAG_DIRTY) {
+            clearObjectDirtyFlag(index);
+        }
+        break;
     }
-    return;
+}
+
+void updateAllObjects(void) {
+    uint8_t i;
+    port_beginSpriteBuild(&GLOBAL_PlayerData);
+    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+        processObject(i);
+    }
+    port_finishSpriteBuild();
 }
 
 
@@ -1682,439 +1238,33 @@ void playerInit(struct sPlayerData* this);
 void onVblank(void);
 
 
-// Load all initial graphics data to VRAM/CGRAM
-// This function handles all the one-time graphics setup
-void LoadInitialGraphics(void) {
-    snesXC_setDataBank(BANK_01);
-    // Initialize BG1 tilemap and palette (in bank 0 - no switching needed)
-    for (uint16_t i = 0; i < sizeof(GLBOAL_M0BG1TileMap); i++) {
-        GLBOAL_M0BG1TileMap[i] = 0x20;
-    }
-    GLOBAL_BG1Pal[0] = 0x00;
-    GLOBAL_BG1Pal[1] = 0x00;
-    GLOBAL_BG1Pal[2] = 0xff;
-    GLOBAL_BG1Pal[3] = 0x7f;
-    
-    // Load BG1 font and tilemap (from rom_bank_1)
-    LoadLoVram(SNESFONT_bin, 0xE000, sizeof(SNESFONT_bin));
-    
-    LoadLoVram(GLBOAL_M0BG1TileMap, 0xF800, sizeof(GLBOAL_M0BG1TileMap));
-    LoadCGRam(GLOBAL_BG1Pal, 0x0000, sizeof(GLOBAL_BG1Pal));
-    
-    // Load cloud graphics (from rom_bank_1)
-    LoadVram(clouds_tiles, 0xC000, sizeof(clouds_tiles));
-    LoadCGRam((char *)clouds_palette, 0x0060, sizeof(clouds_palette));
-    LoadVram((char *)clouds_map, 0x0000, sizeof(clouds_map));
-    
-    // Load sprite graphics (from rom_bank_1)
-    LoadVram(sprite_gfx_4bpp, 0x8000, sizeof(sprite_gfx_4bpp));
-    LoadVram(sprite_gfx_2bpp, 0xA000, sizeof(sprite_gfx_2bpp));
-    
-    // Load all sprite palettes (from rom_bank_1)
-    LoadCGRam((char *)sprite_palettes_4bpp[0], 0x0080, sizeof(sprite_palettes_4bpp[0])); // Player
-    LoadCGRam((char *)sprite_palettes_4bpp[0], 0x0090, sizeof(sprite_palettes_4bpp[0])); // Smoke
-    LoadCGRam((char *)sprite_palettes_4bpp[1], 0x00A0, sizeof(sprite_palettes_4bpp[0])); // Breakable wall
-    LoadCGRam((char *)sprite_palettes_4bpp[2], 0x00B0, sizeof(sprite_palettes_4bpp[0])); // Flower
-    LoadCGRam((char *)sprite_palettes_4bpp[3], 0x00C0, sizeof(sprite_palettes_4bpp[0])); // Strawberry
-    LoadCGRam((char *)sprite_palettes_4bpp[4], 0x00D0, sizeof(sprite_palettes_4bpp[0])); // Deco tree
-    LoadCGRam((char *)sprite_palettes_4bpp[5], 0x00E0, sizeof(sprite_palettes_4bpp[0])); // Spring
-    LoadCGRam((char *)sprite_palettes_4bpp[6], 0x00F0, sizeof(sprite_palettes_4bpp[0])); // Flying berry
-    snesXC_setDataBank(BANK_00);
-}
-
-void LoadRoomDataSwitchCase(uint16_t roomID) {
-    uint16_t i;
-    
-    // Set the correct bank based on room ID
-    if (roomID >= 1 && roomID <= 12) {
-        snesXC_setDataBank(BANK_02);  // Levels 1-12 are in rom_bank_2
-    } else if (roomID >= 13 && roomID <= 24) {
-        snesXC_setDataBank(BANK_03);  // Levels 13-24 are in rom_bank_3
-    } else if (roomID >= 25 && roomID <= 32) {
-        snesXC_setDataBank(BANK_04);  // Levels 25-32 are in rom_bank_4
-    }
-    
-    switch (roomID) {
-        case 1:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level1_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level1_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level1, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level1, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL1;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL1;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL1_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level1, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 2:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level2_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level2_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level2, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level2, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL2;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL2;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL2_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level2, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 3:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level3_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level3_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level3, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level3, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL3;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL3;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL3_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level3, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 4:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level4_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level4_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level4, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level4, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL4;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL4;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL4_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level4, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 5:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level5_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level5_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level5, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level5, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL5;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL5;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL5_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level5, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 6:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level6_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level6_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level6, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level6, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL6;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL6;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL6_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level6, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 7:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level7_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level7_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level7, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level7, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL7;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL7;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL7_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level7, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 8:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level8_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level8_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level8, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level8, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL8;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL8;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL8_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level8, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 9:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level9_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level9_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level9, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level9, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL9;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL9;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL9_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level9, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 10:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level10_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level10_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level10, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level10, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL10;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL10;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL10_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level10, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 11:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level11_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level11_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level11, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level11, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL11;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL11;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL11_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level11, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 12:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level12_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level12_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level12, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level12, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL12;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL12;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL12_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level12, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 13:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level13_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level13_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level13, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level13, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL13;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL13;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL13_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level13, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 14:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level14_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level14_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level14, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level14, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL14;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL14;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL14_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level14, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 15:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level15_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level15_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level15, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level15, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL15;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL15;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL15_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level15, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 16:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level16_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level16_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level16, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level16, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL16;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL16;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL16_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level16, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 17:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level17_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level17_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level17, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level17, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL17;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL17;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL17_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level17, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 18:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level18_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level18_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level18, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level18, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL18;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL18;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL18_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level18, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 19:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level19_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level19_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level19, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level19, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL19;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL19;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL19_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level19, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 20:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level20_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level20_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level20, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level20, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL20;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL20;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL20_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level20, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 21:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level21_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level21_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level21, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level21, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL21;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL21;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL21_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level21, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 22:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level22_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level22_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level22, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level22, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL22;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL22;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL22_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level22, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 23:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level23_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level23_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level23, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level23, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL23;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL23;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL23_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level23, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 24:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level24_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level24_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level24, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level24, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL24;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL24;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL24_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level24, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 25:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level25_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level25_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level25, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level25, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL25;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL25;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL25_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level25, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 26:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level26_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level26_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level26, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level26, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL26;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL26;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL26_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level26, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 27:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level27_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level27_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level27, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level27, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL27;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL27;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL27_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level27, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 28:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level28_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level28_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level28, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level28, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL28;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL28;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL28_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level28, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 29:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level29_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level29_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level29, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level29, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL29;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL29;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL29_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level29, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 30:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level30_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level30_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level30, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level30, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL30;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL30;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL30_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level30, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 31:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level31_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level31_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level31, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level31, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL31;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL31;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL31_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level31, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        case 32:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level32_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level32_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level32, sizeof(GLOBAL_ActiveLevel.paletteBg));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level32, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
-
-            GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL32;
-            GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL32;
-            GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL32_COUNT;
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level32, GLOBAL_ActiveLevel.objectCount * 3);
-            break;
-        default:
-            break;
-    }    
-    GLOBAL_ActiveLevel.scrollPointY = 72;
-    snesXC_setDataBank(BANK_00); // Restore to bank 0 after loading
-}
 
 void LoadRoomData(uint16_t roomID) {
     uint8_t i = 0;
     
+    GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = 16;
     GLOBAL_ActiveLevel.roomSizeY = 16;
-    GLOBAL_ActiveLevel.isLevelLoadedVRAM = false;
-    LoadRoomDataSwitchCase(roomID);
+    GLOBAL_ActiveLevel.textChanged = false;
+    GLOBAL_ActiveLevel.swapCloudPal = false;
+    GLOBAL_ActiveLevel.swapActivePalette = true;
+    GLOBAL_ActiveLevel.textFlashActive = false;
+    port_LoadRoomData(roomID);
     playerInit(&GLOBAL_PlayerData);
+    port_updatePlayerSprite(&GLOBAL_PlayerData);
+    port_beginSpriteBuild(&GLOBAL_PlayerData);
+    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; ++i) {
+        processObject(i);
+    }
+    port_finishSpriteBuild();
 
 }
 
-void LoadRoomDataVRAM(void) {
-    LoadVram(GLOBAL_ActiveLevel.tilemapBg2,0x2000, GLOBAL_ActiveLevel.roomSizeX * GLOBAL_ActiveLevel.roomSizeY * 4); //Bg2 tilemap
-    LoadVram(GLOBAL_ActiveLevel.tilemapBg3,0x4000, GLOBAL_ActiveLevel.roomSizeX * GLOBAL_ActiveLevel.roomSizeY * 4); //Bg2 tilemap
-    LoadCGRam(GLOBAL_ActiveLevel.paletteBg,0x0020, 0x40); //Bg2 palette
-    LoadCGRam(GLOBAL_ActiveLevel.paletteBg,0x0040, 0x40); //Bg3 palette
-}
+
 
 void LoadNextRoom(void) {
-    GLOBAL_GameState.currentRoomID++;
-    LoadRoomData(GLOBAL_GameState.currentRoomID);
+    GLOBAL_ActiveLevel.currentRoomID++;
+    LoadRoomData(GLOBAL_ActiveLevel.currentRoomID);
 }
 
 int main(void){
@@ -2128,90 +1278,15 @@ int main(void){
 	uint32_t j;
     uint8_t regWrite1;
 
-	initSNES(SLOWROM);
-	initOAMCopy(GLOBAL_OAMCopy.Bytes);
-
-
-    REG_CGADD = 0;
-    REG_CGDATA = 0x00;
-    REG_CGDATA = 0x00;
-
-	REG_BGMODE  = 0x00;
-    {
-    // Setup BG1 for text and load all initial graphics
-    LoadInitialGraphics();
-    
-    REG_BG1SC  = 0xFC;
-	REG_BG1HOFS = 0x00;
-	REG_BG1HOFS = 0x00;
-	REG_BG1VOFS = 0x00;
-	REG_BG1VOFS = 0x00;
-    }
+    port_init();
  
-    regWrite1 = 0x00; //8x8 or 16x16
-    regWrite1 = regWrite1 | VRAM_ADD_TO_OBSEL_VALUE(0x8000); 
-    REG_OBSEL = regWrite1; 
-
-
-
-    GLOBAL_OAMCopy.Names.OBJ000X = 0;
-    GLOBAL_OAMCopy.Names.OBJ000Y = 0x00;
-    GLOBAL_OAMCopy.Names.CHARNUM000 = 0x00;
-    GLOBAL_OAMCopy.Names.OAMTABLE2BYTE00 = 0x56; //Enable the first sprite, set size to 16x16
-
-    //Set background 4 to 16x16 tiles
-    //Set background 3 to 16x16 tiles
-    //Set background 2 to 16x16 tiles
-    //Set background 1 to 8x8 tiles
-    REG_BGMODE = 0xE0;
-    //Set background 2 tilemap source address to 0x2000 with single tilemap (YX = 00)
-    REG_BG2SC = (0x2000ul >> (9)) | 0x00u;
-    REG_BG12NBA = (((0xA000 >> 13) << 4) & 0xF0) | ((0xE000 >> 13) & 0x0F);
-
-    
-    //Set background 3 tilemap source address to 0x4000
-    REG_BG3SC = (0x4000ul >> (9)) | 0x00u;
-    //Set background 4 tilemap source address to 0x0000 and size to bigXY
-    REG_BG4SC = (0x0000ul >> (9)) | 0x03u;
-    //Set background 3 tile data source address to 0xA000
-    REG_BG34NBA = ((0xC000 >> 13) << 4) | ((0xA000 >> 13));
-    //Bg1 only gets enabled when needed, this may be overcautious because of a dying ppu
-    REG_TM = 0x1E; //Enable background 4, 3, 2, 0 and OAM/sprite only
-
     //Player is hardcoded to slot 0 for now
     //Setup game state
-    GLOBAL_GameState.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_GameState.currentRoomID = 1; //12 for monument 20, 22 for big chest
-    LoadRoomData(GLOBAL_GameState.currentRoomID); //Test room
-    LoadRoomDataVRAM();
+    GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
+    GLOBAL_ActiveLevel.currentRoomID = 1; //12 for monument 20, 22 for big chest
+    LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
 
-    //REG_NMITIMEN = 0x81; // Enable VBlank interrupt (bit 7) and auto-joypad read (bit 0)
-    REG_NMITIMEN = 0x01; // Enable auto-joypad read (bit 0)
-    REG_INIDISP = 0x0F;
-
-    for (;;) {
-        int8_t regRead1 = 0;
-        uint8_t regRead2 = 0;
-        uint8_t regRead3 = 0;
-        uint16_t scanline;
-        
-        do{ //Wait for Vblank
-            //Latch before reading the interupt
-            //This was after before but resulted in an edge case
-            //It would be in vblank here, but by the time it latched
-            //Vblank would be over
-            regRead1 = REG_SLHV;
-            regRead1 = REG_RDNMI;
-        } while(regRead1 > 0);
-        regRead2 = REG_OPVCT;
-        regRead3 = REG_OPVCT;
-        //9 bits vertical scan line counter
-        scanline = ((regRead3 << 8) | regRead2) & 0x01FF; 
-        //Hacky workaround to make sure we arn't partially in a vblank already
-        if (scanline > 231) {
-            continue;
-        }        
-
+    for (;;) { 
         onVblank();
     }
 }
@@ -2234,6 +1309,12 @@ void playerInit(struct sPlayerData* this){
     this->objData.eType = OBJ_PLAYER;
     this->objData.pos.x = GLOBAL_ActiveLevel.playerSpawnX * 16;
     this->objData.pos.y = GLOBAL_ActiveLevel.playerSpawnY * 16 - 1;
+    this->objData.flags = OBJ_FLAG_DIRTY;
+    this->objData.oamTile = PLAYER_SPRITE_IDLE;
+    this->objData.oamProps = 0x38;
+    this->objData.extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+    this->objData.extraSpriteCount = 0;
+    this->objData.flags |= OBJ_FLAG_DIRTY;
 
     this->posF.x = INT_TO_FIXED(this->objData.pos.x);
     this->posF.y = INT_TO_FIXED(this->objData.pos.y);
@@ -2252,7 +1333,6 @@ void playerInit(struct sPlayerData* this){
     this->dashesLeft = this->doubleDashUnlocked ? 2 : 1;
     this->dashCounter = 0;
     
-
     //Reset some global flags, maybe move this to a death function
     //Reset the collision flags
     for (i = 0; i < 256; i++) {
@@ -2263,12 +1343,12 @@ void playerInit(struct sPlayerData* this){
 
     //Clear out the object array
     for (i = 1; i < GLBOAL_OBJ_LIST_SIZE; i++) {
-        GLOBAL_OBJList[i].eType = OBJ_UNUSED;        
+        GLOBAL_OBJList[i].eType = OBJ_UNUSED;
+        GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+        GLOBAL_OBJList[i].extraSpriteCount = 0;
     }
-    //Clear all sprites
-    for (i = 0; i < 128; i++) {
-        GLOBAL_OAMCopy.arr.OAMArray[i].OBJY = 240;
-    }
+
+    port_resetSprites();
     for (i = 0; i < (GLOBAL_ActiveLevel.objectCount*3); i+=3) {
         if (GLOBAL_ActiveLevel.objectData[i] != 0) {
             //Player spawn, remove from generated code in future
@@ -2434,8 +1514,10 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
 
 #define FPS60_SCALE_FACTOR 1.0f
 void playerUpdate(struct sPlayerData* this) {
-    int16_t curX = this->objData.pos.x;
-    int16_t curY = this->objData.pos.y;
+    int16_t prevPosX = this->objData.pos.x;
+    int16_t prevPosY = this->objData.pos.y;
+    uint8_t prevTile = this->objData.oamTile;
+    uint8_t prevProps = this->objData.oamProps;
     int16_t spdXstepInt;
     int16_t spdYStepInt;
 
@@ -2459,18 +1541,18 @@ void playerUpdate(struct sPlayerData* this) {
     }
 
     //Input handling
-    if(GLOBAL_InputHi & JOY_LEFT_MASK){
+    if(GLOBAL_InputState & JOY_LEFT_MASK){
         inputX = -1;
         this->isFliped = true;
     }
-    if(GLOBAL_InputHi & JOY_RIGHT_MASK){
+    if(GLOBAL_InputState & JOY_RIGHT_MASK){
         inputX = 1;
         this->isFliped = false;
     }
-    if(GLOBAL_InputHi & JOY_UP_MASK){
+    if(GLOBAL_InputState & JOY_UP_MASK){
         inputY = -1;
     }
-    if(GLOBAL_InputHi & JOY_DOWN_MASK){
+    if(GLOBAL_InputState & JOY_DOWN_MASK){
         inputY = 1;
     }
 
@@ -2479,7 +1561,7 @@ void playerUpdate(struct sPlayerData* this) {
     static bool btnJumpLastFrame = false;
     static bool btnDashLastFrame = false;
 
-    if(GLOBAL_InputHi & JOY_B_MASK) {
+    if(GLOBAL_InputState & JOY_B_MASK) {
         if (!btnJumpLastFrame) {
             btnJump = true;
         }
@@ -2488,7 +1570,7 @@ void playerUpdate(struct sPlayerData* this) {
         btnJumpLastFrame = false;
     }
 
-    if(GLOBAL_InputHi & JOY_Y_MASK) {
+    if(GLOBAL_InputState & JOY_Y_MASK) {
         if (!btnDashLastFrame) {
             btnDash = true;
         }
@@ -2637,7 +1719,7 @@ void playerUpdate(struct sPlayerData* this) {
 
             playSoundEffect(SOUND_EFFECT_DASH_START);
             GLOBAL_FreezeFrames = 2 * 2;
-            GLOBAL_ShakeFrames = 6 * 2;
+            GLOBAL_ActiveLevel.shakeFrames = 6 * 2;
             this->dashTarget.x=FIXED_MUL(INT_TO_FIXED(2*2), INT_TO_FIXED(vInput.x));
             this->dashTarget.y=FIXED_MUL(INT_TO_FIXED(2*2), INT_TO_FIXED(vInput.y));
             this->dashAccel.x=FLOAT_TO_FIXED(1.5f*2);
@@ -2772,7 +1854,7 @@ void playerUpdate(struct sPlayerData* this) {
     if (OBJ_isDeathAt(this, 0, 0) || this->objData.pos.y >= (255)) {
         playSoundEffect(SOUND_EFFECT_DEATH);
         this->objData.pos.y = 240; //offscreen
-        GLOBAL_ShakeFrames = 10 * 2;        
+        GLOBAL_ActiveLevel.shakeFrames = 10 * 2;        
         playerInit(this);
         return;
     }
@@ -2780,7 +1862,7 @@ void playerUpdate(struct sPlayerData* this) {
     }
 
     // next level
-    if (this->objData.pos.y <= -14 && GLOBAL_GameState.currentRoomID<31) { 
+    if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID<31) { 
         LoadNextRoom();
         playerInit(this);
      }
@@ -2802,6 +1884,10 @@ void playerUpdate(struct sPlayerData* this) {
     } else {
         this->eSriteState = PLAYER_SPRITE_WALK_1 + (((GLOBAL_FrameCount % 8) >> 2) << 1);
     }
+
+    this->objData.oamTile = (uint8_t)this->eSriteState;
+    this->objData.oamProps = this->isFliped ? (uint8_t)(0x38u | 0x40u) : 0x38u;
+    this->objData.flags |= OBJ_FLAG_DIRTY;
 }
 
 
@@ -2858,98 +1944,17 @@ int16_t randint16(int16_t min, int16_t max) {
     return (int16_t)((randomValue % range) + min);
 }
 
-
-void onUpdateBG4CloudsEffect(void){
-    static uint16_t curHOFS = 0;
-    static uint8_t moveAmount = 1;
-    static uint8_t gustState = 0; // 0=pause, 1=ramp up, 2=peak, 3=ramp down
-    static uint16_t gustTimer = 0;
-    static uint16_t gustDuration = 0;
-    static uint8_t targetSpeed = 0;
-    static uint8_t startSpeed = 0;
- 
-    //Update frame count
-
-    // Handle gust state machine
-    if (gustTimer > 0) {
-        gustTimer--;
-    } else {
-        // Transition to next state
-        switch (gustState) {
-            case 0: // Pause -> Ramp up
-                gustState = 1;
-                gustDuration = randint16(60, 300); // 1-5 seconds (60fps)
-                gustTimer = gustDuration;
-                startSpeed = moveAmount;
-                targetSpeed = randint16(5, 10); // Random peak speed 3-6
-                break;
-            case 1: // Ramp up -> Peak
-                gustState = 2;
-                gustDuration = randint16(0, 120); // 0-2 seconds
-                gustTimer = gustDuration;
-                moveAmount = targetSpeed;
-                break;
-            case 2: // Peak -> Ramp down
-                gustState = 3;
-                gustDuration = randint16(60, 300); // 1-5 seconds
-                gustTimer = gustDuration;
-                startSpeed = moveAmount;
-                targetSpeed = 1;
-                break;
-            case 3: // Ramp down -> Pause
-                gustState = 0;
-                gustDuration = randint16(0, 120); // 0-2 seconds
-                gustTimer = gustDuration;
-                moveAmount = 1;
-                break;
-        }
-    }
-
-    // Calculate current speed based on state
-    if (gustState == 1) { // Ramp up
-        uint16_t progress = gustDuration - gustTimer;
-        moveAmount = startSpeed + ((targetSpeed - startSpeed) * progress) / gustDuration;
-    } else if (gustState == 3) { // Ramp down
-        uint16_t progress = gustDuration - gustTimer;
-        moveAmount = startSpeed - ((startSpeed - targetSpeed) * progress) / gustDuration;
-    }
-
-    //Update scroll
-    curHOFS += moveAmount;
-    
-    //It's a write twice register
-    GLOBAL_ScrollBG4X = curHOFS;
-
-    
-}
-
-
-#define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
-
-
 void onVblank(void) {
     //Start of vblank critical code
-    int8_t regRead1;
     //Update hardware registers
     if (!GLOBAL_ActiveLevel.isLevelLoadedVRAM) {
-        LoadRoomDataVRAM();
-        GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
         //Loading new level takes too long so skip an extra frame
         return;
-    } 
-    LoadCGRam(GLOBAL_BG1Pal, 0x0000, sizeof(GLOBAL_BG1Pal)); // Load BG Palette Data
-    if (GLOBAL_SwapCloudPal) {
-        snesXC_setDataBank(BANK_01); // clouds_palette_2 is in rom_bank_1
-        LoadCGRam((char *)clouds_palette_2,0x0060, sizeof(clouds_palette_2));
-        snesXC_setDataBank(BANK_00); // Restore to bank 0
-        GLOBAL_SwapCloudPal = false;
     }
 
 
-    if (GLOBAL_RELOADBG1VRAM) {
-        LoadLoVram(GLBOAL_M0BG1TileMap,0xF800, sizeof(GLBOAL_M0BG1TileMap));
-        GLOBAL_RELOADBG1VRAM = false;
-    }
+    port_vblank();
+
 
     //Display FPS
     /*
@@ -2961,129 +1966,26 @@ void onVblank(void) {
         GLOBAL_FrameCountVBLANK = 0;
         GLOBAL_FrameCount = 0;
         //sprintf(testStringRam, "FPS: %02d", (uint16_t)((lastFrameCount * 60) / lastVBlankAmount));
-        drawTextBG1(testStringRam, 0, 0);
-        REG_TM = 0x1F;
+        port_drawText((const unsigned char *)testStringRam, 0, 0);
     }
     */
-
-    //Update player hair colour
-    {
-    static uint16_t hairColour;
-    static uint16_t  constZero = 0x0000;
-    if (GLOBAL_PlayerData.dashesLeft == 0) {
-        hairColour = 0x7EA5;
-    }
-    else if (GLOBAL_PlayerData.dashesLeft == 1) {
-        hairColour = 0x241F;
-    }
-    else {
-        hairColour = 0x1B80;
-    }
-    LoadCGRam((char *)&hairColour,0x00C5, sizeof(hairColour));
-    }
-    
-    
-    LoadOAMCopy((char *)GLOBAL_OAMCopy.Bytes,0x0000,sizeof(union uOAMCopy));
-
-    //Update background scrolls
-    //Workaround for calypsi optimizer bug as of 5.11
-    // BG1
-    uint16_t tmpx = GLOBAL_ScrollBG1X;
-    uint8_t lo_x = (uint8_t)(tmpx & 0xFF);
-    uint8_t hi_x = (uint8_t)(tmpx >> 8);
-    REG_BG1HOFS = lo_x;
-    REG_BG1HOFS = hi_x;
-
-    uint16_t tmpy = GLOBAL_ScrollBG1Y;
-    uint8_t lo_y = (uint8_t)(tmpy & 0xFF);
-    uint8_t hi_y = (uint8_t)(tmpy >> 8);
-    REG_BG1VOFS = lo_y;
-    REG_BG1VOFS = hi_y;
-
-    // BG2
-    uint16_t tmpx2 = GLOBAL_ScrollBG2X;
-    uint8_t lo_x2 = (uint8_t)(tmpx2 & 0xFF);
-    uint8_t hi_x2 = (uint8_t)(tmpx2 >> 8);
-    REG_BG2HOFS = lo_x2;
-    REG_BG2HOFS = hi_x2;
-
-    uint16_t tmpy2 = GLOBAL_ScrollBG2Y;
-    uint8_t lo_y2 = (uint8_t)(tmpy2 & 0xFF);
-    uint8_t hi_y2 = (uint8_t)(tmpy2 >> 8);
-    REG_BG2VOFS = lo_y2;
-    REG_BG2VOFS = hi_y2;
-
-    // BG3
-    uint16_t tmpx3 = GLOBAL_ScrollBG3X;
-    uint8_t lo_x3 = (uint8_t)(tmpx3 & 0xFF);
-    uint8_t hi_x3 = (uint8_t)(tmpx3 >> 8);
-    REG_BG3HOFS = lo_x3;
-    REG_BG3HOFS = hi_x3;
-
-    uint16_t tmpy3 = GLOBAL_ScrollBG3Y;
-    uint8_t lo_y3 = (uint8_t)(tmpy3 & 0xFF);
-    uint8_t hi_y3 = (uint8_t)(tmpy3 >> 8);
-    REG_BG3VOFS = lo_y3;
-    REG_BG3VOFS = hi_y3;
-
-    uint16_t tmpx4 = GLOBAL_ScrollBG4X;
-    uint8_t lo_x4 = (uint8_t)(tmpx4 & 0xFF);
-    uint8_t hi_x4 = (uint8_t)(tmpx4 >> 8);
-    REG_BG4HOFS = lo_x4;
-    REG_BG4HOFS = hi_x4;
-
-    uint16_t tmpy4 = GLOBAL_ScrollBG4Y;
-    uint8_t lo_y4 = (uint8_t)(tmpy4 & 0xFF);
-    uint8_t hi_y4 = (uint8_t)(tmpy4 >> 8);
-    REG_BG4VOFS = lo_y4;
-    REG_BG4VOFS = hi_y4;
     //End of vblank critical code
 
-    //Player Draw
-    GLOBAL_OAMCopy.Names.OBJ000X = GLOBAL_PlayerData.objData.pos.x;
-    GLOBAL_OAMCopy.Names.OBJ000Y = GLOBAL_PlayerData.objData.pos.y - GLOBAL_ScrollBG2Y;
-    GLOBAL_OAMCopy.Names.CHARNUM000 = GLOBAL_PlayerData.eSriteState;
-    GLOBAL_OAMCopy.Names.PROPERTIES000 = GLOBAL_PlayerData.isFliped ? (0x38+0x40) : (0x38);
-   
     //Calculate next frame (globals)
     GLOBAL_FrameCount += 1;
     if (GLOBAL_FreezeFrames > 0) {
         GLOBAL_FreezeFrames--;
         return;
     }
-    if (GLOBAL_ShakeFrames > 0) {
-        GLOBAL_ShakeFrames--;
+    if (GLOBAL_ActiveLevel.shakeFrames > 0) {
+        GLOBAL_ActiveLevel.shakeFrames--;
     }
 
-    //Update all active objects
-
-    //Calculate hardware scrolls, do so before objects as they may rely on these values being correct
-    {
-    int16_t shakeAmount = GLOBAL_ShakeFrames > 0 ? ((GLOBAL_FrameCount & 1) ? 2 : -2) : 0;
-    int16_t smoothScrollY = ((int16_t)GLOBAL_PlayerData.objData.pos.y - GLOBAL_ActiveLevel.scrollPointY) >> 2;
-
-    GLOBAL_ScrollBG2Y = CLAMP(GLOBAL_PlayerData.objData.pos.y - 16 - GLOBAL_ActiveLevel.scrollPointY, 0, 31);
-    GLOBAL_ScrollBG2X = 0;
-
-    GLOBAL_ScrollBG3X = GLOBAL_ScrollBG2X + (shakeAmount);
-    GLOBAL_ScrollBG3Y = GLOBAL_ScrollBG2Y + (shakeAmount);
-
-    GLOBAL_ScrollBG4Y =  smoothScrollY + (shakeAmount >> 1) - (GLOBAL_GameState.currentRoomID << 6);
-    }
-
-    //It's the last thing in the frame, it'll be fine
-    regRead1 = REG_HVBJOY;
-    //do{ //Wait for reg read
-    //    regRead1 = REG_HVBJOY;
-    //} while(regRead1 & 0x01);
-
-    GLOBAL_InputLo = REG_JOY1L;
-    GLOBAL_InputHi = REG_JOY1H;
+    GLOBAL_InputState = port_getInputs();
 
     updateAllObjects();
     playerUpdate(&GLOBAL_PlayerData);
-    onUpdateBG4CloudsEffect();
-
+    port_updatePlayerSprite(&GLOBAL_PlayerData);
 }
 
 //Interupt handler for VBlank

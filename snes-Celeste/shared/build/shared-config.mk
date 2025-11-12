@@ -103,9 +103,9 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	CC = mos-common-clang
 	AS = mos-common-clang
 	LD = mos-common-clang
-	CCFLAGS = -mcpu=mosw65816 -I$(SHARED_SRC_DIR) -Iinclude -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector -fdata-sections -ffunction-sections
+	CCFLAGS = -mcpu=mosw65816 -I$(SHARED_SRC_DIR) -Iinclude -Os -flto -fnonreentrant -ffast-math -funroll-loops -finline-functions -fomit-frame-pointer -fno-stack-protector -fdata-sections -ffunction-sections 
 	ASFLAGS = 
-	LDFLAGS = -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -L$(LLVM_MOS_PATH)/mos-platform/common/lib -lzero-bss -lcopy-data -lcopy-zp-data -linit-stack -lc -lexit-loop
+	LDFLAGS = -T $(SHARED_PORT_DIR)/llvm-mos/linker.ld -L$(LLVM_MOS_PATH)/mos-platform/common/lib -lzero-bss -lcopy-data -lcopy-zp-data -linit-stack -lc -lexit-loop  
 	INCLUDES = 
 	OUTPUT_EXT = .smc
 	POST_LINK = 
