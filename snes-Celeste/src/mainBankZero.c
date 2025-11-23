@@ -16,13 +16,6 @@
 
 // 60fps vs 30fps physics scaling factor
 
-//8x8 sprites, 4bpp indexed sprite data
-//16x4 sprite sheet is stored sequentially
-
-//Bank number macros
-#define BANK_00  0  // Default/current bank (where code runs)
-#define BANK_01  1  // rom_bank_1 (fonts, sprites, clouds)
-
 //Prototypes
 int16_t randint16(int16_t min, int16_t max);
 
@@ -54,19 +47,12 @@ void playSoundEffect(enum eSoundEffect soundEffect){
 
 
 
-uint8_t GLOBAL_InputLo = 0;
-uint8_t GLOBAL_InputHi = 0;
 uint8_t GLOBAL_InputState = 0;
 
 enum smokeStates {SMOKE_SPRITE_1 = 0x62,SMOKE_SPRITE_2 = 0x64,SMOKE_SPRITE_3 = 0x66};
 
 #define GLBOAL_OBJ_LIST_SIZE 30
 OBJ_DATA GLOBAL_OBJList[GLBOAL_OBJ_LIST_SIZE] = {0};
-
-
-
-
-
 
 uint16_t GLOBAL_FrameCountVBLANK = 0;
 uint16_t GLOBAL_FrameCount = 0;
@@ -1541,18 +1527,18 @@ void playerUpdate(struct sPlayerData* this) {
     }
 
     //Input handling
-    if(GLOBAL_InputState & JOY_LEFT_MASK){
+    if(GLOBAL_InputState & PORT_INPUT_LEFT_MASK){
         inputX = -1;
         this->isFliped = true;
     }
-    if(GLOBAL_InputState & JOY_RIGHT_MASK){
+    if(GLOBAL_InputState & PORT_INPUT_RIGHT_MASK){
         inputX = 1;
         this->isFliped = false;
     }
-    if(GLOBAL_InputState & JOY_UP_MASK){
+    if(GLOBAL_InputState & PORT_INPUT_UP_MASK){
         inputY = -1;
     }
-    if(GLOBAL_InputState & JOY_DOWN_MASK){
+    if(GLOBAL_InputState & PORT_INPUT_DOWN_MASK){
         inputY = 1;
     }
 
@@ -1561,7 +1547,7 @@ void playerUpdate(struct sPlayerData* this) {
     static bool btnJumpLastFrame = false;
     static bool btnDashLastFrame = false;
 
-    if(GLOBAL_InputState & JOY_B_MASK) {
+    if(GLOBAL_InputState & PORT_INPUT_B_MASK) {
         if (!btnJumpLastFrame) {
             btnJump = true;
         }
@@ -1570,7 +1556,7 @@ void playerUpdate(struct sPlayerData* this) {
         btnJumpLastFrame = false;
     }
 
-    if(GLOBAL_InputState & JOY_Y_MASK) {
+    if(GLOBAL_InputState & PORT_INPUT_Y_MASK) {
         if (!btnDashLastFrame) {
             btnDash = true;
         }
@@ -1946,13 +1932,6 @@ int16_t randint16(int16_t min, int16_t max) {
 
 void onVblank(void) {
     //Start of vblank critical code
-    //Update hardware registers
-    if (!GLOBAL_ActiveLevel.isLevelLoadedVRAM) {
-        //Loading new level takes too long so skip an extra frame
-        return;
-    }
-
-
     port_vblank();
 
 

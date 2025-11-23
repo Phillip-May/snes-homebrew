@@ -6,6 +6,19 @@
 
 #include "../fixedPointSNES.h"
 
+#define PORT_INPUT_RIGHT_MASK    0x01u
+#define PORT_INPUT_LEFT_MASK     0x02u
+#define PORT_INPUT_DOWN_MASK     0x04u
+#define PORT_INPUT_UP_MASK       0x08u
+#define PORT_INPUT_START_MASK    0x10u
+#define PORT_INPUT_SELECT_MASK   0x20u
+#define PORT_INPUT_Y_MASK        0x40u
+#define PORT_INPUT_B_MASK        0x80u
+#define PORT_INPUT_A_MASK        0x80u
+#define PORT_INPUT_X_MASK        0x40u
+#define PORT_INPUT_L_MASK        0x20u
+#define PORT_INPUT_R_MASK        0x10u
+
 #ifndef CLAMP
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 #endif
@@ -153,11 +166,6 @@ struct sActiveLevelData
     bool swapActivePalette;
     bool textFlashActive;
     bool textScrollActive;
-
-    uint16_t tilemapBg2[512];
-    uint16_t tilemapBg3[512];
-
-    uint8_t paletteBg[64];
 
     uint8_t collisionFlagsReset[256];
     uint8_t collisionFlagsArr[256];

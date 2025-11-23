@@ -1,0 +1,66 @@
+#
+# NES NROM build using llvm-mos
+#
+
+PROJECT_NAME := nes-Celeste
+BUILD_DIR    := build-nes
+
+SRC_DIR      := src
+PORT_DIR     := $(SRC_DIR)/port
+SHARED_DIR   := shared/src
+LIBFIX_DIR   := $(SRC_DIR)/libfixmath
+
+LLVM_MOS_PATH ?= C:/llvm-mos
+LLVM_MOS_PATH_WIN   := $(subst /,\,$(LLVM_MOS_PATH))
+LLVM_MOS_PATH_POSIX := $(subst \,/,$(LLVM_MOS_PATH_WIN))
+NES_CLANG_POSIX     := $(LLVM_MOS_PATH_POSIX)/bin/mos-clang.exe
+NES_CONFIG_POSIX    := $(LLVM_MOS_PATH_POSIX)/bin/mos-nes-nrom.cfg
+
+NES_CFLAGS   := -Os -flto -ffunction-sections -fdata-sections -fomit-frame-pointer -fno-common -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signaling-nans -Wall -Wextra -Wno-unused-parameter -std=c17
+NES_PORT_CFLAGS := -Oz -flto -ffunction-sections -fdata-sections -fomit-frame-pointer -funroll-loops -finline-functions -fno-strict-aliasing -fno-common -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signaling-nans -fno-signed-zeros -fno-rounding-math -Wall -Wextra -Wno-unused-parameter -std=c17
+NES_INCLUDES := -I$(SRC_DIR) -I$(PORT_DIR) -I$(SHARED_DIR) -I$(LIBFIX_DIR) -Ipython -I$(LLVM_MOS_PATH_POSIX)/mos-platform/nes/include
+NES_LDFLAGS  := '-Wl,-Map=$(BUILD_DIR)/celeste-nes.map' '-Wl,--gc-sections' '-Wl,--relax'
+NES_LIBS     := -lneslib
+
+NES_ROM      := $(BUILD_DIR)/celeste-nes.nes
+NES_OBJECTS  := $(BUILD_DIR)/mainBankZero.o \
+                $(BUILD_DIR)/nes_port.o \
+                $(BUILD_DIR)/fix16.o \
+                $(BUILD_DIR)/sprite_chr.o
+
+.PHONY: all clean info
+
+all: $(NES_ROM)
+
+$(BUILD_DIR):
+	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
+
+$(BUILD_DIR)/mainBankZero.o: $(SRC_DIR)/mainBankZero.c
+	@echo [NES] Compiling $< with -Oz and performance flags
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_PORT_CFLAGS) $(NES_INCLUDES) -c '$(SRC_DIR)/mainBankZero.c' -o '$(BUILD_DIR)/mainBankZero.o' }"
+
+$(BUILD_DIR)/nes_port.o: $(PORT_DIR)/nes.c
+	@echo [NES] Compiling $< with -Oz and performance flags
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_PORT_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes.c' -o '$(BUILD_DIR)/nes_port.o' }"
+
+$(BUILD_DIR)/fix16.o: $(LIBFIX_DIR)/fix16.c
+	@echo [NES] Compiling $<
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_CFLAGS) $(NES_INCLUDES) -c '$(LIBFIX_DIR)/fix16.c' -o '$(BUILD_DIR)/fix16.o' }"
+
+$(BUILD_DIR)/sprite_chr.o: $(SRC_DIR)/assets/sprite_chr.s python/sprite_chr_combined.bin
+	@echo [NES] Assembling $<
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' -c '$(SRC_DIR)/assets/sprite_chr.s' -o '$(BUILD_DIR)/sprite_chr.o' }"
+
+
+$(NES_ROM): $(NES_OBJECTS)
+	@echo [NES] Linking $(NES_ROM)
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/sprite_chr.o' $(NES_LIBS) -o '$(NES_ROM)' }"
+
+clean:
+	@powershell -NoLogo -NoProfile -Command "if (Test-Path '$(BUILD_DIR)') { Remove-Item -Recurse -Force '$(BUILD_DIR)' }"
+
+info:
+	@echo Project: $(PROJECT_NAME)
+	@echo Build directory: $(BUILD_DIR)
+	@echo LLVM-MOS path: $(LLVM_MOS_PATH)
+	@echo Objects: $(NES_OBJECTS)

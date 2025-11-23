@@ -70,6 +70,7 @@
 extern struct sPlayerData GLOBAL_PlayerData;
 //Compiles without this, linter just gets confused
 extern const unsigned short clouds_palette_2[4];
+uint8_t paletteBg[64];
 
 
 union uOAMCopy GLOBAL_OAMCopy;
@@ -92,8 +93,11 @@ uint16_t GLOBAL_ScrollBG3Y = 0;
 uint16_t GLOBAL_ScrollBG4X = 0;
 uint16_t GLOBAL_ScrollBG4Y = 0;
 
-extern uint8_t GLOBAL_InputLo;
-extern uint8_t GLOBAL_InputHi;
+static uint16_t s_tilemapBg2[512];
+static uint16_t s_tilemapBg3[512];
+
+uint8_t GLOBAL_InputLo;
+uint8_t GLOBAL_InputHi;
 
 uint8_t port_getInputs(void)
 {
@@ -108,29 +112,29 @@ uint8_t port_getInputs(void)
     GLOBAL_InputLo = rawLo;
     GLOBAL_InputHi = rawHi;
 
-    if (rawHi & JOY_RIGHT_MASK) {
-        buttons |= JOY_RIGHT_MASK;
+    if (rawHi & PORT_INPUT_RIGHT_MASK) {
+        buttons |= PORT_INPUT_RIGHT_MASK;
     }
-    if (rawHi & JOY_LEFT_MASK) {
-        buttons |= JOY_LEFT_MASK;
+    if (rawHi & PORT_INPUT_LEFT_MASK) {
+        buttons |= PORT_INPUT_LEFT_MASK;
     }
-    if (rawHi & JOY_DOWN_MASK) {
-        buttons |= JOY_DOWN_MASK;
+    if (rawHi & PORT_INPUT_DOWN_MASK) {
+        buttons |= PORT_INPUT_DOWN_MASK;
     }
-    if (rawHi & JOY_UP_MASK) {
-        buttons |= JOY_UP_MASK;
+    if (rawHi & PORT_INPUT_UP_MASK) {
+        buttons |= PORT_INPUT_UP_MASK;
     }
-    if (rawHi & JOY_START_MASK) {
-        buttons |= JOY_START_MASK;
+    if (rawHi & PORT_INPUT_START_MASK) {
+        buttons |= PORT_INPUT_START_MASK;
     }
-    if (rawHi & JOY_SELECT_MASK) {
-        buttons |= JOY_SELECT_MASK;
+    if (rawHi & PORT_INPUT_SELECT_MASK) {
+        buttons |= PORT_INPUT_SELECT_MASK;
     }
-    if (rawHi & JOY_Y_MASK) {
-        buttons |= JOY_Y_MASK;
+    if (rawHi & PORT_INPUT_Y_MASK) {
+        buttons |= PORT_INPUT_Y_MASK;
     }
-    if (rawHi & JOY_B_MASK) {
-        buttons |= JOY_B_MASK;
+    if (rawHi & PORT_INPUT_B_MASK) {
+        buttons |= PORT_INPUT_B_MASK;
     }
 
     return buttons;
@@ -580,10 +584,10 @@ static bool writeFlyingBerrySprite(uint8_t index, OBJ_DATA *obj)
 #define BANK_04  4  // rom_bank_4 (levels 25-32)
 
 static void LoadRoomDataVRAM(void) {
-    LoadVram((uint8_t *)GLOBAL_ActiveLevel.tilemapBg2, 0x2000, GLOBAL_ActiveLevel.roomSizeX * GLOBAL_ActiveLevel.roomSizeY * 4); //Bg2 tilemap
-    LoadVram((uint8_t *)GLOBAL_ActiveLevel.tilemapBg3, 0x4000, GLOBAL_ActiveLevel.roomSizeX * GLOBAL_ActiveLevel.roomSizeY * 4); //Bg2 tilemap
-    LoadCGRam(GLOBAL_ActiveLevel.paletteBg, 0x0020, 0x40); //Bg2 palette
-    LoadCGRam(GLOBAL_ActiveLevel.paletteBg, 0x0040, 0x40); //Bg3 palette
+    LoadVram((uint8_t *)s_tilemapBg2, 0x2000, GLOBAL_ActiveLevel.roomSizeX * GLOBAL_ActiveLevel.roomSizeY * 4); //Bg2 tilemap
+    LoadVram((uint8_t *)s_tilemapBg3, 0x4000, GLOBAL_ActiveLevel.roomSizeX * GLOBAL_ActiveLevel.roomSizeY * 4); //Bg2 tilemap
+    LoadCGRam(paletteBg, 0x0020, 0x40); //Bg2 palette
+    LoadCGRam(paletteBg, 0x0040, 0x40); //Bg3 palette
 }
 
 void port_LoadRoomData(uint16_t roomID) {
@@ -600,9 +604,9 @@ void port_LoadRoomData(uint16_t roomID) {
 
     switch (roomID) {
         case 1:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level1_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level1_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level1, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level1_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level1_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level1, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level1, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL1;
@@ -611,9 +615,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level1, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 2:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level2_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level2_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level2, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level2_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level2_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level2, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level2, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL2;
@@ -622,9 +626,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level2, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 3:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level3_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level3_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level3, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level3_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level3_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level3, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level3, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL3;
@@ -633,9 +637,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level3, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 4:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level4_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level4_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level4, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level4_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level4_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level4, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level4, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL4;
@@ -644,9 +648,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level4, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 5:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level5_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level5_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level5, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level5_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level5_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level5, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level5, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL5;
@@ -655,9 +659,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level5, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 6:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level6_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level6_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level6, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level6_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level6_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level6, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level6, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL6;
@@ -666,9 +670,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level6, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 7:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level7_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level7_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level7, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level7_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level7_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level7, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level7, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL7;
@@ -677,9 +681,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level7, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 8:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level8_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level8_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level8, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level8_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level8_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level8, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level8, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL8;
@@ -688,9 +692,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level8, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 9:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level9_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level9_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level9, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level9_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level9_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level9, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level9, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL9;
@@ -699,9 +703,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level9, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 10:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level10_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level10_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level10, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level10_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level10_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level10, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level10, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL10;
@@ -710,9 +714,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level10, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 11:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level11_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level11_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level11, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level11_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level11_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level11, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level11, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL11;
@@ -721,9 +725,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level11, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 12:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level12_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level12_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level12, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level12_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level12_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level12, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level12, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL12;
@@ -732,9 +736,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level12, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 13:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level13_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level13_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level13, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level13_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level13_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level13, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level13, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL13;
@@ -743,9 +747,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level13, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 14:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level14_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level14_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level14, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level14_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level14_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level14, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level14, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL14;
@@ -754,9 +758,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level14, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 15:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level15_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level15_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level15, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level15_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level15_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level15, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level15, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL15;
@@ -765,9 +769,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level15, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 16:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level16_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level16_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level16, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level16_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level16_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level16, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level16, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL16;
@@ -776,9 +780,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level16, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 17:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level17_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level17_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level17, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level17_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level17_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level17, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level17, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL17;
@@ -787,9 +791,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level17, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 18:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level18_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level18_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level18, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level18_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level18_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level18, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level18, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL18;
@@ -798,9 +802,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level18, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 19:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level19_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level19_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level19, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level19_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level19_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level19, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level19, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL19;
@@ -809,9 +813,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level19, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 20:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level20_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level20_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level20, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level20_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level20_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level20, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level20, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL20;
@@ -820,9 +824,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level20, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 21:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level21_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level21_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level21, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level21_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level21_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level21, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level21, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL21;
@@ -831,9 +835,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level21, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 22:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level22_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level22_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level22, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level22_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level22_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level22, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level22, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL22;
@@ -842,9 +846,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level22, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 23:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level23_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level23_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level23, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level23_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level23_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level23, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level23, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL23;
@@ -853,9 +857,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level23, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 24:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level24_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level24_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level24, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level24_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level24_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level24, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level24, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL24;
@@ -864,9 +868,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level24, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 25:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level25_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level25_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level25, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level25_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level25_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level25, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level25, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL25;
@@ -875,9 +879,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level25, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 26:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level26_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level26_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level26, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level26_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level26_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level26, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level26, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL26;
@@ -886,9 +890,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level26, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 27:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level27_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level27_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level27, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level27_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level27_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level27, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level27, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL27;
@@ -897,9 +901,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level27, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 28:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level28_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level28_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level28, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level28_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level28_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level28, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level28, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL28;
@@ -908,9 +912,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level28, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 29:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level29_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level29_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level29, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level29_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level29_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level29, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level29, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL29;
@@ -919,9 +923,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level29, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 30:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level30_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level30_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level30, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level30_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level30_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level30, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level30, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL30;
@@ -930,9 +934,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level30, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 31:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level31_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level31_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level31, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level31_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level31_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level31, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level31, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL31;
@@ -941,9 +945,9 @@ void port_LoadRoomData(uint16_t roomID) {
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.objectData, object_level31, GLOBAL_ActiveLevel.objectCount * 3);
             break;
         case 32:
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg2, tilemap_level32_bg2, sizeof(GLOBAL_ActiveLevel.tilemapBg2));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.tilemapBg3, tilemap_level32_bg3, sizeof(GLOBAL_ActiveLevel.tilemapBg3));
-            snesXC_memcpy_banked(GLOBAL_ActiveLevel.paletteBg, palette_level32, sizeof(GLOBAL_ActiveLevel.paletteBg));
+            snesXC_memcpy_banked(s_tilemapBg2, tilemap_level32_bg2, sizeof(s_tilemapBg2));
+            snesXC_memcpy_banked(s_tilemapBg3, tilemap_level32_bg3, sizeof(s_tilemapBg3));
+            snesXC_memcpy_banked(paletteBg, palette_level32, sizeof(paletteBg));
             snesXC_memcpy_banked(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level32, sizeof(GLOBAL_ActiveLevel.collisionFlagsReset));
 
             GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL32;

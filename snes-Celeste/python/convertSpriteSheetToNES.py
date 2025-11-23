@@ -1,0 +1,1378 @@
+from PIL import Image, ImageDraw
+import os
+import json
+import base64
+import zlib
+import gzip
+import struct
+from collections import Counter
+
+"""
+NES Sprite Sheet Converter
+
+This script converts sprite sheets to NES-compatible CHR format (2bpp, 4 colors per tile).
+Each original 8x8 tile is converted to a 16x16 sprite (4 8x8 tiles) in the CHR output.
+The CHR data is split across two CHR banks.
+
+NES Format:
+- 2bpp (2 bits per pixel) = 4 colors per tile
+- Each 8x8 tile = 16 bytes
+- Each original 8x8 tile becomes 4 8x8 tiles (16x16 sprite = 64 bytes)
+- CHR Bank 0: 2048 bytes (128 8x8 tiles)
+- CHR Bank 1: 4096 bytes (256 8x8 tiles)
+"""
+
+# Collision and object definitions (from visualize_map.py)
+far_background_gids = [40, 41, 42, 56, 57, 58, 16, 103, 104, 88]
+deco_objects_gids = [44, 60,61,62,63]
+solid_gids = [32, 33, 34, 35, 36, 37, 38, 39, 48, 49, 50, 51, 52, 53, 54, 55, 66, 67, 68, 69, 82, 83, 84, 85, 98, 99, 100, 101, 114, 115, 116, 117, 72]
+pointy_gids = [17, 27, 43, 59]
+icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
+all_background_gids = far_background_gids + solid_gids + pointy_gids + icy_gids + deco_objects_gids
+
+arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31, 45, 46, 47, 60, 62, 64, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+
+def convert_tile_to_2bpp(tile_image, palette):
+    """Converts an 8x8 tile image to NES 2bpp format (16 bytes)."""
+    tile_2bpp = bytearray(16)
+
+    # Use RGB mode for palette processing
+    tile_rgb = tile_image.convert('RGB')
+    pixels = list(tile_rgb.getdata())
+
+    # Create a mapping from palette color to palette index (0-3)
+    color_to_palette_index = {color: i for i, color in enumerate(palette)}
+
+    pixel_indices = []
+    for pixel_color in pixels:
+        # Special handling for near-black colors to ensure they map to index 0
+        r, g, b = pixel_color
+        if r < 8 and g < 8 and b < 8:
+            pixel_indices.append(0)
+            continue
+
+        if pixel_color in color_to_palette_index:
+            pixel_indices.append(color_to_palette_index[pixel_color])
+        else:
+            # Fallback for colors not exactly in palette
+            # Find the closest color by Euclidean distance
+            min_dist = float('inf')
+            best_idx = 0
+            for i, pal_color in enumerate(palette):
+                pr, pg, pb = pal_color
+                dist = (r-pr)**2 + (g-pg)**2 + (b-pb)**2
+                if dist < min_dist:
+                    min_dist = dist
+                    best_idx = i
+            pixel_indices.append(best_idx)
+
+    # Encode as 2bpp (NES format)
+    # NES format: First 8 bytes are plane 0 (LSB), next 8 bytes are plane 1 (MSB)
+    # Each byte represents one row, with bits packed left-to-right (bit 7 = leftmost pixel)
+    for y in range(8):
+        row_pixels = pixel_indices[y*8 : y*8+8]
+
+        bp0 = 0  # Bit plane 0 (LSB)
+        bp1 = 0  # Bit plane 1 (MSB)
+
+        for i, pixel_index in enumerate(row_pixels):
+            bp0 |= (pixel_index & 1) << (7 - i)
+            bp1 |= ((pixel_index >> 1) & 1) << (7 - i)
+
+        # NES format: plane 0 bytes at 0-7, plane 1 bytes at 8-15
+        tile_2bpp[y] = bp0      # Plane 0 (LSB)
+        tile_2bpp[y + 8] = bp1  # Plane 1 (MSB)
+
+    return tile_2bpp
+
+
+def extract_palette(tile_image, max_colors=4):
+    """
+    Extract a palette from a tile image, limiting to max_colors.
+    Always ensures black (0,0,0) is color 0.
+    """
+    tile_rgb = tile_image.convert('RGB')
+    colors = tile_rgb.getcolors(maxcolors=256)
+
+    if not colors:
+        return [(0, 0, 0)] * max_colors
+
+    # Sort by frequency (descending) then by color value for determinism
+    colors.sort(key=lambda item: (-item[0], item[1]))
+
+    # Extract unique colors
+    palette_colors = []
+    black = (0, 0, 0)
+
+    # Always start with black
+    palette_colors.append(black)
+
+    # Add other colors (excluding black)
+    for count, color in colors:
+        if color != black and color not in palette_colors:
+            palette_colors.append(color)
+            if len(palette_colors) >= max_colors:
+                break
+
+    # Pad with black if needed
+    while len(palette_colors) < max_colors:
+        palette_colors.append(black)
+
+    return palette_colors[:max_colors]
+
+
+def create_preview_image(sprite_data_list, tiles_per_row=8, scale=2, show_grid=True):
+    """
+    Create a preview image showing all 16x16 sprites with grid overlay.
+    Each sprite is shown at 16x16 (scaled 2x from 8x8 original).
+    Grid overlay shows the underlying 8x8 tile boundaries.
+    
+    Args:
+        sprite_data_list: List of (sprite_4tiles, palette) tuples where sprite_4tiles
+                         is a list of 4 tile data bytearrays [TL, TR, BL, BR]
+    """
+    if not sprite_data_list:
+        # Return a small empty image if no tiles
+        return Image.new('RGB', (16, 16), (128, 128, 128))
+
+    num_sprites = len(sprite_data_list)
+    num_rows = (num_sprites + tiles_per_row - 1) // tiles_per_row
+
+    # Each sprite is 16x16, scaled by scale factor
+    sprite_size_scaled = 16 * scale
+    preview_width = tiles_per_row * sprite_size_scaled
+    preview_height = num_rows * sprite_size_scaled
+
+    preview = Image.new('RGB', (preview_width, preview_height), (128, 128, 128))
+
+    # Draw sprites
+    for sprite_idx, (sprite_4tiles, palette) in enumerate(sprite_data_list):
+        row = sprite_idx // tiles_per_row
+        col = sprite_idx % tiles_per_row
+
+        # Reconstruct 16x16 sprite from 4 8x8 tiles
+        # Decode each tile
+        tl_pixels = decode_tile_from_2bpp(sprite_4tiles[0], palette)
+        tr_pixels = decode_tile_from_2bpp(sprite_4tiles[1], palette)
+        bl_pixels = decode_tile_from_2bpp(sprite_4tiles[2], palette)
+        br_pixels = decode_tile_from_2bpp(sprite_4tiles[3], palette)
+
+        # Create 16x16 image
+        sprite_16x16 = Image.new('RGB', (16, 16))
+
+        # Top row: TL and TR
+        for y in range(8):
+            for x in range(8):
+                sprite_16x16.putpixel((x, y), tl_pixels[y*8 + x])
+                sprite_16x16.putpixel((x+8, y), tr_pixels[y*8 + x])
+
+        # Bottom row: BL and BR
+        for y in range(8):
+            for x in range(8):
+                sprite_16x16.putpixel((x, y+8), bl_pixels[y*8 + x])
+                sprite_16x16.putpixel((x+8, y+8), br_pixels[y*8 + x])
+
+        # Scale up the sprite
+        sprite_scaled = sprite_16x16.resize((sprite_size_scaled, sprite_size_scaled), Image.NEAREST)
+
+        # Paste into preview
+        x = col * sprite_size_scaled
+        y = row * sprite_size_scaled
+        preview.paste(sprite_scaled, (x, y))
+
+    # Draw grid overlay showing 8x8 tile boundaries
+    if show_grid:
+        draw = ImageDraw.Draw(preview)
+
+        # Grid color: semi-transparent white/light gray
+        grid_color = (200, 200, 200)
+
+        # Draw vertical lines (every 8*scale pixels for 8x8 tile boundaries)
+        tile_8x8_size_scaled = 8 * scale
+        for x in range(0, preview_width + 1, tile_8x8_size_scaled):
+            draw.line([(x, 0), (x, preview_height)], fill=grid_color, width=1)
+
+        # Draw horizontal lines (every 8*scale pixels for 8x8 tile boundaries)
+        for y in range(0, preview_height + 1, tile_8x8_size_scaled):
+            draw.line([(0, y), (preview_width, y)], fill=grid_color, width=1)
+
+    return preview
+
+
+def convert_8x8_to_16x16_sprite(tile_8x8, palette):
+    """
+    Convert an 8x8 tile to a 16x16 sprite (4 8x8 tiles).
+    Returns a list of 4 tile data bytearrays: [top_left, top_right, bottom_left, bottom_right]
+    """
+    # Scale the 8x8 tile to 16x16 using nearest neighbor
+    tile_16x16 = tile_8x8.resize((16, 16), Image.NEAREST)
+
+    # Split into 4 8x8 tiles
+    top_left = tile_16x16.crop((0, 0, 8, 8))
+    top_right = tile_16x16.crop((8, 0, 16, 8))
+    bottom_left = tile_16x16.crop((0, 8, 8, 16))
+    bottom_right = tile_16x16.crop((8, 8, 16, 16))
+
+    # Convert each 8x8 tile to 2bpp
+    tiles_data = [
+        convert_tile_to_2bpp(top_left, palette),
+        convert_tile_to_2bpp(top_right, palette),
+        convert_tile_to_2bpp(bottom_left, palette),
+        convert_tile_to_2bpp(bottom_right, palette)
+    ]
+
+    return tiles_data
+
+
+def decode_tile_from_2bpp(tile_data, palette):
+    """Decode 2bpp tile data back to pixel colors."""
+    # NES format: First 8 bytes are plane 0 (LSB), next 8 bytes are plane 1 (MSB)
+    pixels = []
+
+    for y in range(8):
+        bp0 = tile_data[y]      # Plane 0 (LSB) - bytes 0-7
+        bp1 = tile_data[y + 8]  # Plane 1 (MSB) - bytes 8-15
+
+        for x in range(8):
+            bit0 = (bp0 >> (7 - x)) & 1
+            bit1 = (bp1 >> (7 - x)) & 1
+            pixel_index = (bit1 << 1) | bit0
+
+            # Clamp to palette size
+            if pixel_index >= len(palette):
+                pixel_index = 0
+
+            pixels.append(palette[pixel_index])
+
+    return pixels
+
+
+def decode_tiled_layer_data(layer):
+    """Decodes layer data if it is base64 encoded and compressed."""
+    if layer.get("encoding") == "base64" and isinstance(layer.get("data"), str):
+        decoded_data = base64.b64decode(layer["data"])
+        compression = layer.get("compression")
+
+        if compression == "zlib":
+            decompressed_data = zlib.decompress(decoded_data)
+        elif compression == "gzip":
+            decompressed_data = gzip.decompress(decoded_data)
+        else:
+            decompressed_data = decoded_data
+
+        num_tiles = len(decompressed_data) // 4
+        unpacked_data = struct.unpack(f"<{num_tiles}I", decompressed_data)
+        layer["data"] = list(unpacked_data)
+
+
+# NES 64-color palette (RGB values)
+# This is the standard NES palette with 64 predefined colors
+NES_PALETTE = [
+    (0x75, 0x75, 0x75), (0x27, 0x1B, 0x8F), (0x00, 0x00, 0xAB), (0x47, 0x00, 0x9F),
+    (0x8F, 0x00, 0x77), (0xAB, 0x00, 0x13), (0xA7, 0x00, 0x00), (0x7F, 0x0B, 0x00),
+    (0x43, 0x2F, 0x00), (0x00, 0x47, 0x00), (0x00, 0x51, 0x00), (0x00, 0x3F, 0x17),
+    (0x1B, 0x3F, 0x5F), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00),
+    (0xBC, 0xBC, 0xBC), (0x00, 0x73, 0xEF), (0x23, 0x3B, 0xEF), (0x83, 0x00, 0xF3),
+    (0xBF, 0x00, 0xBF), (0xE7, 0x00, 0x5B), (0xDB, 0x2B, 0x00), (0xCB, 0x4F, 0x0F),
+    (0x8B, 0x73, 0x00), (0x00, 0x97, 0x00), (0x00, 0xAB, 0x00), (0x00, 0x93, 0x3B),
+    (0x00, 0x83, 0x8B), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00),
+    (0xFF, 0xFF, 0xFF), (0x3F, 0xBF, 0xFF), (0x5F, 0x97, 0xFF), (0xA7, 0x8B, 0xFD),
+    (0xF7, 0x7B, 0xFF), (0xFF, 0x77, 0xB7), (0xFF, 0x77, 0x63), (0xFF, 0x9F, 0x3B),
+    (0xF3, 0xBF, 0x3B), (0x83, 0xD3, 0x13), (0x4F, 0xDF, 0x4B), (0x58, 0xF8, 0x98),
+    (0x00, 0xEB, 0xDB), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00),
+    (0xFF, 0xFF, 0xFF), (0xAB, 0xE7, 0xFF), (0xC7, 0xD7, 0xFF), (0xD7, 0xCB, 0xFF),
+    (0xFF, 0xC7, 0xFF), (0xFF, 0xC7, 0xDB), (0xFF, 0xBF, 0xB3), (0xFF, 0xDB, 0xAB),
+    (0xFF, 0xE7, 0xA3), (0xE3, 0xFF, 0xA3), (0xAB, 0xF3, 0xBF), (0xB3, 0xFF, 0xCF),
+    (0x9F, 0xFF, 0xF3), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00), (0x00, 0x00, 0x00),
+]
+
+
+def rgb_to_nes_6bit(r, g, b):
+    """
+    Convert RGB (0-255) to NES 6-bit color index (0-63).
+    Finds the closest matching color from the NES 64-color palette.
+    """
+    # Find the closest NES color by Euclidean distance
+    min_dist = float('inf')
+    closest_idx = 0
+
+    for i, (nr, ng, nb) in enumerate(NES_PALETTE):
+        # Calculate Euclidean distance in RGB space
+        dist = ((r - nr) ** 2 + (g - ng) ** 2 + (b - nb) ** 2) ** 0.5
+        if dist < min_dist:
+            min_dist = dist
+            closest_idx = i
+
+    return closest_idx
+
+
+def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, all_sprite_data, tile_mapping, unique_chr_tiles, all_palettes):
+    """
+    Generate a .h file with tilemap, palette, collision, object, and spawn data for NES.
+    
+    Args:
+        tile_data: List of tile GIDs from the JSON map
+        layer_name: Name of the layer
+        map_width: Width of map in tiles
+        map_height: Height of map in tiles
+        all_sprite_data: List of (sprite_4tiles, palette) tuples
+        tile_mapping: Dictionary mapping original_tile_index -> optimized_tile_index
+        unique_chr_tiles: List of unique CHR tile data
+        all_palettes: List of all palettes
+    """
+    # Sanitize layer name for C identifiers
+    safe_layer_name = ''.join(c if c.isalnum() else '_' for c in layer_name)
+    if not safe_layer_name or safe_layer_name[0].isdigit():
+        safe_layer_name = 'level_' + safe_layer_name
+
+    # Get the directory where this script is located (for output files)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_filename = os.path.join(script_dir, f'tilemap_{safe_layer_name}_nes.h')
+
+    # Process tile data to extract tilemap, palette, collision, objects, and spawn
+    tilemap_data = []  # List of (tl_tile, tr_tile, bl_tile, br_tile, palette_idx, flip_flags)
+    collision_data = []
+    object_data = []
+    spawn_x = 0
+    spawn_y = 0
+    spawn_found = False
+
+    # Collect unique palettes separately for background and sprite tiles
+    # Background palettes: max 4, first color must be black
+    background_palettes = []
+    background_palette_to_index = {}  # Maps palette tuple to index in background_palettes
+
+    # Sprite palettes: max 4
+    sprite_palettes = []
+    sprite_palette_to_index = {}  # Maps palette tuple to index in sprite_palettes
+
+    for i, tile_gid in enumerate(tile_data):
+        # Extract flip flags before clearing
+        FLIPPED_HORIZONTALLY_FLAG = 0x80000000
+        FLIPPED_VERTICALLY_FLAG = 0x40000000
+        FLIPPED_DIAGONALLY_FLAG = 0x20000000
+
+        flipped_horizontally = bool(tile_gid & FLIPPED_HORIZONTALLY_FLAG)
+        flipped_vertically = bool(tile_gid & FLIPPED_VERTICALLY_FLAG)
+        flipped_diagonally = bool(tile_gid & FLIPPED_DIAGONALLY_FLAG)
+
+        # Clear flags to get actual tile index
+        tile_gid_clean = tile_gid & ~(FLIPPED_HORIZONTALLY_FLAG | FLIPPED_VERTICALLY_FLAG | FLIPPED_DIAGONALLY_FLAG)
+        tile_index = (tile_gid_clean - 1) & 0x3FFF  # 14-bit tile index
+
+        # Calculate tile position
+        map_x_tile = i % map_width
+        map_y_tile = i // map_width
+
+        if tile_gid_clean == 0 or tile_index < 0 or tile_index >= len(all_sprite_data):
+            # Empty or invalid tile
+            tilemap_data.append((0, 0, 0, 0, 0, 0))  # Empty tile entry
+            collision_data.append(0)
+            continue
+
+        # Special handling for player (tile index 1) - track spawn but skip in tilemap
+        if tile_index == 1:
+            # Track spawn location for .h file
+            if not spawn_found:
+                spawn_x = map_x_tile
+                spawn_y = map_y_tile
+                spawn_found = True
+            # Skip in tilemap (empty black tile)
+            tilemap_data.append((0, 0, 0, 0, 0, 0))  # Empty tile entry
+            collision_data.append(0)
+            continue
+
+        # Skip tiles in arrMustBeObject - treat as empty black tiles in tilemap
+        if tile_index in arrMustBeObject:
+            # Add to object data but skip in tilemap (empty black tile)
+            object_data.append((tile_index, map_x_tile, map_y_tile))
+            tilemap_data.append((0, 0, 0, 0, 0, 0))  # Empty tile entry
+            collision_data.append(0)
+            continue
+
+        # Get sprite data
+        sprite_4tiles, palette = all_sprite_data[tile_index]
+
+        # Map original tile indices to optimized indices
+        tl_opt_idx = tile_mapping.get(tile_index * 4 + 0, 0)
+        tr_opt_idx = tile_mapping.get(tile_index * 4 + 1, 0)
+        bl_opt_idx = tile_mapping.get(tile_index * 4 + 2, 0)
+        br_opt_idx = tile_mapping.get(tile_index * 4 + 3, 0)
+
+        # Clamp to valid range
+        tl_opt_idx = min(tl_opt_idx, 255)
+        tr_opt_idx = min(tr_opt_idx, 255)
+        bl_opt_idx = min(bl_opt_idx, 255)
+        br_opt_idx = min(br_opt_idx, 255)
+
+        # Determine if this is a background tile (includes far_background, solid, pointy, and icy)
+        is_background = tile_index in all_background_gids
+
+        # Normalize palette: pad to 4 colors
+        # Note: extract_palette already ensures black is color 0 for all palettes
+        if is_background:
+            # Background tiles: palette should already have black as color 0 (from extract_palette)
+            normalized_palette = list(palette)
+            # Pad to 4 colors if needed
+            while len(normalized_palette) < 4:
+                normalized_palette.append((0, 0, 0))
+            normalized_palette = normalized_palette[:4]
+            # Verify black is color 0 (should always be true from extract_palette)
+            if len(normalized_palette) > 0 and normalized_palette[0] != (0, 0, 0):
+                # Force black as color 0 (this shouldn't happen, but safety check)
+                normalized_palette = [(0, 0, 0)] + [c for c in normalized_palette if c != (0, 0, 0)]
+                normalized_palette = normalized_palette[:4]
+
+            # Get or add palette to background palettes (max 4)
+            palette_key = tuple(normalized_palette)
+            if palette_key not in background_palette_to_index:
+                if len(background_palettes) >= 4:
+                    # Use the first palette if we've exceeded the limit
+                    print(f"WARNING: Exceeded 4 background palettes limit. Reusing palette 0 for tile {tile_index}")
+                    palette_idx = 0
+                else:
+                    background_palette_to_index[palette_key] = len(background_palettes)
+                    background_palettes.append(normalized_palette)
+                    palette_idx = len(background_palettes) - 1
+            else:
+                palette_idx = background_palette_to_index[palette_key]
+
+            # Encode: bit 2 = 0 (background), bits 0-1 = palette index (0-3)
+            palette_idx_encoded = palette_idx & 0x03  # 0-3
+
+            # Safety check: ensure we never exceed 3
+            if palette_idx_encoded > 3:
+                print(f"ERROR: Background palette index {palette_idx_encoded} exceeds limit of 3!")
+                palette_idx_encoded = 0
+        else:
+            # Sprite tile - use sprite palettes
+            normalized_palette = list(palette)
+            # Pad to 4 colors if needed
+            while len(normalized_palette) < 4:
+                normalized_palette.append((0, 0, 0))
+            normalized_palette = normalized_palette[:4]
+
+            # Get or add palette to sprite palettes (max 4)
+            palette_key = tuple(normalized_palette)
+            if palette_key not in sprite_palette_to_index:
+                if len(sprite_palettes) >= 4:
+                    # Use the first palette if we've exceeded the limit
+                    palette_idx = 0
+                else:
+                    sprite_palette_to_index[palette_key] = len(sprite_palettes)
+                    sprite_palettes.append(normalized_palette)
+                    palette_idx = len(sprite_palettes) - 1
+            else:
+                palette_idx = sprite_palette_to_index[palette_key]
+
+            # Encode: bit 2 = 1 (sprite), bits 0-1 = palette index (0-3)
+            palette_idx_encoded = (palette_idx & 0x03) | 0x04  # 4-7
+
+        # Encode flip flags (3 bits: H, V, D)
+        flip_flags = 0
+        if flipped_horizontally:
+            flip_flags |= 0x01
+        if flipped_vertically:
+            flip_flags |= 0x02
+        if flipped_diagonally:
+            flip_flags |= 0x04
+
+        # Store tilemap entry: (TL, TR, BL, BR, palette_idx, flip_flags)
+        tilemap_data.append((tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx, palette_idx_encoded, flip_flags))
+
+        # Generate collision data
+        if tile_index in solid_gids or tile_index in icy_gids:
+            collision_data.append(1)
+        elif tile_index in pointy_gids:
+            if tile_index == 17:
+                collision_data.append(4)
+            elif tile_index == 27:
+                collision_data.append(8)
+            elif tile_index == 43:
+                collision_data.append(16)  # 0x10
+            elif tile_index == 59:
+                collision_data.append(32)  # 0x20
+            else:
+                collision_data.append(0)
+        else:
+            collision_data.append(0)
+
+    # Write .h file
+    with open(output_filename, 'w') as f:
+        # Header guard
+        header_guard = f"TILEMAP_{safe_layer_name.upper()}_NES_H"
+        f.write(f"// NES tilemap data for layer '{layer_name}'\n")
+        f.write(f"// Generated from baseCelesteTileMap.json\n\n")
+        f.write(f"#ifndef {header_guard}\n")
+        f.write(f"#define {header_guard}\n\n")
+
+        # Map dimensions
+        f.write(f"// Tilemap dimensions: {map_width}x{map_height} tiles (NES 8x8)\n")
+        f.write(f"#define TILEMAP_{safe_layer_name.upper()}_WIDTH {map_width}\n")
+        f.write(f"#define TILEMAP_{safe_layer_name.upper()}_HEIGHT {map_height}\n\n")
+
+        # Tilemap data - each entry is 6 bytes: TL, TR, BL, BR (tile indices), palette_idx, flip_flags
+        f.write(f"// Tilemap data for layer '{layer_name}'\n")
+        f.write(f"// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
+        f.write(f"// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+        f.write(f"const unsigned char tilemap_{safe_layer_name}[] = {{\n")
+        for y in range(map_height):
+            f.write(f"    // Row {y}\n")
+            for x in range(map_width):
+                idx = y * map_width + x
+                if idx < len(tilemap_data):
+                    tl, tr, bl, br, pal_idx, flip = tilemap_data[idx]
+                    f.write(f"    {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip}")
+                    if idx < len(tilemap_data) - 1:
+                        f.write(",")
+                    f.write("\n")
+        f.write("};\n\n")
+        f.write(f"#define TILEMAP_{safe_layer_name.upper()}_COUNT {len(tilemap_data)}\n\n")
+
+        # Background palette data - NES 6-bit format (4 palettes, 4 colors per palette)
+        # Background palettes must have black as color 0
+        f.write(f"// Background palette data for layer '{layer_name}' (NES 6-bit format)\n")
+        f.write(f"// 4 background palettes, each with 4 colors: [color0=black, color1, color2, color3]\n")
+        f.write(f"// Used by tiles in all_background_gids (far_background, solid, pointy, and icy)\n")
+        f.write(f"const unsigned char palette_background_{safe_layer_name}[4][4] = {{\n")
+        for pal_idx in range(4):
+            if pal_idx < len(background_palettes):
+                palette = background_palettes[pal_idx]
+            else:
+                # Default: all black
+                palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
+            f.write(f"    // Background Palette {pal_idx}\n")
+            f.write("    { ")
+            for color_idx, (r, g, b) in enumerate(palette):
+                nes_color = rgb_to_nes_6bit(r, g, b)
+                f.write(f"0x{nes_color:02x}")
+                if color_idx < len(palette) - 1:
+                    f.write(", ")
+            f.write(" }")
+            if pal_idx < 3:
+                f.write(",")
+            f.write("\n")
+        f.write("};\n\n")
+        f.write(f"#define PALETTE_BACKGROUND_{safe_layer_name.upper()}_COUNT {min(len(background_palettes), 4)}\n\n")
+
+        # Sprite palette data - NES 6-bit format (4 palettes, 4 colors per palette)
+        f.write(f"// Sprite palette data for layer '{layer_name}' (NES 6-bit format)\n")
+        f.write(f"// 4 sprite palettes, each with 4 colors: [color0, color1, color2, color3]\n")
+        f.write(f"// Used by non-background tiles\n")
+        f.write(f"const unsigned char palette_sprite_{safe_layer_name}[4][4] = {{\n")
+        for pal_idx in range(4):
+            if pal_idx < len(sprite_palettes):
+                palette = sprite_palettes[pal_idx]
+            else:
+                # Default: all black
+                palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
+            f.write(f"    // Sprite Palette {pal_idx}\n")
+            f.write("    { ")
+            for color_idx, (r, g, b) in enumerate(palette):
+                nes_color = rgb_to_nes_6bit(r, g, b)
+                f.write(f"0x{nes_color:02x}")
+                if color_idx < len(palette) - 1:
+                    f.write(", ")
+            f.write(" }")
+            if pal_idx < 3:
+                f.write(",")
+            f.write("\n")
+        f.write("};\n\n")
+        f.write(f"#define PALETTE_SPRITE_{safe_layer_name.upper()}_COUNT {min(len(sprite_palettes), 4)}\n\n")
+
+        # Collision data
+        f.write(f"// Collision data for layer '{layer_name}'\n")
+        f.write(f"const unsigned char collision_{safe_layer_name}[] = {{\n")
+        # Write in rows for readability
+        for y in range(map_height):
+            row_start = y * map_width
+            row_end = row_start + map_width
+            row_data = collision_data[row_start:row_end]
+            f.write(f"    // Row {y}\n")
+            f.write("    ")
+            f.write(", ".join(str(val) for val in row_data))
+            if y < map_height - 1:
+                f.write(",")
+            f.write("\n")
+        f.write("};\n\n")
+        f.write(f"#define COLLISION_{safe_layer_name.upper()}_COUNT {len(collision_data)}\n\n")
+
+        # Object data
+        f.write(f"// Object data for layer '{layer_name}'\n")
+        if object_data:
+            f.write(f"const unsigned char object_{safe_layer_name}[] = {{\n")
+            for obj_tile, obj_x, obj_y in object_data:
+                f.write(f"    {obj_tile}, {obj_x}, {obj_y},\n")
+            f.write("};\n\n")
+            f.write(f"#define OBJECT_{safe_layer_name.upper()}_COUNT {len(object_data)}\n\n")
+        else:
+            f.write(f"const unsigned char object_{safe_layer_name}[] = {{}};\n\n")
+            f.write(f"#define OBJECT_{safe_layer_name.upper()}_COUNT 0\n\n")
+
+        # Spawn data
+        f.write(f"// Player start location for layer '{layer_name}'\n")
+        if spawn_found:
+            f.write(f"#define SPAWN_X_{safe_layer_name.upper()} {spawn_x}\n")
+            f.write(f"#define SPAWN_Y_{safe_layer_name.upper()} {spawn_y}\n\n")
+        else:
+            f.write(f"#define SPAWN_X_{safe_layer_name.upper()} 0\n")
+            f.write(f"#define SPAWN_Y_{safe_layer_name.upper()} 0\n\n")
+
+        f.write(f"#endif // {header_guard}\n")
+
+    print(f"Generated tilemap header: {output_filename}")
+    print(f"  Tilemap data: {len(tilemap_data)} entries (6 bytes each)")
+    print(f"  Background palettes: {min(len(background_palettes), 4)}/4")
+    print(f"  Sprite palettes: {min(len(sprite_palettes), 4)}/4")
+    print(f"  Collision data: {len(collision_data)} entries")
+    print(f"  Object data: {len(object_data)} objects")
+    if spawn_found:
+        print(f"  Spawn location: ({spawn_x}, {spawn_y})")
+    else:
+        print(f"  Spawn location: not found (defaulting to 0, 0)")
+
+
+def collect_background_colors(img, tiles_per_row, num_rows, all_background_gids):
+    """
+    Collect all unique colors from background tiles (all_background_gids).
+    Returns a Counter of (r, g, b) colors with their frequencies.
+    """
+    color_counter = Counter()
+
+    for y in range(num_rows):
+        for x in range(tiles_per_row):
+            tile_index = y * tiles_per_row + x
+            if tile_index in all_background_gids:
+                box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
+                tile_8x8 = img.crop(box)
+                tile_rgb = tile_8x8.convert('RGB')
+                pixels = list(tile_rgb.getdata())
+                for color in pixels:
+                    color_counter[color] += 1
+
+    return color_counter
+
+
+def quantize_colors(color_counter, target_colors=9):
+    """
+    Quantize colors down to target_colors + black (10 total).
+    Uses the most frequent colors, always including black.
+    Maps colors to NES palette for accuracy.
+    Returns a list of 10 colors: [black, color1, color2, ..., color9]
+    """
+    # Always include black
+    black = (0, 0, 0)
+    quantized = [black]
+
+    # Remove black from counter if present
+    if black in color_counter:
+        del color_counter[black]
+
+    # Get the most frequent colors
+    most_common = color_counter.most_common(target_colors * 2)  # Get more candidates
+
+    # Map colors to NES palette and deduplicate
+    nes_colors_seen = set()
+    for color, count in most_common:
+        if color == black:
+            continue
+
+        # Map to NES color
+        nes_idx = rgb_to_nes_6bit(color[0], color[1], color[2])
+        nes_color = NES_PALETTE[nes_idx]
+
+        if nes_color != black and nes_color not in nes_colors_seen:
+            quantized.append(nes_color)
+            nes_colors_seen.add(nes_color)
+            if len(quantized) >= 10:  # black + 9 colors
+                break
+
+    # Pad with black if needed
+    while len(quantized) < 10:
+        quantized.append(black)
+
+    return quantized[:10]
+
+
+def create_background_palettes(quantized_colors):
+    """
+    Create 4 background palettes from 10 quantized colors.
+    Each palette has 4 colors, with black always as color 0.
+    Returns a list of 4 palettes, each with 4 colors.
+    """
+    black = (0, 0, 0)
+    other_colors = [c for c in quantized_colors if c != black]
+
+    # Distribute the 9 non-black colors across 4 palettes
+    # Each palette: [black, color1, color2, color3]
+    palettes = []
+
+    # Strategy: distribute colors evenly
+    colors_per_palette = 3  # 3 non-black colors per palette (black is always 0)
+
+    for pal_idx in range(4):
+        palette = [black]  # Always start with black
+
+        # Add 3 colors from the quantized set
+        for i in range(colors_per_palette):
+            color_idx = (pal_idx * colors_per_palette + i) % len(other_colors)
+            if color_idx < len(other_colors):
+                palette.append(other_colors[color_idx])
+
+        # Pad with black if needed
+        while len(palette) < 4:
+            palette.append(black)
+
+        palettes.append(palette[:4])
+
+    return palettes
+
+
+def find_best_palette_for_tile(tile_image, background_palettes):
+    """
+    Find the best background palette for a tile by minimizing color distance.
+    Returns (palette_index, remapped_palette) where remapped_palette is the best palette.
+    """
+    tile_rgb = tile_image.convert('RGB')
+    pixels = list(tile_rgb.getdata())
+
+    best_palette_idx = 0
+    min_total_distance = float('inf')
+
+    for pal_idx, palette in enumerate(background_palettes):
+        total_distance = 0
+        for r, g, b in pixels:
+            # Find closest color in palette
+            min_dist = float('inf')
+            for pr, pg, pb in palette:
+                dist = (r - pr)**2 + (g - pg)**2 + (b - pb)**2
+                if dist < min_dist:
+                    min_dist = dist
+            total_distance += min_dist
+
+        if total_distance < min_total_distance:
+            min_total_distance = total_distance
+            best_palette_idx = pal_idx
+
+    return best_palette_idx, background_palettes[best_palette_idx]
+
+
+def deduplicate_tiles(all_chr_tiles):
+    """
+    Remove duplicate 8x8 tiles and create a mapping from original to optimized indices.
+    
+    Returns:
+        (unique_tiles, tile_mapping)
+        - unique_tiles: List of unique 8x8 tile data (bytearrays)
+        - tile_mapping: Dictionary mapping original_tile_index -> optimized_tile_index
+    """
+    unique_tiles = []
+    tile_mapping = {}
+    tile_to_index = {}  # Maps tile bytes (as tuple) to optimized index
+
+    for original_idx, tile_data in enumerate(all_chr_tiles):
+        # Convert bytearray to tuple for hashing
+        tile_key = tuple(tile_data)
+
+        if tile_key in tile_to_index:
+            # Duplicate tile found, reuse existing index
+            tile_mapping[original_idx] = tile_to_index[tile_key]
+        else:
+            # New unique tile
+            optimized_idx = len(unique_tiles)
+            unique_tiles.append(tile_data)
+            tile_to_index[tile_key] = optimized_idx
+            tile_mapping[original_idx] = optimized_idx
+
+    return unique_tiles, tile_mapping
+
+
+def create_map_preview(tilemap_data, optimized_chr_tiles, tile_mapping, all_palettes, all_sprite_data, output_path, map_width_tiles, map_height_tiles, scale=2, show_grid=True):
+    """
+    Create a preview image of the map using optimized NES CHR data.
+    
+    Args:
+        tilemap_data: List of tile GIDs from the JSON map
+        optimized_chr_tiles: List of unique CHR tile data (8x8 tiles)
+        tile_mapping: Dictionary mapping original_tile_index -> optimized_tile_index
+        all_palettes: List of all palettes
+        all_sprite_data: List of (sprite_4tiles, palette) tuples (uses original indices)
+        output_path: Path to save the preview
+        map_width_tiles: Width of map in tiles
+        map_height_tiles: Height of map in tiles
+        scale: Scale factor for preview (2 = 16x16 pixels per 8x8 tile)
+        show_grid: Whether to show 8x8 tile grid overlay
+    """
+
+    # Calculate preview size (each 8x8 tile becomes 16x16 in preview)
+    tile_size_scaled = 8 * scale
+    preview_width = map_width_tiles * tile_size_scaled
+    preview_height = map_height_tiles * tile_size_scaled
+
+    preview = Image.new('RGB', (preview_width, preview_height), (0, 0, 0))
+
+    # Track palette indices for each 8x8 tile position
+    # Each 16x16 sprite contains 4 8x8 tiles, so we need 2x the dimensions
+    palette_indices_8x8 = [[-1] * (map_width_tiles * 2) for _ in range(map_height_tiles * 2)]
+
+    # Collect unique background palettes only (map preview only shows background tiles)
+    background_palettes = []
+    background_palette_to_index = {}
+
+    # Process each tile in the map
+    for i, tile_gid in enumerate(tilemap_data):
+        if tile_gid == 0:
+            continue  # Empty tile
+
+        # Calculate tile position in map
+        map_x_tile = i % map_width_tiles
+        map_y_tile = i // map_width_tiles
+
+        # Extract flip flags
+        FLIPPED_HORIZONTALLY_FLAG = 0x80000000
+        FLIPPED_VERTICALLY_FLAG = 0x40000000
+        FLIPPED_DIAGONALLY_FLAG = 0x20000000
+
+        flipped_horizontally = bool(tile_gid & FLIPPED_HORIZONTALLY_FLAG)
+        flipped_vertically = bool(tile_gid & FLIPPED_VERTICALLY_FLAG)
+        flipped_diagonally = bool(tile_gid & FLIPPED_DIAGONALLY_FLAG)
+
+        # Clear flags to get actual tile index
+        tile_gid &= ~(FLIPPED_HORIZONTALLY_FLAG | FLIPPED_VERTICALLY_FLAG | FLIPPED_DIAGONALLY_FLAG)
+
+        # Convert GID to original tile index (GID is 1-based, tiles are 0-based)
+        original_tile_index = tile_gid - 1
+
+        if original_tile_index < 0 or original_tile_index >= len(all_sprite_data):
+            continue  # Invalid tile index
+
+        # Skip player (tile index 1) - don't draw in preview
+        if original_tile_index == 1:
+            continue  # Skip drawing player tile
+
+        # Skip tiles in arrMustBeObject - don't draw them in preview
+        if original_tile_index in arrMustBeObject:
+            continue  # Skip drawing this tile
+
+        # Get the sprite data (4 tiles for 16x16 sprite)
+        sprite_4tiles, palette = all_sprite_data[original_tile_index]
+
+        # Determine palette index (same logic as generate_nes_tilemap_header)
+        is_background = original_tile_index in all_background_gids
+
+        # Skip sprite tiles - only show background tiles in map preview
+        if not is_background:
+            continue  # Skip drawing sprite tiles
+
+        # Normalize palette: pad to 4 colors
+        normalized_palette = list(palette)
+        while len(normalized_palette) < 4:
+            normalized_palette.append((0, 0, 0))
+        normalized_palette = normalized_palette[:4]
+
+        # Background tiles only (sprite tiles are skipped above)
+        palette_key = tuple(normalized_palette)
+        if palette_key not in background_palette_to_index:
+            if len(background_palettes) >= 4:
+                palette_idx_encoded = 0
+            else:
+                background_palette_to_index[palette_key] = len(background_palettes)
+                background_palettes.append(normalized_palette)
+                palette_idx_encoded = len(background_palettes) - 1
+        else:
+            palette_idx_encoded = background_palette_to_index[palette_key]
+
+        # Validate: background palette index must be 0-3
+        if palette_idx_encoded > 3:
+            print(f"WARNING: Background palette index {palette_idx_encoded} exceeds limit of 3, clamping to 0")
+            palette_idx_encoded = 0
+
+        # Store palette index for all 4 8x8 tiles in this sprite
+        # Each 16x16 sprite is at position (map_x_tile, map_y_tile)
+        # It contains 4 8x8 tiles at positions:
+        # TL: (map_x_tile * 2, map_y_tile * 2)
+        # TR: (map_x_tile * 2 + 1, map_y_tile * 2)
+        # BL: (map_x_tile * 2, map_y_tile * 2 + 1)
+        # BR: (map_x_tile * 2 + 1, map_y_tile * 2 + 1)
+        tl_8x8_x = map_x_tile * 2
+        tl_8x8_y = map_y_tile * 2
+        if tl_8x8_x < map_width_tiles * 2 and tl_8x8_y < map_height_tiles * 2:
+            palette_indices_8x8[tl_8x8_y][tl_8x8_x] = palette_idx_encoded
+            palette_indices_8x8[tl_8x8_y][tl_8x8_x + 1] = palette_idx_encoded
+            palette_indices_8x8[tl_8x8_y + 1][tl_8x8_x] = palette_idx_encoded
+            palette_indices_8x8[tl_8x8_y + 1][tl_8x8_x + 1] = palette_idx_encoded
+
+        # Map original tile indices to optimized indices
+        # Each sprite has 4 tiles, so we need to map each one
+        tl_opt_idx = tile_mapping.get(original_tile_index * 4 + 0, 0)
+        tr_opt_idx = tile_mapping.get(original_tile_index * 4 + 1, 0)
+        bl_opt_idx = tile_mapping.get(original_tile_index * 4 + 2, 0)
+        br_opt_idx = tile_mapping.get(original_tile_index * 4 + 3, 0)
+
+        # Get optimized tile data
+        tl_tile = optimized_chr_tiles[tl_opt_idx] if tl_opt_idx < len(optimized_chr_tiles) else bytearray(16)
+        tr_tile = optimized_chr_tiles[tr_opt_idx] if tr_opt_idx < len(optimized_chr_tiles) else bytearray(16)
+        bl_tile = optimized_chr_tiles[bl_opt_idx] if bl_opt_idx < len(optimized_chr_tiles) else bytearray(16)
+        br_tile = optimized_chr_tiles[br_opt_idx] if br_opt_idx < len(optimized_chr_tiles) else bytearray(16)
+
+        # Reconstruct 16x16 sprite from 4 8x8 tiles using optimized CHR data
+        sprite_16x16 = Image.new('RGB', (16, 16))
+
+        # Decode each tile from optimized CHR data
+        tl_pixels = decode_tile_from_2bpp(tl_tile, palette)
+        tr_pixels = decode_tile_from_2bpp(tr_tile, palette)
+        bl_pixels = decode_tile_from_2bpp(bl_tile, palette)
+        br_pixels = decode_tile_from_2bpp(br_tile, palette)
+
+        # Top row: TL and TR
+        for y in range(8):
+            for x in range(8):
+                sprite_16x16.putpixel((x, y), tl_pixels[y*8 + x])
+                sprite_16x16.putpixel((x+8, y), tr_pixels[y*8 + x])
+
+        # Bottom row: BL and BR
+        for y in range(8):
+            for x in range(8):
+                sprite_16x16.putpixel((x, y+8), bl_pixels[y*8 + x])
+                sprite_16x16.putpixel((x+8, y+8), br_pixels[y*8 + x])
+
+        # Apply transformations
+        if flipped_diagonally:
+            if flipped_horizontally and flipped_vertically:
+                sprite_16x16 = sprite_16x16.transpose(Image.ROTATE_270)
+                sprite_16x16 = sprite_16x16.transpose(Image.FLIP_LEFT_RIGHT)
+            elif flipped_horizontally:
+                sprite_16x16 = sprite_16x16.transpose(Image.ROTATE_270)
+            elif flipped_vertically:
+                sprite_16x16 = sprite_16x16.transpose(Image.ROTATE_90)
+            else:
+                sprite_16x16 = sprite_16x16.transpose(Image.ROTATE_270)
+                sprite_16x16 = sprite_16x16.transpose(Image.FLIP_TOP_BOTTOM)
+        else:
+            if flipped_horizontally:
+                sprite_16x16 = sprite_16x16.transpose(Image.FLIP_LEFT_RIGHT)
+            if flipped_vertically:
+                sprite_16x16 = sprite_16x16.transpose(Image.FLIP_TOP_BOTTOM)
+
+        # Scale up the sprite
+        sprite_scaled = sprite_16x16.resize((tile_size_scaled, tile_size_scaled), Image.NEAREST)
+
+        # Paste into preview
+        x = map_x_tile * tile_size_scaled
+        y = map_y_tile * tile_size_scaled
+        preview.paste(sprite_scaled, (x, y))
+
+    # Draw grid overlay showing 8x8 tile boundaries
+    if show_grid:
+        draw = ImageDraw.Draw(preview)
+        grid_color = (200, 200, 200)
+
+        # Draw vertical lines (every tile_size_scaled pixels)
+        for x in range(0, preview_width + 1, tile_size_scaled):
+            draw.line([(x, 0), (x, preview_height)], fill=grid_color, width=1)
+
+        # Draw horizontal lines (every tile_size_scaled pixels)
+        for y in range(0, preview_height + 1, tile_size_scaled):
+            draw.line([(0, y), (preview_width, y)], fill=grid_color, width=1)
+
+    # Draw transparent overlay showing palette indices for each 8x8 tile
+    overlay = Image.new('RGBA', (preview_width, preview_height), (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
+
+    # Color mapping for palette indices (background palettes only: 0-3)
+    # Background palettes: 0-3 (blue tones)
+    # Alpha set to ~20% (51 out of 255)
+    alpha = 51
+    palette_colors = [
+        (0, 0, 255, alpha),    # 0: Blue (background)
+        (0, 128, 255, alpha),  # 1: Light blue (background)
+        (128, 128, 255, alpha), # 2: Purple-blue (background)
+        (0, 255, 255, alpha),  # 3: Cyan (background)
+        (255, 0, 0, alpha),    # 4: Red (sprite)
+        (255, 128, 0, alpha),  # 5: Orange (sprite)
+        (255, 0, 255, alpha),  # 6: Magenta (sprite)
+        (255, 128, 128, alpha), # 7: Pink (sprite)
+    ]
+
+    # Draw overlay rectangles for each 8x8 tile
+    tile_8x8_size = tile_size_scaled // 2  # Each 8x8 tile is half the size of a 16x16 sprite
+    for y_8x8 in range(map_height_tiles * 2):
+        for x_8x8 in range(map_width_tiles * 2):
+            palette_idx = palette_indices_8x8[y_8x8][x_8x8]
+            if palette_idx >= 0:
+                # Draw semi-transparent rectangle
+                x_pixel = x_8x8 * tile_8x8_size
+                y_pixel = y_8x8 * tile_8x8_size
+                color = palette_colors[palette_idx % len(palette_colors)]
+                overlay_draw.rectangle(
+                    [(x_pixel, y_pixel), (x_pixel + tile_8x8_size - 1, y_pixel + tile_8x8_size - 1)],
+                    fill=color
+                )
+
+    # Draw palette index number only once per 16x16 sprite (centered)
+    # Iterate over 16x16 sprite positions
+    font_size = max(10, tile_size_scaled // 2)
+    try:
+        from PIL import ImageFont
+        font = ImageFont.truetype("arial.ttf", font_size)
+    except:
+        try:
+            font = ImageFont.load_default()
+        except:
+            font = None
+
+    for y_sprite in range(map_height_tiles):
+        for x_sprite in range(map_width_tiles):
+            # Get palette index from top-left 8x8 tile of this sprite
+            y_8x8 = y_sprite * 2
+            x_8x8 = x_sprite * 2
+            if y_8x8 < map_height_tiles * 2 and x_8x8 < map_width_tiles * 2:
+                palette_idx = palette_indices_8x8[y_8x8][x_8x8]
+                if palette_idx >= 0:
+                    # Calculate center of 16x16 sprite
+                    x_pixel = x_sprite * tile_size_scaled
+                    y_pixel = y_sprite * tile_size_scaled
+                    # Draw palette index label in the center of the sprite
+                    # Map preview only shows background tiles, so palette indices are always 0-3
+                    # Format: "B0", "B1", "B2", or "B3"
+                    text = f"B{palette_idx}"
+                    # Calculate text position (centered in 16x16 sprite)
+                    bbox = overlay_draw.textbbox((0, 0), text, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
+                    text_x = x_pixel + (tile_size_scaled - text_width) // 2
+                    text_y = y_pixel + (tile_size_scaled - text_height) // 2
+                    # Use white text
+                    text_color = (255, 255, 255, 255)
+                    overlay_draw.text((text_x, text_y), text, fill=text_color, font=font)
+
+    # Composite the overlay onto the preview
+    preview_rgba = preview.convert('RGBA')
+    preview_rgba = Image.alpha_composite(preview_rgba, overlay)
+    preview = preview_rgba.convert('RGB')
+
+    preview.save(output_path)
+    return preview
+
+
+def main():
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
+    image_filename = os.path.join(script_dir, 'baseCelesteSpriteSheet.png')
+    output_chr_bank0 = os.path.join(script_dir, 'sprite_chr_bank0.bin')
+    output_chr_bank1 = os.path.join(script_dir, 'sprite_chr_bank1.bin')
+    output_preview_bank0 = os.path.join(script_dir, 'sprite_chr_bank0_preview.png')
+    output_preview_bank1 = os.path.join(script_dir, 'sprite_chr_bank1_preview.png')
+
+    # Check for Pillow installation
+    try:
+        from PIL import Image
+    except ImportError:
+        print("Pillow library not found. Please install it using: pip install Pillow")
+        return
+
+    if not os.path.exists(image_filename):
+        print(f"Error: '{image_filename}' not found.")
+        print(f"Script directory: {script_dir}")
+        print(f"Current working directory: {os.getcwd()}")
+        return
+
+    img = Image.open(image_filename)
+    width, height = img.size
+
+    if width % 8 != 0 or height % 8 != 0:
+        print("Warning: Image dimensions are not a multiple of 8. Some parts may be cropped.")
+
+    # Calculate number of tiles
+    tiles_per_row = width // 8
+    num_rows = height // 8
+    total_tiles = tiles_per_row * num_rows
+
+    print(f"Processing {total_tiles} tiles from {width}x{height} image...")
+
+    # First, collect colors from background tiles for quantization
+    print("\nCollecting colors from background tiles...")
+    background_color_counter = collect_background_colors(img, tiles_per_row, num_rows, all_background_gids)
+    print(f"  Found {len(background_color_counter)} unique colors in background tiles")
+
+    # Quantize to 9 colors + black and create 4 palettes
+    background_palettes = None
+    if len(background_color_counter) > 0:
+        quantized_colors = quantize_colors(background_color_counter, target_colors=9)
+        print(f"  Quantized to {len(quantized_colors)} colors (black + 9 colors)")
+
+        background_palettes = create_background_palettes(quantized_colors)
+        print(f"  Created {len(background_palettes)} background palettes")
+        for i, pal in enumerate(background_palettes):
+            print(f"    Palette {i}: {pal}")
+    else:
+        print("  No background tiles found, using default palettes")
+        background_palettes = [[(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)] for _ in range(4)]
+
+    # Process all tiles - each 8x8 tile becomes a 16x16 sprite (4 8x8 tiles)
+    all_sprite_data = []  # List of (sprite_4tiles, palette) tuples
+    all_palettes = []
+    all_chr_tiles = []  # Flat list of all 8x8 tile data for CHR banks
+
+    for y in range(num_rows):
+        for x in range(tiles_per_row):
+            box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
+            tile_8x8 = img.crop(box)
+            tile_index = y * tiles_per_row + x
+
+            # For background tiles, use quantized palette; otherwise extract palette
+            if tile_index in all_background_gids:
+                # Find best palette from background_palettes
+                best_palette_idx, palette = find_best_palette_for_tile(tile_8x8, background_palettes)
+            else:
+                # Extract palette (max 4 colors for NES)
+                palette = extract_palette(tile_8x8, max_colors=4)
+
+            # Convert 8x8 tile to 16x16 sprite (4 8x8 tiles)
+            sprite_4tiles = convert_8x8_to_16x16_sprite(tile_8x8, palette)
+
+            all_sprite_data.append((sprite_4tiles, palette))
+            all_palettes.append(palette)
+
+            # Add all 4 tiles to the flat CHR list
+            all_chr_tiles.extend(sprite_4tiles)
+
+    print(f"\nProcessed {len(all_sprite_data)} original 8x8 tiles")
+    print(f"Generated {len(all_chr_tiles)} 8x8 tiles for CHR output (4 tiles per sprite)")
+
+    # Deduplicate tiles to optimize CHR usage
+    print("\nDeduplicating tiles...")
+    unique_chr_tiles, tile_mapping = deduplicate_tiles(all_chr_tiles)
+    print(f"  Original tiles: {len(all_chr_tiles)}")
+    print(f"  Unique tiles: {len(unique_chr_tiles)}")
+    print(f"  Duplicates removed: {len(all_chr_tiles) - len(unique_chr_tiles)}")
+    print(f"  Space saved: {((len(all_chr_tiles) - len(unique_chr_tiles)) * 16)} bytes")
+
+    # Split into CHR banks using optimized unique tiles
+    # Bank 0: 4096 bytes = 256 tiles
+    # Bank 1: 4096 bytes = 256 tiles
+    bank0_size = 4096
+    bank1_size = 4096
+    tiles_per_bank0 = bank0_size // 16  # 256 tiles
+    tiles_per_bank1 = bank1_size // 16  # 256 tiles
+
+    # Write CHR Bank 0 (using optimized unique tiles)
+    bank0_data = bytearray()
+    bank0_tiles = unique_chr_tiles[:tiles_per_bank0]
+
+    for tile_data in bank0_tiles:
+        bank0_data.extend(tile_data)
+
+    # Pad bank 0 if needed
+    while len(bank0_data) < bank0_size:
+        bank0_data.append(0)
+
+    # Write CHR Bank 1 (using optimized unique tiles)
+    bank1_data = bytearray()
+    bank1_tiles = unique_chr_tiles[tiles_per_bank0:tiles_per_bank0 + tiles_per_bank1]
+
+    for tile_data in bank1_tiles:
+        bank1_data.extend(tile_data)
+
+    # Pad bank 1 if needed
+    while len(bank1_data) < bank1_size:
+        bank1_data.append(0)
+
+    # Create optimized sprite data for previews (using optimized tile indices)
+    # We need to map the sprite data to use optimized tile indices
+    optimized_sprite_data = []
+    for sprite_idx, (sprite_4tiles, palette) in enumerate(all_sprite_data):
+        # Map each of the 4 tiles in the sprite to optimized indices
+        optimized_4tiles = []
+        for tile_idx_in_sprite in range(4):
+            original_tile_idx = sprite_idx * 4 + tile_idx_in_sprite
+            optimized_tile_idx = tile_mapping.get(original_tile_idx, 0)
+            # Get the optimized tile data
+            if optimized_tile_idx < len(unique_chr_tiles):
+                optimized_4tiles.append(unique_chr_tiles[optimized_tile_idx])
+        else:
+            optimized_4tiles.append(bytearray(16))
+        optimized_sprite_data.append((optimized_4tiles, palette))
+
+    # For preview, we need to filter sprites that fit in each bank
+    # Since tiles are now optimized, we need to check which sprites can be rendered
+    # based on whether all their tiles are in the bank
+    bank0_sprites = []
+    bank1_sprites = []
+
+    for sprite_idx, (optimized_4tiles, palette) in enumerate(optimized_sprite_data):
+        # Check if all 4 tiles are in bank 0
+        all_in_bank0 = all(
+            tile_mapping.get(sprite_idx * 4 + i, tiles_per_bank0) < tiles_per_bank0
+            for i in range(4)
+        )
+        if all_in_bank0 and sprite_idx < len(all_sprite_data):
+            bank0_sprites.append((optimized_4tiles, palette))
+        elif sprite_idx < len(all_sprite_data):
+            # Check if all tiles are in bank 1
+            all_in_bank1 = all(
+                tiles_per_bank0 <= tile_mapping.get(sprite_idx * 4 + i, tiles_per_bank0 + tiles_per_bank1) < tiles_per_bank0 + tiles_per_bank1
+                for i in range(4)
+            )
+            if all_in_bank1:
+                bank1_sprites.append((optimized_4tiles, palette))
+
+    # Write CHR files
+    with open(output_chr_bank0, 'wb') as f:
+        f.write(bank0_data)
+
+    with open(output_chr_bank1, 'wb') as f:
+        f.write(bank1_data)
+
+    # Create combined CHR file
+    output_chr_combined = os.path.join(script_dir, 'sprite_chr_combined.bin')
+    combined_data = bank0_data + bank1_data
+    with open(output_chr_combined, 'wb') as f:
+        f.write(combined_data)
+
+    print(f"Wrote {len(bank0_data)} bytes to {output_chr_bank0} ({len(bank0_tiles)} unique 8x8 tiles)")
+    print(f"Wrote {len(bank1_data)} bytes to {output_chr_bank1} ({len(bank1_tiles)} unique 8x8 tiles)")
+    print(f"Wrote {len(combined_data)} bytes to {output_chr_combined} (combined CHR data)")
+
+    # Create separate preview images for each bank (16x16 sprites with grid overlay)
+    # Use optimized sprite data for previews
+    print("Creating preview images...")
+    if bank0_sprites:
+        preview_bank0 = create_preview_image(bank0_sprites, tiles_per_row=tiles_per_row, scale=2, show_grid=True)
+        preview_bank0.save(output_preview_bank0)
+        print(f"Saved Bank 0 preview to {output_preview_bank0} ({len(bank0_sprites)} 16x16 sprites)")
+
+    if bank1_sprites:
+        preview_bank1 = create_preview_image(bank1_sprites, tiles_per_row=tiles_per_row, scale=2, show_grid=True)
+        preview_bank1.save(output_preview_bank1)
+        print(f"Saved Bank 1 preview to {output_preview_bank1} ({len(bank1_sprites)} 16x16 sprites)")
+
+    # Statistics
+    unique_palettes = {}
+    for palette in all_palettes:
+        palette_key = tuple(palette)
+        unique_palettes[palette_key] = unique_palettes.get(palette_key, 0) + 1
+
+    print(f"\nStatistics:")
+    print(f"  Original 8x8 tiles: {len(all_sprite_data)}")
+    print(f"  Total 8x8 CHR tiles (before dedup): {len(all_chr_tiles)} (4 per sprite)")
+    print(f"  Unique 8x8 CHR tiles (after dedup): {len(unique_chr_tiles)}")
+    print(f"  Bank 0: {len(bank0_tiles)} unique 8x8 tiles ({len(bank0_sprites)} 16x16 sprites)")
+    print(f"  Bank 1: {len(bank1_tiles)} unique 8x8 tiles ({len(bank1_sprites)} 16x16 sprites)")
+    print(f"  Unique palettes: {len(unique_palettes)}")
+
+    # Check if we have more tiles than can fit in both banks
+    max_tiles = tiles_per_bank0 + tiles_per_bank1
+    if len(unique_chr_tiles) > max_tiles:
+        print(f"  WARNING: {len(unique_chr_tiles)} unique 8x8 tiles exceed capacity of {max_tiles} tiles!")
+        print(f"  Only first {max_tiles} tiles were written to CHR banks.")
+    else:
+        remaining_tiles = max_tiles - len(unique_chr_tiles)
+        print(f"  Remaining capacity: {remaining_tiles} unique 8x8 tiles")
+
+    # Process map JSON and create level previews and .h files
+    tilemap_filename = os.path.join(script_dir, 'baseCelesteTileMap.json')
+    if os.path.exists(tilemap_filename):
+        print("\nProcessing map JSON file...")
+        try:
+            with open(tilemap_filename, 'r') as f:
+                tilemap_json = json.load(f)
+
+            map_width_global = tilemap_json.get("width", 128)
+            map_height_global = tilemap_json.get("height", 64)
+
+            # Process each layer
+            for layer in tilemap_json.get("layers", []):
+                if layer.get("type") == "tilelayer":
+                    decode_tiled_layer_data(layer)
+                    tile_data_all = layer.get("data", [])
+
+                    if not tile_data_all:
+                        continue
+
+                    # Split map into 16x16 tile levels (8x4 grid = 32 levels)
+                    xMaps = 8
+                    yMaps = 4
+                    map_width_tiles_local = 16
+                    map_height_tiles_local = 16
+
+                    for mapNum in range(xMaps * yMaps):
+                        level_name = f"level{mapNum+1}"
+
+                        # Calculate top-left corner of this submap
+                        topLeftX = (mapNum % xMaps) * map_width_tiles_local
+                        topLeftY = (mapNum // xMaps) * map_height_tiles_local
+
+                        # Extract 16x16 tile data for this level
+                        submap_data = []
+                        for y in range(map_height_tiles_local):
+                            row = []
+                            for x in range(map_width_tiles_local):
+                                global_x = topLeftX + x
+                                global_y = topLeftY + y
+
+                                # Check bounds
+                                if global_x < map_width_global and global_y < map_height_global:
+                                    index = global_y * map_width_global + global_x
+                                    if index < len(tile_data_all):
+                                        row.append(tile_data_all[index])
+                                    else:
+                                        row.append(0)
+                                else:
+                                    row.append(0)
+                            submap_data.append(row)
+
+                        # Flatten submap_data for preview and header generation
+                        flat_submap_data = []
+                        for row in submap_data:
+                            flat_submap_data.extend(row)
+
+                        # Create preview for this level
+                        output_map_preview = os.path.join(script_dir, f'level_map_preview_{level_name}.png')
+
+                        print(f"Creating map preview for {level_name} (16x16 tiles)...")
+                        create_map_preview(
+                            flat_submap_data,
+                            unique_chr_tiles,
+                            tile_mapping,
+                            all_palettes,
+                            all_sprite_data,
+                            output_map_preview,
+                            map_width_tiles_local,
+                            map_height_tiles_local,
+                            scale=2,
+                            show_grid=True
+                        )
+                        print(f"Saved map preview to {output_map_preview}")
+
+                        # Generate .h file with tilemap, palette, collision, object, and spawn data for this level
+                        generate_nes_tilemap_header(
+                            flat_submap_data,
+                            level_name,
+                            map_width_tiles_local,
+                            map_height_tiles_local,
+                            all_sprite_data,
+                            tile_mapping,
+                            unique_chr_tiles,
+                            all_palettes
+                        )
+        except Exception as e:
+            print(f"Error processing map JSON: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"\nMap JSON file '{tilemap_filename}' not found, skipping map preview generation.")
+
+    print(f"\nConversion complete!")
+    print(f"  CHR Bank 0: {output_chr_bank0}")
+    print(f"  CHR Bank 1: {output_chr_bank1}")
+    print(f"  CHR Combined: {output_chr_combined}")
+    if bank0_sprites:
+        print(f"  Bank 0 Preview: {output_preview_bank0}")
+    if bank1_sprites:
+        print(f"  Bank 1 Preview: {output_preview_bank1}")
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,28 @@
+{
+    "files.associations": {
+        "tilemap_level1.h": "c",
+        "tilemap_level13.h": "c",
+        "tilemap_level15.h": "c",
+        "tilemap_level25.h": "c",
+        "sprite_data.h": "c",
+        "tilemap_level23.h": "c",
+        "tilemap_level22.h": "c",
+        "tilemap_level6.h": "c",
+        "mainbankzero.h": "c",
+        "initsnes.h": "c",
+        "snes_regs_xc.h": "c",
+        "inttypes.h": "c",
+        "string.h": "c",
+        "port.h": "c",
+        "int_snes_xc.h": "c",
+        "snes_font.h": "c",
+        "stdio.h": "c",
+        "clouds.h": "c",
+        "tilemap_level32.h": "c",
+        "tilemap_level31.h": "c",
+        "tilemap_level29.h": "c",
+        "fixedpointsnes.h": "c",
+        "stdbool.h": "c",
+        "tilemap_level1_nes.h": "c"
+    }
+}
