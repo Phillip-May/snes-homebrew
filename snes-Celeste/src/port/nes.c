@@ -21,6 +21,11 @@
 #include "../../python/tilemap_level13_nes.h"
 #include "../../python/tilemap_level14_nes.h"
 #include "../../python/tilemap_level15_nes.h"
+#include "../../python/tilemap_level16_nes.h"
+#include "../../python/tilemap_level17_nes.h"
+#include "../../python/tilemap_level18_nes.h"
+#include "../../python/tilemap_level19_nes.h"
+#include "../../python/tilemap_level20_nes.h"
 
 #ifndef _WIN32 //Fix linter
 #include <neslib.h>
@@ -46,6 +51,8 @@ typedef struct {
     uint8_t height;
     const unsigned char *tilemap;
     uint16_t tilemap_count;
+    // Collision data is now generated from tilemap GIDs, so this field is unused
+    // Keeping for compatibility but it will be NULL
     const unsigned char *collision;
     uint16_t collision_count;
     const unsigned char *objects;
@@ -66,7 +73,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL1_WIDTH, TILEMAP_LEVEL1_HEIGHT,
         tilemap_level1, TILEMAP_LEVEL1_COUNT,
-        collision_level1, COLLISION_LEVEL1_COUNT,
+        NULL, TILEMAP_LEVEL1_COUNT, // Collision generated from tilemap
         object_level1, OBJECT_LEVEL1_COUNT,
         object_sprite_level1, OBJECT_SPRITE_LEVEL1_COUNT,
         palette_background_level1, PALETTE_BACKGROUND_LEVEL1_COUNT,
@@ -77,7 +84,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL2_WIDTH, TILEMAP_LEVEL2_HEIGHT,
         tilemap_level2, TILEMAP_LEVEL2_COUNT,
-        collision_level2, COLLISION_LEVEL2_COUNT,
+        NULL, TILEMAP_LEVEL2_COUNT, // Collision generated from tilemap
         object_level2, OBJECT_LEVEL2_COUNT,
         object_sprite_level2, OBJECT_SPRITE_LEVEL2_COUNT,
         palette_background_level2, PALETTE_BACKGROUND_LEVEL2_COUNT,
@@ -88,7 +95,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL3_WIDTH, TILEMAP_LEVEL3_HEIGHT,
         tilemap_level3, TILEMAP_LEVEL3_COUNT,
-        collision_level3, COLLISION_LEVEL3_COUNT,
+        NULL, TILEMAP_LEVEL3_COUNT, // Collision generated from tilemap
         object_level3, OBJECT_LEVEL3_COUNT,
         object_sprite_level3, OBJECT_SPRITE_LEVEL3_COUNT,
         palette_background_level3, PALETTE_BACKGROUND_LEVEL3_COUNT,
@@ -99,7 +106,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL4_WIDTH, TILEMAP_LEVEL4_HEIGHT,
         tilemap_level4, TILEMAP_LEVEL4_COUNT,
-        collision_level4, COLLISION_LEVEL4_COUNT,
+        NULL, TILEMAP_LEVEL4_COUNT, // Collision generated from tilemap
         object_level4, OBJECT_LEVEL4_COUNT,
         object_sprite_level4, OBJECT_SPRITE_LEVEL4_COUNT,
         palette_background_level4, PALETTE_BACKGROUND_LEVEL4_COUNT,
@@ -110,7 +117,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL5_WIDTH, TILEMAP_LEVEL5_HEIGHT,
         tilemap_level5, TILEMAP_LEVEL5_COUNT,
-        collision_level5, COLLISION_LEVEL5_COUNT,
+        NULL, TILEMAP_LEVEL5_COUNT, // Collision generated from tilemap
         object_level5, OBJECT_LEVEL5_COUNT,
         object_sprite_level5, OBJECT_SPRITE_LEVEL5_COUNT,
         palette_background_level5, PALETTE_BACKGROUND_LEVEL5_COUNT,
@@ -121,7 +128,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL6_WIDTH, TILEMAP_LEVEL6_HEIGHT,
         tilemap_level6, TILEMAP_LEVEL6_COUNT,
-        collision_level6, COLLISION_LEVEL6_COUNT,
+        NULL, TILEMAP_LEVEL6_COUNT, // Collision generated from tilemap
         object_level6, OBJECT_LEVEL6_COUNT,
         object_sprite_level6, OBJECT_SPRITE_LEVEL6_COUNT,
         palette_background_level6, PALETTE_BACKGROUND_LEVEL6_COUNT,
@@ -132,7 +139,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL7_WIDTH, TILEMAP_LEVEL7_HEIGHT,
         tilemap_level7, TILEMAP_LEVEL7_COUNT,
-        collision_level7, COLLISION_LEVEL7_COUNT,
+        NULL, TILEMAP_LEVEL7_COUNT, // Collision generated from tilemap
         object_level7, OBJECT_LEVEL7_COUNT,
         object_sprite_level7, OBJECT_SPRITE_LEVEL7_COUNT,
         palette_background_level7, PALETTE_BACKGROUND_LEVEL7_COUNT,
@@ -143,7 +150,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL8_WIDTH, TILEMAP_LEVEL8_HEIGHT,
         tilemap_level8, TILEMAP_LEVEL8_COUNT,
-        collision_level8, COLLISION_LEVEL8_COUNT,
+        NULL, TILEMAP_LEVEL8_COUNT, // Collision generated from tilemap
         object_level8, OBJECT_LEVEL8_COUNT,
         object_sprite_level8, OBJECT_SPRITE_LEVEL8_COUNT,
         palette_background_level8, PALETTE_BACKGROUND_LEVEL8_COUNT,
@@ -154,7 +161,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL9_WIDTH, TILEMAP_LEVEL9_HEIGHT,
         tilemap_level9, TILEMAP_LEVEL9_COUNT,
-        collision_level9, COLLISION_LEVEL9_COUNT,
+        NULL, TILEMAP_LEVEL9_COUNT, // Collision generated from tilemap
         object_level9, OBJECT_LEVEL9_COUNT,
         object_sprite_level9, OBJECT_SPRITE_LEVEL9_COUNT,
         palette_background_level9, PALETTE_BACKGROUND_LEVEL9_COUNT,
@@ -165,7 +172,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL10_WIDTH, TILEMAP_LEVEL10_HEIGHT,
         tilemap_level10, TILEMAP_LEVEL10_COUNT,
-        collision_level10, COLLISION_LEVEL10_COUNT,
+        NULL, TILEMAP_LEVEL10_COUNT, // Collision generated from tilemap
         object_level10, OBJECT_LEVEL10_COUNT,
         object_sprite_level10, OBJECT_SPRITE_LEVEL10_COUNT,
         palette_background_level10, PALETTE_BACKGROUND_LEVEL10_COUNT,
@@ -176,19 +183,18 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL11_WIDTH, TILEMAP_LEVEL11_HEIGHT,
         tilemap_level11, TILEMAP_LEVEL11_COUNT,
-        collision_level11, COLLISION_LEVEL11_COUNT,
+        NULL, TILEMAP_LEVEL11_COUNT, // Collision generated from tilemap
         object_level11, OBJECT_LEVEL11_COUNT,
         object_sprite_level11, OBJECT_SPRITE_LEVEL11_COUNT,
         palette_background_level11, PALETTE_BACKGROUND_LEVEL11_COUNT,
         palette_sprite_level11, PALETTE_SPRITE_LEVEL11_COUNT,
         SPAWN_X_LEVEL11, SPAWN_Y_LEVEL11
     },
-    /*
     // Level 12
     {
         TILEMAP_LEVEL12_WIDTH, TILEMAP_LEVEL12_HEIGHT,
         tilemap_level12, TILEMAP_LEVEL12_COUNT,
-        collision_level12, COLLISION_LEVEL12_COUNT,
+        NULL, TILEMAP_LEVEL12_COUNT, // Collision generated from tilemap
         object_level12, OBJECT_LEVEL12_COUNT,
         object_sprite_level12, OBJECT_SPRITE_LEVEL12_COUNT,
         palette_background_level12, PALETTE_BACKGROUND_LEVEL12_COUNT,
@@ -199,7 +205,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL13_WIDTH, TILEMAP_LEVEL13_HEIGHT,
         tilemap_level13, TILEMAP_LEVEL13_COUNT,
-        collision_level13, COLLISION_LEVEL13_COUNT,
+        NULL, TILEMAP_LEVEL13_COUNT, // Collision generated from tilemap
         object_level13, OBJECT_LEVEL13_COUNT,
         object_sprite_level13, OBJECT_SPRITE_LEVEL13_COUNT,
         palette_background_level13, PALETTE_BACKGROUND_LEVEL13_COUNT,
@@ -210,7 +216,7 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL14_WIDTH, TILEMAP_LEVEL14_HEIGHT,
         tilemap_level14, TILEMAP_LEVEL14_COUNT,
-        collision_level14, COLLISION_LEVEL14_COUNT,
+        NULL, TILEMAP_LEVEL14_COUNT, // Collision generated from tilemap
         object_level14, OBJECT_LEVEL14_COUNT,
         object_sprite_level14, OBJECT_SPRITE_LEVEL14_COUNT,
         palette_background_level14, PALETTE_BACKGROUND_LEVEL14_COUNT,
@@ -221,12 +227,68 @@ static const LevelData level_data[] = {
     {
         TILEMAP_LEVEL15_WIDTH, TILEMAP_LEVEL15_HEIGHT,
         tilemap_level15, TILEMAP_LEVEL15_COUNT,
-        collision_level15, COLLISION_LEVEL15_COUNT,
+        NULL, TILEMAP_LEVEL15_COUNT, // Collision generated from tilemap
         object_level15, OBJECT_LEVEL15_COUNT,
         object_sprite_level15, OBJECT_SPRITE_LEVEL15_COUNT,
         palette_background_level15, PALETTE_BACKGROUND_LEVEL15_COUNT,
         palette_sprite_level15, PALETTE_SPRITE_LEVEL15_COUNT,
         SPAWN_X_LEVEL15, SPAWN_Y_LEVEL15
+    },
+    // Level 16
+    {
+        TILEMAP_LEVEL16_WIDTH, TILEMAP_LEVEL16_HEIGHT,
+        tilemap_level16, TILEMAP_LEVEL16_COUNT,
+        NULL, TILEMAP_LEVEL16_COUNT, // Collision generated from tilemap
+        object_level16, OBJECT_LEVEL16_COUNT,
+        object_sprite_level16, OBJECT_SPRITE_LEVEL16_COUNT,
+        palette_background_level16, PALETTE_BACKGROUND_LEVEL16_COUNT,
+        palette_sprite_level16, PALETTE_SPRITE_LEVEL16_COUNT,
+        SPAWN_X_LEVEL16, SPAWN_Y_LEVEL16
+    },
+    // Level 17
+    {
+        TILEMAP_LEVEL17_WIDTH, TILEMAP_LEVEL17_HEIGHT,
+        tilemap_level17, TILEMAP_LEVEL17_COUNT,
+        NULL, TILEMAP_LEVEL17_COUNT, // Collision generated from tilemap
+        object_level17, OBJECT_LEVEL17_COUNT,
+        object_sprite_level17, OBJECT_SPRITE_LEVEL17_COUNT,
+        palette_background_level17, PALETTE_BACKGROUND_LEVEL17_COUNT,
+        palette_sprite_level17, PALETTE_SPRITE_LEVEL17_COUNT,
+        SPAWN_X_LEVEL17, SPAWN_Y_LEVEL17
+    },
+    // Level 18
+    {
+        TILEMAP_LEVEL18_WIDTH, TILEMAP_LEVEL18_HEIGHT,
+        tilemap_level18, TILEMAP_LEVEL18_COUNT,
+        NULL, TILEMAP_LEVEL18_COUNT, // Collision generated from tilemap
+        object_level18, OBJECT_LEVEL18_COUNT,
+        object_sprite_level18, OBJECT_SPRITE_LEVEL18_COUNT,
+        palette_background_level18, PALETTE_BACKGROUND_LEVEL18_COUNT,
+        palette_sprite_level18, PALETTE_SPRITE_LEVEL18_COUNT,
+        SPAWN_X_LEVEL18, SPAWN_Y_LEVEL18
+    },
+    /*
+    // Level 19
+    {
+        TILEMAP_LEVEL19_WIDTH, TILEMAP_LEVEL19_HEIGHT,
+        tilemap_level19, TILEMAP_LEVEL19_COUNT,
+        NULL, TILEMAP_LEVEL19_COUNT, // Collision generated from tilemap
+        object_level19, OBJECT_LEVEL19_COUNT,
+        object_sprite_level19, OBJECT_SPRITE_LEVEL19_COUNT,
+        palette_background_level19, PALETTE_BACKGROUND_LEVEL19_COUNT,
+        palette_sprite_level19, PALETTE_SPRITE_LEVEL19_COUNT,
+        SPAWN_X_LEVEL19, SPAWN_Y_LEVEL19
+    },
+    // Level 20
+    {
+        TILEMAP_LEVEL20_WIDTH, TILEMAP_LEVEL20_HEIGHT,
+        tilemap_level20, TILEMAP_LEVEL20_COUNT,
+        NULL, TILEMAP_LEVEL20_COUNT, // Collision generated from tilemap
+        object_level20, OBJECT_LEVEL20_COUNT,
+        object_sprite_level20, OBJECT_SPRITE_LEVEL20_COUNT,
+        palette_background_level20, PALETTE_BACKGROUND_LEVEL20_COUNT,
+        palette_sprite_level20, PALETTE_SPRITE_LEVEL20_COUNT,
+        SPAWN_X_LEVEL20, SPAWN_Y_LEVEL20
     },
     */
 };
@@ -236,6 +298,7 @@ static const LevelData level_data[] = {
 // Shared GID mapping (used by all levels)
 #define GID_TO_TILE_MAP gid_to_tile_shared
 #define GID_TO_TILE_MAP_COUNT GID_TO_TILE_SHARED_COUNT
+#define GID_TO_COLLISION_COUNT 72
 
 static void oam_upload(void) {
     OAM_ADDR = 0x00;
@@ -838,11 +901,11 @@ static void load_sprite_palettes(void) {
     }
     const LevelData *level = &level_data[level_idx];
     
-    // Load sprite palettes from tilemap data (up to 4 palettes)
-    uint8_t pal_count = level->sprite_palette_count;
-    if (pal_count > 4) pal_count = 4;
-    
-    for (uint8_t pal_idx = 0; pal_idx < pal_count; pal_idx++) {
+    // Load sprite palettes from tilemap data
+    // The sprite_palettes array is always [4][4], so we always load all 4 palettes
+    // sprite_palette_count tells us how many are actually used, but we need all 4
+    // (especially palette 3 which is reserved for the player)
+    for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         // Each palette has 4 colors
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             uint8_t nes_6bit = level->sprite_palettes[pal_idx][col_idx];
@@ -1051,9 +1114,17 @@ void port_LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.roomSizeX = level->width;
     GLOBAL_ActiveLevel.roomSizeY = level->height;
     
-    // Copy collision data
-    memcpy(GLOBAL_ActiveLevel.collisionFlagsReset, level->collision, level->collision_count);
-    memcpy(GLOBAL_ActiveLevel.collisionFlagsArr, level->collision, level->collision_count);
+    // Generate collision data from tilemap GIDs
+    // Use shared GID to collision mapping (defined in gid_to_tile_shared.h)
+    for (uint16_t i = 0; i < level->tilemap_count && i < 256; i++) {
+        uint8_t gid = level->tilemap[i];
+        uint8_t collision_flag = 0;
+        if (gid < GID_TO_COLLISION_COUNT) {
+            collision_flag = gid_to_collision[gid];
+        }
+        GLOBAL_ActiveLevel.collisionFlagsReset[i] = collision_flag;
+        GLOBAL_ActiveLevel.collisionFlagsArr[i] = collision_flag;
+    }
     
     // Set player spawn position
     GLOBAL_ActiveLevel.playerSpawnX = level->spawn_x;

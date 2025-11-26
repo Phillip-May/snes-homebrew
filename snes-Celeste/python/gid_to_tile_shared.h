@@ -7,7 +7,7 @@
 #ifndef GID_TO_TILE_SHARED_H
 #define GID_TO_TILE_SHARED_H
 
-const unsigned char gid_to_tile_shared[54][6] = {
+const unsigned char gid_to_tile_shared[72][6] = {
     // GID 0
     { 0, 0, 0, 0, 0, 0 },
     // GID 1
@@ -115,9 +115,124 @@ const unsigned char gid_to_tile_shared[54][6] = {
     // GID 52
     { 242, 243, 236, 244, 0, 0 },
     // GID 53
-    { 255, 255, 255, 255, 4, 0 }
+    { 255, 255, 255, 255, 4, 0 },
+    // GID 54
+    { 0, 0, 0, 0, 4, 0 },
+    // GID 55
+    { 0, 195, 196, 197, 4, 0 },
+    // GID 56
+    { 0, 0, 216, 217, 4, 0 },
+    // GID 57
+    { 0, 0, 218, 219, 4, 0 },
+    // GID 58
+    { 0, 220, 221, 222, 4, 0 },
+    // GID 59
+    { 0, 223, 218, 219, 4, 0 },
+    // GID 60
+    { 224, 225, 226, 227, 4, 0 },
+    // GID 61
+    { 0, 0, 228, 219, 4, 0 },
+    // GID 62
+    { 249, 250, 0, 0, 4, 0 },
+    // GID 63
+    { 251, 252, 253, 254, 4, 0 },
+    // GID 64
+    { 251, 255, 0, 0, 4, 0 },
+    // GID 65
+    { 251, 252, 0, 0, 4, 0 },
+    // GID 66
+    { 255, 255, 0, 0, 4, 0 },
+    // GID 67
+    { 255, 0, 0, 255, 4, 0 },
+    // GID 68
+    { 0, 255, 255, 255, 4, 0 },
+    // GID 69
+    { 178, 0, 0, 0, 4, 0 },
+    // GID 70
+    { 0, 255, 0, 0, 4, 0 },
+    // GID 71
+    { 255, 0, 255, 255, 4, 0 }
 };
 
-#define GID_TO_TILE_SHARED_COUNT 54
+#define GID_TO_TILE_SHARED_COUNT 72
+
+// GID to collision flags mapping
+// Collision flags: 0 = no collision, 1 = solid, 4/8/16/32 = pointy variants
+const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    1,
+    4,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    8,
+    16,
+    32,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    1,
+    1,
+    1,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+};
+
+#define GID_TO_COLLISION_COUNT GID_TO_TILE_SHARED_COUNT
 
 #endif // GID_TO_TILE_SHARED_H

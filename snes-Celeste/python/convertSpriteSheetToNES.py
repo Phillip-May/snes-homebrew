@@ -7,14 +7,12 @@ import gzip
 import struct
 from collections import Counter
 
-# Global list to track level sizes for compression statistics
-level_sizes = []  # List of (level_name, uncompressed_bytes, compressed_bytes)
-level_data_combined = []  # List of (level_name, const_data, const_data_no_collision, uncompressed_bytes, uncompressed_no_collision_bytes)
 
 # Shared GID mapping (built incrementally as levels are processed)
 shared_gid_mapping_global = {
     'tile_to_gid': {},  # Maps (tl, tr, bl, br, pal_idx, flip_flags) -> GID
     'gid_map_data': [],  # List of tile entries indexed by GID
+    'gid_to_original_tile_index': {},  # Maps NES GID -> original tile_index (for collision)
     'next_gid': 1  # Next available GID (0 is reserved for empty tiles)
 }
 
@@ -42,6 +40,26 @@ icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
 all_background_gids = far_background_gids + solid_gids + pointy_gids + icy_gids + deco_objects_gids
 
 arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31, 45, 46, 47, 64, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+
+def get_collision_for_tile_index(tile_index):
+    """Get collision flag for a given original tile_index."""
+    if tile_index < 0:
+        return 0
+    if tile_index in solid_gids or tile_index in icy_gids:
+        return 1
+    elif tile_index in pointy_gids:
+        if tile_index == 17:
+            return 4
+        elif tile_index == 27:
+            return 8
+        elif tile_index == 43:
+            return 16  # 0x10
+        elif tile_index == 59:
+            return 32  # 0x20
+        else:
+            return 0
+    else:
+        return 0
 
 def convert_tile_to_2bpp(tile_image, palette):
     """Converts an 8x8 tile image to NES 2bpp format (16 bytes)."""
@@ -317,204 +335,6 @@ def rgb_to_nes_6bit(r, g, b):
     return closest_idx
 
 
-def compress_lzss(data):
-    """
-    LZSS (Lempel-Ziv-Storer-Szymanski) compression for estimation purposes.
-    LZSS is commonly used in SNES/NES games and is more efficient than basic LZ77.
-    
-    Format:
-    - Flag byte: 8 bits, each bit indicates if next token is literal (0) or match (1)
-    - Literal: 1 byte (the literal value)
-    - Match: 2 bytes (distance low, distance high) + 1 byte (length)
-    
-    Args:
-        data: bytes or bytearray to compress
-        
-    Returns:
-        compressed_data: bytearray of compressed data
-    """
-    if len(data) == 0:
-        return bytearray()
-    
-    data = bytearray(data)
-    output = bytearray()
-    i = 0
-    window_size = 4096  # 4KB sliding window (common for SNES/NES)
-    min_match = 3
-    max_match = 18
-    
-    while i < len(data):
-        flag_byte = 0
-        flag_byte_pos = len(output)
-        output.append(0)  # Placeholder for flag byte
-        
-        # Process up to 8 tokens (one flag byte worth)
-        for token in range(8):
-            if i >= len(data):
-                break
-            
-            best_match_len = 0
-            best_match_dist = 0
-            
-            # Search in the sliding window
-            search_start = max(0, i - window_size)
-            
-            for j in range(search_start, i):
-                match_len = 0
-                # Find how many bytes match
-                while (match_len < max_match and 
-                       i + match_len < len(data) and
-                       j + match_len < i and
-                       data[j + match_len] == data[i + match_len]):
-                    match_len += 1
-                
-                if match_len > best_match_len:
-                    best_match_len = match_len
-                    best_match_dist = i - j
-            
-            # Decide: literal or match?
-            if best_match_len >= min_match:
-                # Match is better - encode as match
-                flag_byte |= (1 << token)  # Set bit for match
-                
-                # Encode match: distance (2 bytes) + length (1 byte)
-                dist_low = best_match_dist & 0xFF
-                dist_high = (best_match_dist >> 8) & 0xFF
-                length_byte = min(best_match_len - min_match, max_match - min_match)  # 0-15 for lengths 3-18
-                
-                output.append(dist_low)
-                output.append(dist_high)
-                output.append(length_byte)
-                i += best_match_len
-            else:
-                # Literal is better - encode as literal
-                output.append(data[i])
-                i += 1
-        
-        # Update flag byte
-        output[flag_byte_pos] = flag_byte
-    
-    return output
-
-
-def estimate_lzss_size(data):
-    """
-    Estimate LZSS compressed size using the LZSS compressor.
-    
-    Args:
-        data: bytes or bytearray to estimate
-        
-    Returns:
-        estimated_size: estimated compressed size in bytes
-    """
-    if len(data) == 0:
-        return 0
-    
-    compressed = compress_lzss(data)
-    return len(compressed)
-
-
-def compress_lzsa2(data):
-    """
-    LZSA2 (Lempel-Ziv-Storer-Szymanski variant 2) compression for estimation purposes.
-    LZSA2 uses a different encoding scheme than LZSS, often with better compression ratios.
-    
-    Format:
-    - Flag byte: 8 bits, each bit indicates if next token is literal (0) or match (1)
-    - Literal: 1 byte (the literal value)
-    - Match: Variable encoding - typically 2 bytes for distance + 1 byte for length
-    - Uses different distance/length encoding than LZSS
-    
-    Args:
-        data: bytes or bytearray to compress
-        
-    Returns:
-        compressed_data: bytearray of compressed data
-    """
-    if len(data) == 0:
-        return bytearray()
-    
-    data = bytearray(data)
-    output = bytearray()
-    i = 0
-    window_size = 4096  # 4KB sliding window (common for SNES/NES)
-    min_match = 2  # LZSA2 often uses shorter minimum matches
-    max_match = 257  # LZSA2 supports longer matches
-    
-    while i < len(data):
-        flag_byte = 0
-        flag_byte_pos = len(output)
-        output.append(0)  # Placeholder for flag byte
-        
-        # Process up to 8 tokens (one flag byte worth)
-        for token in range(8):
-            if i >= len(data):
-                break
-            
-            best_match_len = 0
-            best_match_dist = 0
-            
-            # Search in the sliding window
-            search_start = max(0, i - window_size)
-            
-            for j in range(search_start, i):
-                match_len = 0
-                # Find how many bytes match
-                while (match_len < max_match and 
-                       i + match_len < len(data) and
-                       j + match_len < i and
-                       data[j + match_len] == data[i + match_len]):
-                    match_len += 1
-                
-                if match_len > best_match_len:
-                    best_match_len = match_len
-                    best_match_dist = i - j
-            
-            # Decide: literal or match?
-            # LZSA2: match is beneficial if length >= min_match
-            if best_match_len >= min_match:
-                # Match is better - encode as match
-                flag_byte |= (1 << token)  # Set bit for match
-                
-                # LZSA2 encoding: distance (2 bytes) + length (variable, but we'll use 1 byte for estimation)
-                # Distance encoding: low byte, high byte
-                dist_low = best_match_dist & 0xFF
-                dist_high = (best_match_dist >> 8) & 0xFF
-                
-                # Length encoding: for LZSA2, we encode length-2 (since min_match=2)
-                # Cap at 255 for single byte encoding
-                length_byte = min(best_match_len - min_match, 255)
-                
-                output.append(dist_low)
-                output.append(dist_high)
-                output.append(length_byte)
-                i += best_match_len
-            else:
-                # Literal is better - encode as literal
-                output.append(data[i])
-                i += 1
-        
-        # Update flag byte
-        output[flag_byte_pos] = flag_byte
-    
-    return output
-
-
-def estimate_lzsa2_size(data):
-    """
-    Estimate LZSA2 compressed size using the LZSA2 compressor.
-    
-    Args:
-        data: bytes or bytearray to estimate
-        
-    Returns:
-        estimated_size: estimated compressed size in bytes
-    """
-    if len(data) == 0:
-        return 0
-    
-    compressed = compress_lzsa2(data)
-    return len(compressed)
 
 
 def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, all_sprite_data, tile_mapping, unique_chr_tiles, all_palettes, object_palettes=None, object_palette_mapping=None, shared_gid_mapping=None):
@@ -632,7 +452,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
 
         if tile_gid_clean == 0 or tile_index < 0 or tile_index >= len(all_sprite_data):
             # Empty or invalid tile
-            tilemap_data.append((0, 0, 0, 0, 0, 0))  # Empty tile entry
+            tilemap_data.append((0, 0, 0, 0, 0, 0, -1))  # Empty tile entry, tile_index = -1
             collision_data.append(0)
             continue
 
@@ -644,7 +464,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 spawn_y = map_y_tile
                 spawn_found = True
             # Skip in tilemap (empty black tile)
-            tilemap_data.append((0, 0, 0, 0, 0, 0))  # Empty tile entry
+            tilemap_data.append((0, 0, 0, 0, 0, 0, -1))  # Empty tile entry, tile_index = -1
             collision_data.append(0)
             continue
 
@@ -652,7 +472,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         if tile_index in arrMustBeObject:
             # Add to object data but skip in tilemap (empty black tile)
             object_data.append((tile_index, map_x_tile, map_y_tile))
-            tilemap_data.append((0, 0, 0, 0, 0, 0))  # Empty tile entry
+            tilemap_data.append((0, 0, 0, 0, 0, 0, -1))  # Empty tile entry, tile_index = -1
             collision_data.append(0)
             continue
 
@@ -759,7 +579,8 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             flip_flags |= 0x04
 
         # Store tilemap entry: (TL, TR, BL, BR, palette_idx, flip_flags)
-        tilemap_data.append((tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx, palette_idx_encoded, flip_flags))
+        # Also store original tile_index for collision mapping
+        tilemap_data.append((tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx, palette_idx_encoded, flip_flags, tile_index))
 
         # Generate collision data
         if tile_index in solid_gids or tile_index in icy_gids:
@@ -820,11 +641,19 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     next_gid = shared_gid_mapping_global['next_gid']
     
     # Generate GID array from tilemap_data using shared mapping
+    # Track original tile_index for collision mapping
     gid_array = []
-    for tile_entry in tilemap_data:
+    for i, tile_entry_with_index in enumerate(tilemap_data):
+        # Extract tile entry (first 6 elements) and original tile_index (last element)
+        tile_entry = tile_entry_with_index[:6]
+        original_tile_index = tile_entry_with_index[6] if len(tile_entry_with_index) > 6 else -1
+        
         if tile_entry in tile_to_gid:
             # Use existing GID from shared mapping
             gid = tile_to_gid[tile_entry]
+            # Update original tile_index if this is the first time we see a valid one for this GID
+            if original_tile_index >= 0 and gid not in shared_gid_mapping_global['gid_to_original_tile_index']:
+                shared_gid_mapping_global['gid_to_original_tile_index'][gid] = original_tile_index
         else:
             # Add new entry to shared mapping
             if next_gid >= 256:
@@ -835,6 +664,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 gid = next_gid
                 tile_to_gid[tile_entry] = gid
                 gid_map_data.append(tile_entry)
+                # Track original tile_index for this GID
+                if original_tile_index >= 0:
+                    shared_gid_mapping_global['gid_to_original_tile_index'][gid] = original_tile_index
                 next_gid += 1
                 shared_gid_mapping_global['next_gid'] = next_gid
         gid_array.append(gid)
@@ -862,17 +694,18 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         # Tilemap data - array of GIDs (one byte per entry)
         f.write(f"// Tilemap data for layer '{layer_name}' (GIDs, one byte per entry)\n")
         f.write(f"const unsigned char tilemap_{safe_layer_name}[] = {{\n")
-        for y in range(map_height):
-            f.write(f"    // Row {y}\n")
-            for x in range(map_width):
-                idx = y * map_width + x
-                if idx < len(gid_array):
-                    gid = gid_array[idx]
-                    f.write(f"    {gid}")
-                    if idx < len(gid_array) - 1:
-                        f.write(",")
+        # Write 16 values per line
+        for i in range(len(gid_array)):
+            if i % 16 == 0:
+                f.write("    ")
+            f.write(f"{gid_array[i]}")
+            if i < len(gid_array) - 1:
+                f.write(",")
+                if (i + 1) % 16 == 0:
                     f.write("\n")
-        f.write("};\n\n")
+                else:
+                    f.write(" ")
+        f.write("\n};\n\n")
         f.write(f"#define TILEMAP_{safe_layer_name.upper()}_COUNT {len(gid_array)}\n\n")
 
         # Background palette data - NES 6-bit format (4 palettes, 4 colors per palette)
@@ -961,22 +794,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         f.write("};\n\n")
         f.write(f"#define PALETTE_SPRITE_{safe_layer_name.upper()}_COUNT {min(len(sprite_palettes), 4)}\n\n")
 
-        # Collision data
-        f.write(f"// Collision data for layer '{layer_name}'\n")
-        f.write(f"const unsigned char collision_{safe_layer_name}[] = {{\n")
-        # Write in rows for readability
-        for y in range(map_height):
-            row_start = y * map_width
-            row_end = row_start + map_width
-            row_data = collision_data[row_start:row_end]
-            f.write(f"    // Row {y}\n")
-            f.write("    ")
-            f.write(", ".join(str(val) for val in row_data))
-            if y < map_height - 1:
-                f.write(",")
-            f.write("\n")
-        f.write("};\n\n")
-        f.write(f"#define COLLISION_{safe_layer_name.upper()}_COUNT {len(collision_data)}\n\n")
+        # Collision data is now generated from tilemap GIDs at runtime, so it's omitted here
 
         # Object data
         f.write(f"// Object data for layer '{layer_name}'\n")
@@ -1114,131 +932,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     
     total_bytes = (tilemap_gid_bytes + gid_mapping_bytes + background_palette_bytes + sprite_palette_bytes + 
                    collision_bytes + object_bytes + object_sprite_bytes + object_palette_bytes)
-    
-    # Calculate total without collision data (can be derived from tilemap)
-    total_bytes_no_collision = (tilemap_gid_bytes + gid_mapping_bytes + background_palette_bytes + sprite_palette_bytes + 
-                                object_bytes + object_sprite_bytes + object_palette_bytes)
 
-    # Collect all const data into a bytearray for compression estimation
-    const_data = bytearray()
-    
-    # Add tilemap GIDs (1 byte per entry)
-    const_data.extend(gid_array)
-    
-    # Add GID mapping data (6 bytes per unique GID)
-    for gid_entry in gid_map_data:
-        tl, tr, bl, br, pal_idx, flip = gid_entry
-        const_data.extend([tl, tr, bl, br, pal_idx, flip])
-    
-    # Add background palettes
-    for pal_idx in range(4):
-        if pal_idx < len(background_palettes):
-            palette = background_palettes[pal_idx]
-        else:
-            palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
-        for r, g, b in palette:
-            const_data.append(rgb_to_nes_6bit(r, g, b))
-    
-    # Add sprite palettes
-    for pal_idx in range(4):
-        if pal_idx < len(sprite_palettes):
-            palette = sprite_palettes[pal_idx]
-        else:
-            palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
-        for r, g, b in palette:
-            const_data.append(rgb_to_nes_6bit(r, g, b))
-    
-    # Add collision data
-    const_data.extend(collision_data)
-    
-    # Create version without collision data for comparison
-    const_data_no_collision = bytearray()
-    # Add tilemap GIDs (1 byte per entry)
-    const_data_no_collision.extend(gid_array)
-    
-    # Add GID mapping data (6 bytes per unique GID)
-    for gid_entry in gid_map_data:
-        tl, tr, bl, br, pal_idx, flip = gid_entry
-        const_data_no_collision.extend([tl, tr, bl, br, pal_idx, flip])
-    # Add background palettes
-    for pal_idx in range(4):
-        if pal_idx < len(background_palettes):
-            palette = background_palettes[pal_idx]
-        else:
-            palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
-        for r, g, b in palette:
-            const_data_no_collision.append(rgb_to_nes_6bit(r, g, b))
-    # Add sprite palettes
-    for pal_idx in range(4):
-        if pal_idx < len(sprite_palettes):
-            palette = sprite_palettes[pal_idx]
-        else:
-            palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
-        for r, g, b in palette:
-            const_data_no_collision.append(rgb_to_nes_6bit(r, g, b))
-    # Skip collision data
-    # Add object data
-    for obj_tile, obj_x, obj_y in object_data:
-        const_data.extend([obj_tile, obj_x, obj_y])
-        const_data_no_collision.extend([obj_tile, obj_x, obj_y])
-    
-    # Add object sprite data (if available)
-    if object_palettes and object_palette_mapping:
-        unique_object_tiles = set()
-        for obj_tile, obj_x, obj_y in object_data:
-            if obj_tile < len(all_sprite_data):
-                unique_object_tiles.add(obj_tile)
-        player_sprite_tile_indices = [1, 2, 3, 4, 5, 6, 7]
-        for player_tile_idx in player_sprite_tile_indices:
-            if player_tile_idx < len(all_sprite_data):
-                unique_object_tiles.add(player_tile_idx)
-        
-        for obj_tile_idx in sorted(unique_object_tiles):
-            if obj_tile_idx < len(all_sprite_data):
-                tl_opt_idx = tile_mapping.get(obj_tile_idx * 4 + 0, 0)
-                tr_opt_idx = tile_mapping.get(obj_tile_idx * 4 + 1, 0)
-                bl_opt_idx = tile_mapping.get(obj_tile_idx * 4 + 2, 0)
-                br_opt_idx = tile_mapping.get(obj_tile_idx * 4 + 3, 0)
-                
-                player_sprite_tile_indices = [1, 2, 3, 4, 5, 6, 7]
-                if obj_tile_idx in player_sprite_tile_indices:
-                    palette_idx = 3
-                else:
-                    palette_idx = object_palette_mapping.get(obj_tile_idx, 0)
-                    if palette_idx >= len(object_palettes):
-                        palette_idx = 0
-                
-                const_data.extend([obj_tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx])
-                const_data_no_collision.extend([obj_tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx])
-        
-        # Add object palettes
-        for pal_idx in range(3):
-            if pal_idx < len(object_palettes):
-                palette = object_palettes[pal_idx]
-            else:
-                palette = [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]
-            for r, g, b in palette:
-                const_data.append(rgb_to_nes_6bit(r, g, b))
-                const_data_no_collision.append(rgb_to_nes_6bit(r, g, b))
-    else:
-        # Add empty object palettes
-        for pal_idx in range(3):
-            for _ in range(4):
-                const_data.append(0)
-                const_data_no_collision.append(0)
-    
-    # Estimate LZSS and LZSA2 compressed sizes (with and without collision)
-    compressed_size_lzss = estimate_lzss_size(const_data)
-    compressed_size_lzss_no_collision = estimate_lzss_size(const_data_no_collision)
-    compressed_size_lzsa2 = estimate_lzsa2_size(const_data)
-    compressed_size_lzsa2_no_collision = estimate_lzsa2_size(const_data_no_collision)
-    
-    # Store in global list for final summary: (name, uncompressed_with_collision, lzss_with_collision, lzsa2_with_collision, uncompressed_no_collision, lzss_no_collision, lzsa2_no_collision)
-    level_sizes.append((layer_name, total_bytes, compressed_size_lzss, compressed_size_lzsa2, total_bytes_no_collision, compressed_size_lzss_no_collision, compressed_size_lzsa2_no_collision))
-    
-    # Store data for combined compression (exclude level32)
-    if layer_name != "level32":
-        level_data_combined.append((layer_name, bytes(const_data), bytes(const_data_no_collision), total_bytes, total_bytes_no_collision))
 
     print(f"Generated tilemap header: {output_filename}")
     print(f"  Tilemap GIDs: {len(gid_array)} entries (1 byte each) = {tilemap_gid_bytes} bytes")
@@ -1254,12 +948,6 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         print(f"  Object sprite data: 0 unique object sprites = 0 bytes")
         print(f"  Object palettes: 0/3 = {object_palette_bytes} bytes")
     print(f"  TOTAL CONST DATA SIZE: {total_bytes} bytes (uncompressed)")
-    print(f"  ESTIMATED LZSS COMPRESSED SIZE: {compressed_size_lzss} bytes ({100.0 * compressed_size_lzss / total_bytes if total_bytes > 0 else 0:.1f}% of original)")
-    print(f"  ESTIMATED LZSA2 COMPRESSED SIZE: {compressed_size_lzsa2} bytes ({100.0 * compressed_size_lzsa2 / total_bytes if total_bytes > 0 else 0:.1f}% of original)")
-    print(f"  WITHOUT COLLISION DATA: {total_bytes_no_collision} bytes uncompressed")
-    print(f"    LZSS: {compressed_size_lzss_no_collision} bytes, LZSA2: {compressed_size_lzsa2_no_collision} bytes")
-    print(f"  SAVINGS FROM DROPPING COLLISION (LZSS): {collision_bytes} bytes uncompressed, {compressed_size_lzss - compressed_size_lzss_no_collision} bytes compressed")
-    print(f"  SAVINGS FROM DROPPING COLLISION (LZSA2): {collision_bytes} bytes uncompressed, {compressed_size_lzsa2 - compressed_size_lzsa2_no_collision} bytes compressed")
     if spawn_found:
         print(f"  Spawn location: ({spawn_x}, {spawn_y})")
     else:
@@ -1773,10 +1461,6 @@ def create_map_preview(tilemap_data, optimized_chr_tiles, tile_mapping, all_pale
 
 
 def main():
-    # Clear level sizes list for this run
-    global level_sizes, level_data_combined
-    level_sizes = []
-    level_data_combined = []
     
     # Get the directory where this script is located
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -2201,6 +1885,21 @@ def main():
                                 f.write("\n")
                             f.write("};\n\n")
                             f.write(f"#define GID_TO_TILE_SHARED_COUNT {len(shared_gid_mapping_global['gid_map_data'])}\n\n")
+                            
+                            # Generate GID to collision mapping
+                            f.write("// GID to collision flags mapping\n")
+                            f.write("// Collision flags: 0 = no collision, 1 = solid, 4/8/16/32 = pointy variants\n")
+                            f.write("const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {\n")
+                            gid_to_original = shared_gid_mapping_global['gid_to_original_tile_index']
+                            for gid in range(len(shared_gid_mapping_global['gid_map_data'])):
+                                original_tile_index = gid_to_original.get(gid, -1)
+                                collision_flag = get_collision_for_tile_index(original_tile_index)
+                                f.write(f"    {collision_flag}")
+                                if gid < len(shared_gid_mapping_global['gid_map_data']) - 1:
+                                    f.write(",")
+                                f.write("\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_COLLISION_COUNT GID_TO_TILE_SHARED_COUNT\n\n")
                         else:
                             # Empty mapping (just empty tile)
                             f.write("const unsigned char gid_to_tile_shared[1][6] = {\n")
@@ -2241,6 +1940,21 @@ def main():
                     f.write("\n")
                 f.write("};\n\n")
                 f.write(f"#define GID_TO_TILE_SHARED_COUNT {len(shared_gid_mapping_global['gid_map_data'])}\n\n")
+                
+                # Generate GID to collision mapping
+                f.write("// GID to collision flags mapping\n")
+                f.write("// Collision flags: 0 = no collision, 1 = solid, 4/8/16/32 = pointy variants\n")
+                f.write("const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {\n")
+                gid_to_original = shared_gid_mapping_global['gid_to_original_tile_index']
+                for gid in range(len(shared_gid_mapping_global['gid_map_data'])):
+                    original_tile_index = gid_to_original.get(gid, -1)
+                    collision_flag = get_collision_for_tile_index(original_tile_index)
+                    f.write(f"    {collision_flag}")
+                    if gid < len(shared_gid_mapping_global['gid_map_data']) - 1:
+                        f.write(",")
+                    f.write("\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_COLLISION_COUNT GID_TO_TILE_SHARED_COUNT\n\n")
             else:
                 # Empty mapping (just empty tile)
                 f.write("const unsigned char gid_to_tile_shared[1][6] = {\n")
@@ -2251,160 +1965,6 @@ def main():
             f.write("#endif // GID_TO_TILE_SHARED_H\n")
         print(f"Generated shared GID mapping with {len(shared_gid_mapping_global['gid_map_data']) if len(shared_gid_mapping_global['gid_map_data']) > 0 else 1} unique GIDs")
 
-    # Output compression statistics for all levels
-    if level_sizes:
-        print(f"\n{'='*120}")
-        print(f"LEVEL COMPRESSION STATISTICS SUMMARY (LZSS vs LZSA2)")
-        print(f"{'='*120}")
-        total_uncompressed = 0
-        total_lzss_compressed = 0
-        total_lzsa2_compressed = 0
-        total_uncompressed_no_collision = 0
-        total_lzss_compressed_no_collision = 0
-        total_lzsa2_compressed_no_collision = 0
-        
-        print(f"\n{'Level':<15} {'Uncomp':>12} {'LZSS':>12} {'LZSA2':>12} {'Uncomp':>12} {'LZSS':>12} {'LZSA2':>12}")
-        print(f"{'':<15} {'(w/coll)':>12} {'(w/coll)':>12} {'(w/coll)':>12} {'(no coll)':>12} {'(no coll)':>12} {'(no coll)':>12}")
-        print(f"{'-'*120}")
-        
-        for level_data in sorted(level_sizes):
-            if len(level_data) == 7:
-                level_name, uncompressed, lzss_compressed, lzsa2_compressed, uncompressed_no_collision, lzss_compressed_no_collision, lzsa2_compressed_no_collision = level_data
-            elif len(level_data) == 5:
-                # Old format with single compression method
-                level_name, uncompressed, compressed, uncompressed_no_collision, compressed_no_collision = level_data
-                lzss_compressed = compressed
-                lzsa2_compressed = compressed
-                lzss_compressed_no_collision = compressed_no_collision
-                lzsa2_compressed_no_collision = compressed_no_collision
-            else:
-                # Backward compatibility with very old format
-                level_name, uncompressed, compressed = level_data
-                uncompressed_no_collision = uncompressed
-                lzss_compressed = compressed
-                lzsa2_compressed = compressed
-                lzss_compressed_no_collision = compressed
-                lzsa2_compressed_no_collision = compressed
-            
-            # Exclude level32 from totals
-            if level_name != "level32":
-                total_uncompressed += uncompressed
-                total_lzss_compressed += lzss_compressed
-                total_lzsa2_compressed += lzsa2_compressed
-                total_uncompressed_no_collision += uncompressed_no_collision
-                total_lzss_compressed_no_collision += lzss_compressed_no_collision
-                total_lzsa2_compressed_no_collision += lzsa2_compressed_no_collision
-            
-            # Still show level32 in the table, but mark it as excluded from totals
-            marker = " (excl.)" if level_name == "level32" else ""
-            print(f"{level_name:<15}{marker:<8} {uncompressed:>12,} {lzss_compressed:>12,} {lzsa2_compressed:>12,} {uncompressed_no_collision:>12,} {lzss_compressed_no_collision:>12,} {lzsa2_compressed_no_collision:>12,}")
-        
-        print(f"{'-'*120}")
-        print(f"{'TOTAL (excl. level32)':<23} {total_uncompressed:>12,} {total_lzss_compressed:>12,} {total_lzsa2_compressed:>12,} {total_uncompressed_no_collision:>12,} {total_lzss_compressed_no_collision:>12,} {total_lzsa2_compressed_no_collision:>12,}")
-        print(f"{'='*120}")
-        
-        # Calculate savings and ratios
-        total_lzss_ratio = 100.0 * total_lzss_compressed / total_uncompressed if total_uncompressed > 0 else 0
-        total_lzss_savings = total_uncompressed - total_lzss_compressed
-        total_lzsa2_ratio = 100.0 * total_lzsa2_compressed / total_uncompressed if total_uncompressed > 0 else 0
-        total_lzsa2_savings = total_uncompressed - total_lzsa2_compressed
-        
-        total_lzss_ratio_no_collision = 100.0 * total_lzss_compressed_no_collision / total_uncompressed_no_collision if total_uncompressed_no_collision > 0 else 0
-        total_lzss_savings_no_collision = total_uncompressed_no_collision - total_lzss_compressed_no_collision
-        total_lzsa2_ratio_no_collision = 100.0 * total_lzsa2_compressed_no_collision / total_uncompressed_no_collision if total_uncompressed_no_collision > 0 else 0
-        total_lzsa2_savings_no_collision = total_uncompressed_no_collision - total_lzsa2_compressed_no_collision
-        
-        print(f"\nWITH COLLISION DATA (level32 excluded from totals):")
-        print(f"  LZSS: {total_lzss_savings:,} bytes saved ({100.0 * total_lzss_savings / total_uncompressed if total_uncompressed > 0 else 0:.1f}% reduction), ratio: {total_lzss_ratio:.1f}%")
-        print(f"  LZSA2: {total_lzsa2_savings:,} bytes saved ({100.0 * total_lzsa2_savings / total_uncompressed if total_uncompressed > 0 else 0:.1f}% reduction), ratio: {total_lzsa2_ratio:.1f}%")
-        lzsa2_vs_lzss = total_lzss_compressed - total_lzsa2_compressed
-        if lzsa2_vs_lzss > 0:
-            print(f"  LZSA2 is {lzsa2_vs_lzss:,} bytes smaller than LZSS ({100.0 * lzsa2_vs_lzss / total_lzss_compressed if total_lzss_compressed > 0 else 0:.1f}% better)")
-        elif lzsa2_vs_lzss < 0:
-            print(f"  LZSS is {abs(lzsa2_vs_lzss):,} bytes smaller than LZSA2 ({100.0 * abs(lzsa2_vs_lzss) / total_lzsa2_compressed if total_lzsa2_compressed > 0 else 0:.1f}% better)")
-        else:
-            print(f"  LZSS and LZSA2 are the same size")
-        
-        print(f"\nWITHOUT COLLISION DATA (derived from tilemap, level32 excluded from totals):")
-        print(f"  LZSS: {total_lzss_savings_no_collision:,} bytes saved ({100.0 * total_lzss_savings_no_collision / total_uncompressed_no_collision if total_uncompressed_no_collision > 0 else 0:.1f}% reduction), ratio: {total_lzss_ratio_no_collision:.1f}%")
-        print(f"  LZSA2: {total_lzsa2_savings_no_collision:,} bytes saved ({100.0 * total_lzsa2_savings_no_collision / total_uncompressed_no_collision if total_uncompressed_no_collision > 0 else 0:.1f}% reduction), ratio: {total_lzsa2_ratio_no_collision:.1f}%")
-        lzsa2_vs_lzss_no_collision = total_lzss_compressed_no_collision - total_lzsa2_compressed_no_collision
-        if lzsa2_vs_lzss_no_collision > 0:
-            print(f"  LZSA2 is {lzsa2_vs_lzss_no_collision:,} bytes smaller than LZSS ({100.0 * lzsa2_vs_lzss_no_collision / total_lzss_compressed_no_collision if total_lzss_compressed_no_collision > 0 else 0:.1f}% better)")
-        elif lzsa2_vs_lzss_no_collision < 0:
-            print(f"  LZSS is {abs(lzsa2_vs_lzss_no_collision):,} bytes smaller than LZSA2 ({100.0 * abs(lzsa2_vs_lzss_no_collision) / total_lzsa2_compressed_no_collision if total_lzsa2_compressed_no_collision > 0 else 0:.1f}% better)")
-        else:
-            print(f"  LZSS and LZSA2 are the same size")
-        
-        # Calculate savings from dropping collision
-        collision_savings_uncompressed = total_uncompressed - total_uncompressed_no_collision
-        collision_savings_lzss = total_lzss_compressed - total_lzss_compressed_no_collision
-        collision_savings_lzsa2 = total_lzsa2_compressed - total_lzsa2_compressed_no_collision
-        
-        print(f"\nSAVINGS FROM DROPPING COLLISION ARRAY:")
-        print(f"  Uncompressed: {collision_savings_uncompressed:,} bytes ({100.0 * collision_savings_uncompressed / total_uncompressed if total_uncompressed > 0 else 0:.1f}% reduction)")
-        print(f"  LZSS compressed: {collision_savings_lzss:,} bytes ({100.0 * collision_savings_lzss / total_lzss_compressed if total_lzss_compressed > 0 else 0:.1f}% reduction)")
-        print(f"  LZSA2 compressed: {collision_savings_lzsa2:,} bytes ({100.0 * collision_savings_lzsa2 / total_lzsa2_compressed if total_lzsa2_compressed > 0 else 0:.1f}% reduction)")
-        print(f"  Final LZSS compressed size without collision: {total_lzss_compressed_no_collision:,} bytes")
-        print(f"  Final LZSA2 compressed size without collision: {total_lzsa2_compressed_no_collision:,} bytes")
-        
-        # Calculate combined compression (all 31 levels compressed together)
-        if level_data_combined:
-            print(f"\n{'='*120}")
-            print(f"COMBINED COMPRESSION (All 31 levels compressed together as one block)")
-            print(f"{'='*120}")
-            
-            # Combine all level data
-            combined_data_with_collision = bytearray()
-            combined_data_no_collision = bytearray()
-            combined_uncompressed_with_collision = 0
-            combined_uncompressed_no_collision = 0
-            
-            for level_name, const_data, const_data_no_collision, uncompressed, uncompressed_no_collision in level_data_combined:
-                combined_data_with_collision.extend(const_data)
-                combined_data_no_collision.extend(const_data_no_collision)
-                combined_uncompressed_with_collision += uncompressed
-                combined_uncompressed_no_collision += uncompressed_no_collision
-            
-            # Compress combined data with LZSA2
-            combined_lzsa2_with_collision = estimate_lzsa2_size(combined_data_with_collision)
-            combined_lzsa2_no_collision = estimate_lzsa2_size(combined_data_no_collision)
-            
-            print(f"\nWITH COLLISION DATA (all 31 levels combined):")
-            print(f"  Uncompressed total: {combined_uncompressed_with_collision:,} bytes")
-            print(f"  LZSA2 compressed: {combined_lzsa2_with_collision:,} bytes")
-            combined_ratio_with = 100.0 * combined_lzsa2_with_collision / combined_uncompressed_with_collision if combined_uncompressed_with_collision > 0 else 0
-            combined_savings_with = combined_uncompressed_with_collision - combined_lzsa2_with_collision
-            print(f"  Compression ratio: {combined_ratio_with:.1f}%")
-            print(f"  Space saved: {combined_savings_with:,} bytes ({100.0 * combined_savings_with / combined_uncompressed_with_collision if combined_uncompressed_with_collision > 0 else 0:.1f}% reduction)")
-            
-            # Compare with individual compression
-            individual_vs_combined_with = total_lzsa2_compressed - combined_lzsa2_with_collision
-            if individual_vs_combined_with > 0:
-                print(f"  Combined compression saves {individual_vs_combined_with:,} bytes vs individual compression ({100.0 * individual_vs_combined_with / total_lzsa2_compressed if total_lzsa2_compressed > 0 else 0:.1f}% better)")
-            elif individual_vs_combined_with < 0:
-                print(f"  Individual compression is {abs(individual_vs_combined_with):,} bytes smaller ({100.0 * abs(individual_vs_combined_with) / combined_lzsa2_with_collision if combined_lzsa2_with_collision > 0 else 0:.1f}% better)")
-            else:
-                print(f"  Combined and individual compression are the same size")
-            
-            print(f"\nWITHOUT COLLISION DATA (all 31 levels combined, derived from tilemap):")
-            print(f"  Uncompressed total: {combined_uncompressed_no_collision:,} bytes")
-            print(f"  LZSA2 compressed: {combined_lzsa2_no_collision:,} bytes")
-            combined_ratio_no_collision = 100.0 * combined_lzsa2_no_collision / combined_uncompressed_no_collision if combined_uncompressed_no_collision > 0 else 0
-            combined_savings_no_collision = combined_uncompressed_no_collision - combined_lzsa2_no_collision
-            print(f"  Compression ratio: {combined_ratio_no_collision:.1f}%")
-            print(f"  Space saved: {combined_savings_no_collision:,} bytes ({100.0 * combined_savings_no_collision / combined_uncompressed_no_collision if combined_uncompressed_no_collision > 0 else 0:.1f}% reduction)")
-            
-            # Compare with individual compression
-            individual_vs_combined_no_collision = total_lzsa2_compressed_no_collision - combined_lzsa2_no_collision
-            if individual_vs_combined_no_collision > 0:
-                print(f"  Combined compression saves {individual_vs_combined_no_collision:,} bytes vs individual compression ({100.0 * individual_vs_combined_no_collision / total_lzsa2_compressed_no_collision if total_lzsa2_compressed_no_collision > 0 else 0:.1f}% better)")
-            elif individual_vs_combined_no_collision < 0:
-                print(f"  Individual compression is {abs(individual_vs_combined_no_collision):,} bytes smaller ({100.0 * abs(individual_vs_combined_no_collision) / combined_lzsa2_no_collision if combined_lzsa2_no_collision > 0 else 0:.1f}% better)")
-            else:
-                print(f"  Combined and individual compression are the same size")
-            
-            print(f"{'='*120}")
 
     print(f"\nConversion complete!")
     print(f"  CHR Bank 0: {output_chr_bank0}")
