@@ -89,7 +89,7 @@ const unsigned char tilemap_level32[] = {
     0, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
-    0, 193, 194, 195, 5, 0,
+    0, 196, 197, 198, 4, 0,
     0, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
@@ -103,13 +103,13 @@ const unsigned char tilemap_level32[] = {
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
-    0, 0, 216, 217, 6, 0,
-    0, 0, 218, 219, 6, 0,
-    0, 220, 221, 222, 7, 0,
-    0, 223, 218, 219, 5, 0,
-    224, 225, 226, 227, 5, 0,
-    0, 0, 228, 219, 6, 0,
-    0, 0, 218, 219, 6, 0,
+    0, 0, 220, 221, 5, 0,
+    0, 0, 222, 223, 5, 0,
+    0, 224, 225, 226, 6, 0,
+    0, 227, 222, 223, 4, 0,
+    228, 229, 230, 231, 4, 0,
+    0, 0, 232, 223, 5, 0,
+    0, 0, 222, 223, 5, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
@@ -120,13 +120,13 @@ const unsigned char tilemap_level32[] = {
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
-    248, 249, 0, 0, 4, 0,
-    250, 251, 252, 253, 4, 0,
-    250, 254, 0, 0, 4, 0,
-    250, 251, 0, 0, 4, 0,
+    251, 252, 0, 0, 4, 0,
+    253, 254, 255, 255, 4, 0,
+    253, 255, 0, 0, 4, 0,
+    253, 254, 0, 0, 4, 0,
     255, 255, 0, 0, 4, 0,
     255, 0, 0, 255, 4, 0,
-    250, 251, 0, 0, 4, 0,
+    253, 254, 0, 0, 4, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
@@ -138,7 +138,7 @@ const unsigned char tilemap_level32[] = {
     0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0,
     0, 255, 255, 255, 4, 0,
-    177, 0, 0, 0, 4, 0,
+    180, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
     0, 0, 0, 0, 4, 0,
@@ -307,15 +307,16 @@ const unsigned char palette_background_level32[4][4] = {
 // Sprite palette data for layer 'level32' (NES 6-bit format)
 // 4 sprite palettes, each with 4 colors: [color0, color1, color2, color3]
 // Used by non-background tiles
+// Palette 3 is reserved for player sprites
 const unsigned char palette_sprite_level32[4][4] = {
     // Sprite Palette 0
-    { 0x0d, 0x0d, 0x0d, 0x0d },
+    { 0x0d, 0x21, 0x0d, 0x0d },
     // Sprite Palette 1
-    { 0x0d, 0x10, 0x00, 0x21 },
-    // Sprite Palette 2
     { 0x0d, 0x10, 0x00, 0x0d },
-    // Sprite Palette 3
-    { 0x0d, 0x10, 0x21, 0x00 }
+    // Sprite Palette 2
+    { 0x0d, 0x10, 0x21, 0x00 },
+    // Sprite Palette 3 (Player)
+    { 0x0d, 0x15, 0x37, 0x1b }
 };
 
 #define PALETTE_SPRITE_LEVEL32_COUNT 4
@@ -362,6 +363,36 @@ const unsigned char collision_level32[] = {
 const unsigned char object_level32[] = {};
 
 #define OBJECT_LEVEL32_COUNT 0
+
+// Object sprite data for layer 'level32'
+// Each object sprite is 16x16 (4 8x8 tiles = 64 bytes)
+// Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile, ...]
+const unsigned char object_sprite_level32[] = {
+    // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
+    1, 3, 1, 2, 3, 4,
+    2, 3, 1, 2, 3, 5,
+    3, 3, 6, 7, 8, 9,
+    4, 3, 1, 2, 10, 4,
+    5, 3, 11, 12, 13, 14,
+    6, 3, 15, 16, 17, 18,
+    7, 3, 19, 20, 21, 22,
+};
+
+#define OBJECT_SPRITE_LEVEL32_COUNT 7
+
+// Object palette data for layer 'level32' (NES 6-bit format)
+// 3 object palettes, each with 4 colors: [color0, color1, color2, color3]
+// Note: Palette 3 is reserved for the player
+const unsigned char palette_object_level32[3][4] = {
+    // Object Palette 0
+    { 0x0d, 0x20, 0x27, 0x25 },
+    // Object Palette 1
+    { 0x0d, 0x28, 0x15, 0x0c },
+    // Object Palette 2
+    { 0x0d, 0x17, 0x1a, 0x10 }
+};
+
+#define PALETTE_OBJECT_LEVEL32_COUNT 3
 
 // Player start location for layer 'level32'
 #define SPAWN_X_LEVEL32 0

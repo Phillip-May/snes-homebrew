@@ -5,7 +5,22 @@
 #include <string.h>
 
 
+#include "../../python/gid_to_tile_shared.h"
 #include "../../python/tilemap_level1_nes.h"
+#include "../../python/tilemap_level2_nes.h"
+#include "../../python/tilemap_level3_nes.h"
+#include "../../python/tilemap_level4_nes.h"
+#include "../../python/tilemap_level5_nes.h"
+#include "../../python/tilemap_level6_nes.h"
+#include "../../python/tilemap_level7_nes.h"
+#include "../../python/tilemap_level8_nes.h"
+#include "../../python/tilemap_level9_nes.h"
+#include "../../python/tilemap_level10_nes.h"
+#include "../../python/tilemap_level11_nes.h"
+#include "../../python/tilemap_level12_nes.h"
+#include "../../python/tilemap_level13_nes.h"
+#include "../../python/tilemap_level14_nes.h"
+#include "../../python/tilemap_level15_nes.h"
 
 #ifndef _WIN32 //Fix linter
 #include <neslib.h>
@@ -23,6 +38,204 @@ static uint8_t s_oamIndex = 0;
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern struct sPlayerData GLOBAL_PlayerData;
 extern OBJ_DATA GLOBAL_OBJList[];
+
+// Centralized level data structure
+// Comment out levels here to test ROM size
+typedef struct {
+    uint8_t width;
+    uint8_t height;
+    const unsigned char *tilemap;
+    uint16_t tilemap_count;
+    const unsigned char *collision;
+    uint16_t collision_count;
+    const unsigned char *objects;
+    uint16_t object_count;
+    const unsigned char *object_sprites;
+    uint16_t object_sprite_count;
+    const unsigned char (*bg_palettes)[4];
+    uint8_t bg_palette_count;
+    const unsigned char (*sprite_palettes)[4];
+    uint8_t sprite_palette_count;
+    uint8_t spawn_x;
+    uint8_t spawn_y;
+} LevelData;
+
+// Level data table - comment out levels here to exclude them from ROM
+static const LevelData level_data[] = {
+    // Level 1
+    {
+        TILEMAP_LEVEL1_WIDTH, TILEMAP_LEVEL1_HEIGHT,
+        tilemap_level1, TILEMAP_LEVEL1_COUNT,
+        collision_level1, COLLISION_LEVEL1_COUNT,
+        object_level1, OBJECT_LEVEL1_COUNT,
+        object_sprite_level1, OBJECT_SPRITE_LEVEL1_COUNT,
+        palette_background_level1, PALETTE_BACKGROUND_LEVEL1_COUNT,
+        palette_sprite_level1, PALETTE_SPRITE_LEVEL1_COUNT,
+        SPAWN_X_LEVEL1, SPAWN_Y_LEVEL1
+    },
+    // Level 2
+    {
+        TILEMAP_LEVEL2_WIDTH, TILEMAP_LEVEL2_HEIGHT,
+        tilemap_level2, TILEMAP_LEVEL2_COUNT,
+        collision_level2, COLLISION_LEVEL2_COUNT,
+        object_level2, OBJECT_LEVEL2_COUNT,
+        object_sprite_level2, OBJECT_SPRITE_LEVEL2_COUNT,
+        palette_background_level2, PALETTE_BACKGROUND_LEVEL2_COUNT,
+        palette_sprite_level2, PALETTE_SPRITE_LEVEL2_COUNT,
+        SPAWN_X_LEVEL2, SPAWN_Y_LEVEL2
+    },
+    // Level 3
+    {
+        TILEMAP_LEVEL3_WIDTH, TILEMAP_LEVEL3_HEIGHT,
+        tilemap_level3, TILEMAP_LEVEL3_COUNT,
+        collision_level3, COLLISION_LEVEL3_COUNT,
+        object_level3, OBJECT_LEVEL3_COUNT,
+        object_sprite_level3, OBJECT_SPRITE_LEVEL3_COUNT,
+        palette_background_level3, PALETTE_BACKGROUND_LEVEL3_COUNT,
+        palette_sprite_level3, PALETTE_SPRITE_LEVEL3_COUNT,
+        SPAWN_X_LEVEL3, SPAWN_Y_LEVEL3
+    },
+    // Level 4
+    {
+        TILEMAP_LEVEL4_WIDTH, TILEMAP_LEVEL4_HEIGHT,
+        tilemap_level4, TILEMAP_LEVEL4_COUNT,
+        collision_level4, COLLISION_LEVEL4_COUNT,
+        object_level4, OBJECT_LEVEL4_COUNT,
+        object_sprite_level4, OBJECT_SPRITE_LEVEL4_COUNT,
+        palette_background_level4, PALETTE_BACKGROUND_LEVEL4_COUNT,
+        palette_sprite_level4, PALETTE_SPRITE_LEVEL4_COUNT,
+        SPAWN_X_LEVEL4, SPAWN_Y_LEVEL4
+    },
+    // Level 5
+    {
+        TILEMAP_LEVEL5_WIDTH, TILEMAP_LEVEL5_HEIGHT,
+        tilemap_level5, TILEMAP_LEVEL5_COUNT,
+        collision_level5, COLLISION_LEVEL5_COUNT,
+        object_level5, OBJECT_LEVEL5_COUNT,
+        object_sprite_level5, OBJECT_SPRITE_LEVEL5_COUNT,
+        palette_background_level5, PALETTE_BACKGROUND_LEVEL5_COUNT,
+        palette_sprite_level5, PALETTE_SPRITE_LEVEL5_COUNT,
+        SPAWN_X_LEVEL5, SPAWN_Y_LEVEL5
+    },
+    // Level 6
+    {
+        TILEMAP_LEVEL6_WIDTH, TILEMAP_LEVEL6_HEIGHT,
+        tilemap_level6, TILEMAP_LEVEL6_COUNT,
+        collision_level6, COLLISION_LEVEL6_COUNT,
+        object_level6, OBJECT_LEVEL6_COUNT,
+        object_sprite_level6, OBJECT_SPRITE_LEVEL6_COUNT,
+        palette_background_level6, PALETTE_BACKGROUND_LEVEL6_COUNT,
+        palette_sprite_level6, PALETTE_SPRITE_LEVEL6_COUNT,
+        SPAWN_X_LEVEL6, SPAWN_Y_LEVEL6
+    },
+    // Level 7
+    {
+        TILEMAP_LEVEL7_WIDTH, TILEMAP_LEVEL7_HEIGHT,
+        tilemap_level7, TILEMAP_LEVEL7_COUNT,
+        collision_level7, COLLISION_LEVEL7_COUNT,
+        object_level7, OBJECT_LEVEL7_COUNT,
+        object_sprite_level7, OBJECT_SPRITE_LEVEL7_COUNT,
+        palette_background_level7, PALETTE_BACKGROUND_LEVEL7_COUNT,
+        palette_sprite_level7, PALETTE_SPRITE_LEVEL7_COUNT,
+        SPAWN_X_LEVEL7, SPAWN_Y_LEVEL7
+    },
+    // Level 8
+    {
+        TILEMAP_LEVEL8_WIDTH, TILEMAP_LEVEL8_HEIGHT,
+        tilemap_level8, TILEMAP_LEVEL8_COUNT,
+        collision_level8, COLLISION_LEVEL8_COUNT,
+        object_level8, OBJECT_LEVEL8_COUNT,
+        object_sprite_level8, OBJECT_SPRITE_LEVEL8_COUNT,
+        palette_background_level8, PALETTE_BACKGROUND_LEVEL8_COUNT,
+        palette_sprite_level8, PALETTE_SPRITE_LEVEL8_COUNT,
+        SPAWN_X_LEVEL8, SPAWN_Y_LEVEL8
+    },
+    // Level 9
+    {
+        TILEMAP_LEVEL9_WIDTH, TILEMAP_LEVEL9_HEIGHT,
+        tilemap_level9, TILEMAP_LEVEL9_COUNT,
+        collision_level9, COLLISION_LEVEL9_COUNT,
+        object_level9, OBJECT_LEVEL9_COUNT,
+        object_sprite_level9, OBJECT_SPRITE_LEVEL9_COUNT,
+        palette_background_level9, PALETTE_BACKGROUND_LEVEL9_COUNT,
+        palette_sprite_level9, PALETTE_SPRITE_LEVEL9_COUNT,
+        SPAWN_X_LEVEL9, SPAWN_Y_LEVEL9
+    },
+    // Level 10
+    {
+        TILEMAP_LEVEL10_WIDTH, TILEMAP_LEVEL10_HEIGHT,
+        tilemap_level10, TILEMAP_LEVEL10_COUNT,
+        collision_level10, COLLISION_LEVEL10_COUNT,
+        object_level10, OBJECT_LEVEL10_COUNT,
+        object_sprite_level10, OBJECT_SPRITE_LEVEL10_COUNT,
+        palette_background_level10, PALETTE_BACKGROUND_LEVEL10_COUNT,
+        palette_sprite_level10, PALETTE_SPRITE_LEVEL10_COUNT,
+        SPAWN_X_LEVEL10, SPAWN_Y_LEVEL10
+    },
+    // Level 11
+    {
+        TILEMAP_LEVEL11_WIDTH, TILEMAP_LEVEL11_HEIGHT,
+        tilemap_level11, TILEMAP_LEVEL11_COUNT,
+        collision_level11, COLLISION_LEVEL11_COUNT,
+        object_level11, OBJECT_LEVEL11_COUNT,
+        object_sprite_level11, OBJECT_SPRITE_LEVEL11_COUNT,
+        palette_background_level11, PALETTE_BACKGROUND_LEVEL11_COUNT,
+        palette_sprite_level11, PALETTE_SPRITE_LEVEL11_COUNT,
+        SPAWN_X_LEVEL11, SPAWN_Y_LEVEL11
+    },
+    /*
+    // Level 12
+    {
+        TILEMAP_LEVEL12_WIDTH, TILEMAP_LEVEL12_HEIGHT,
+        tilemap_level12, TILEMAP_LEVEL12_COUNT,
+        collision_level12, COLLISION_LEVEL12_COUNT,
+        object_level12, OBJECT_LEVEL12_COUNT,
+        object_sprite_level12, OBJECT_SPRITE_LEVEL12_COUNT,
+        palette_background_level12, PALETTE_BACKGROUND_LEVEL12_COUNT,
+        palette_sprite_level12, PALETTE_SPRITE_LEVEL12_COUNT,
+        SPAWN_X_LEVEL12, SPAWN_Y_LEVEL12
+    },
+    // Level 13
+    {
+        TILEMAP_LEVEL13_WIDTH, TILEMAP_LEVEL13_HEIGHT,
+        tilemap_level13, TILEMAP_LEVEL13_COUNT,
+        collision_level13, COLLISION_LEVEL13_COUNT,
+        object_level13, OBJECT_LEVEL13_COUNT,
+        object_sprite_level13, OBJECT_SPRITE_LEVEL13_COUNT,
+        palette_background_level13, PALETTE_BACKGROUND_LEVEL13_COUNT,
+        palette_sprite_level13, PALETTE_SPRITE_LEVEL13_COUNT,
+        SPAWN_X_LEVEL13, SPAWN_Y_LEVEL13
+    },
+    // Level 14
+    {
+        TILEMAP_LEVEL14_WIDTH, TILEMAP_LEVEL14_HEIGHT,
+        tilemap_level14, TILEMAP_LEVEL14_COUNT,
+        collision_level14, COLLISION_LEVEL14_COUNT,
+        object_level14, OBJECT_LEVEL14_COUNT,
+        object_sprite_level14, OBJECT_SPRITE_LEVEL14_COUNT,
+        palette_background_level14, PALETTE_BACKGROUND_LEVEL14_COUNT,
+        palette_sprite_level14, PALETTE_SPRITE_LEVEL14_COUNT,
+        SPAWN_X_LEVEL14, SPAWN_Y_LEVEL14
+    },
+    // Level 15
+    {
+        TILEMAP_LEVEL15_WIDTH, TILEMAP_LEVEL15_HEIGHT,
+        tilemap_level15, TILEMAP_LEVEL15_COUNT,
+        collision_level15, COLLISION_LEVEL15_COUNT,
+        object_level15, OBJECT_LEVEL15_COUNT,
+        object_sprite_level15, OBJECT_SPRITE_LEVEL15_COUNT,
+        palette_background_level15, PALETTE_BACKGROUND_LEVEL15_COUNT,
+        palette_sprite_level15, PALETTE_SPRITE_LEVEL15_COUNT,
+        SPAWN_X_LEVEL15, SPAWN_Y_LEVEL15
+    },
+    */
+};
+
+#define LEVEL_DATA_COUNT (sizeof(level_data) / sizeof(level_data[0]))
+
+// Shared GID mapping (used by all levels)
+#define GID_TO_TILE_MAP gid_to_tile_shared
+#define GID_TO_TILE_MAP_COUNT GID_TO_TILE_SHARED_COUNT
 
 static void oam_upload(void) {
     OAM_ADDR = 0x00;
@@ -50,12 +263,113 @@ void port_init(void) {
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj) {
     (void)playerObj;
-    s_oamIndex = 0;
+    // Player uses slots 0-3 (4 sprites), so start other objects at slot 4
+    s_oamIndex = 4;
     oam_set(0);
 }
 
 void port_finishSpriteBuild(void) {
 
+}
+
+// Map PLAYER_SPRITE_ enum values to sprite sheet tile indices
+// PLAYER_SPRITE_ macros: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
+// Sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
+static uint8_t map_player_sprite_to_tile_index(uint8_t player_sprite_state) {
+    // Map PLAYER_SPRITE_ enum to sprite sheet tile index (1-7)
+    switch (player_sprite_state) {
+        case 0:  // PLAYER_SPRITE_IDLE
+            return 1;
+        case 2:  // PLAYER_SPRITE_WALK_1
+            return 2;
+        case 4:  // PLAYER_SPRITE_WALK_2
+            return 3;
+        case 6:  // PLAYER_SPRITE_WALK_3
+            return 4;
+        case 8:  // PLAYER_SPRITE_WALL
+            return 5;
+        case 10: // PLAYER_SPRITE_DOWN
+            return 6;
+        case 12: // PLAYER_SPRITE_UP
+            return 7;
+        default:
+            return 1; // Default to IDLE
+    }
+}
+
+// Look up player sprite data from object_sprite array
+// Player frames: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
+// Maps to sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
+static const unsigned char* find_player_sprite_data(uint8_t frame_index) {
+    // Map PLAYER_SPRITE_ enum value to sprite sheet tile index
+    uint8_t tile_index = map_player_sprite_to_tile_index(frame_index);
+    
+    // Search through object_sprite array for the mapped tile index based on current level
+    // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
+    // Get level data (room ID is 1-indexed, array is 0-indexed)
+    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) {
+        level_idx = 0; // Default to level 1 if out of range
+    }
+    const LevelData *level = &level_data[level_idx];
+    
+    for (uint8_t i = 0; i < level->object_sprite_count; i++) {
+        const unsigned char *sprite_entry = &level->object_sprites[i * 6];
+        if (sprite_entry[0] == tile_index) {  // Match the mapped tile index
+            return sprite_entry;
+        }
+    }
+    return NULL;  // Player sprite data not found
+}
+
+// Map SPRING_SPRITE_ OAM tile values to sprite sheet tile indices
+// SPRING_SPRITE_1 = 0x2E (46), SPRING_SPRITE_2 = 0x40 (64)
+// Maps to sprite sheet tile indices: 23, 24 (or similar, adjust based on actual data)
+static uint8_t map_spring_sprite_to_tile_index(uint8_t spring_sprite_state) {
+    switch (spring_sprite_state) {
+        case 0x2E:  // SPRING_SPRITE_1
+            return 23;  // Adjust based on actual sprite sheet tile index
+        case 0x40:  // SPRING_SPRITE_2
+            return 24;  // Adjust based on actual sprite sheet tile index
+        default:
+            return 23; // Default to SPRING_SPRITE_1
+    }
+}
+
+// Map COLLAPSE_TILE_SPRITE_ OAM tile values to sprite sheet tile indices
+// COLLAPSE_TILE_SPRITE_1 = 0x48 (72), SPRITE_2 = 0x4A (74), SPRITE_3 = 0x4C (76)
+// Maps to sprite sheet tile indices: 30, 31, 32 (or similar, adjust based on actual data)
+static uint8_t map_collapse_tile_sprite_to_tile_index(uint8_t collapse_tile_sprite_state) {
+    switch (collapse_tile_sprite_state) {
+        case 0x48:  // COLLAPSE_TILE_SPRITE_1
+            return 30;  // Adjust based on actual sprite sheet tile index
+        case 0x4A:  // COLLAPSE_TILE_SPRITE_2
+            return 31;  // Adjust based on actual sprite sheet tile index
+        case 0x4C:  // COLLAPSE_TILE_SPRITE_3
+            return 32;  // Adjust based on actual sprite sheet tile index
+        default:
+            return 30; // Default to COLLAPSE_TILE_SPRITE_1
+    }
+}
+
+// Look up sprite data from object_sprite array by tile index
+static const unsigned char* find_sprite_data_by_tile_index(uint8_t tile_index) {
+    // Get level data (room ID is 1-indexed, array is 0-indexed)
+    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) {
+        level_idx = 0; // Default to level 1 if out of range
+    }
+    const LevelData *level = &level_data[level_idx];
+    
+    // Search through object_sprite array for the tile index
+    // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
+    for (uint8_t i = 0; i < level->object_sprite_count; i++) {
+        const unsigned char *sprite_entry = &level->object_sprites[i * 6];
+        if (sprite_entry[0] == tile_index) {
+            return sprite_entry;
+        }
+    }
+    return NULL;  // Sprite data not found
 }
 
 void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
@@ -66,35 +380,118 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     const struct sOBJ_DATA *playerData = &playerObj->objData;
     uint8_t baseX = (uint8_t)playerData->pos.x;
     uint8_t baseY = (uint8_t)playerData->pos.y;
-    uint8_t baseTile = playerData->oamTile;
-    uint8_t baseProps = playerData->oamProps;
-    // Clear bit 5 (0x20) to make sprite appear in front of background
-    // Bit 5 = 0: in front, Bit 5 = 1: behind
-    baseProps &= ~0x20;
     
-    // Sprite 0: Top-left
-    OAM_BUF[0] = baseY;
-    OAM_BUF[1] = baseTile;
-    OAM_BUF[2] = baseProps;
-    OAM_BUF[3] = baseX;
+    // Get player frame index from oamTile (player sprite state)
+    // Player sprite states: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
+    uint8_t frame_index = playerData->oamTile;
     
-    // Sprite 1: Top-right
-    OAM_BUF[4] = baseY;
-    OAM_BUF[5] = baseTile + 1;
-    OAM_BUF[6] = baseProps;
-    OAM_BUF[7] = baseX + 8;
+    // Look up player sprite data from object sprite array for this frame
+    const unsigned char *player_sprite = find_player_sprite_data(frame_index);
     
-    // Sprite 2: Bottom-left
-    OAM_BUF[8] = baseY + 8;
-    OAM_BUF[9] = baseTile + 16;  // Assuming tiles are arranged in 16-tile rows
-    OAM_BUF[10] = baseProps;
-    OAM_BUF[11] = baseX;
-    
-    // Sprite 3: Bottom-right
-    OAM_BUF[12] = baseY + 8;
-    OAM_BUF[13] = baseTile + 17;  // Assuming tiles are arranged in 16-tile rows
-    OAM_BUF[14] = baseProps;
-    OAM_BUF[15] = baseX + 8;
+    if (player_sprite != NULL) {
+        // player_sprite format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
+        uint8_t palette_idx = player_sprite[1];  // palette_index (should be 3 for player)
+        uint8_t tl_tile = player_sprite[2];     // Top-left tile
+        uint8_t tr_tile = player_sprite[3];     // Top-right tile
+        uint8_t bl_tile = player_sprite[4];     // Bottom-left tile
+        uint8_t br_tile = player_sprite[5];     // Bottom-right tile
+        
+        // Check if sprite should be flipped horizontally (for left/right facing)
+        // isFliped is stored in oamProps bit 6 (0x40)
+        bool flip_horizontal = (playerData->oamProps & 0x40) != 0;
+        
+        // Set palette in properties (bits 0-1 of byte 2 in OAM entry)
+        // Player uses sprite palette 3 (bits 0-1 = 3)
+        // NES OAM format: bits 0-1 = palette (0-3), bit 5 = priority, bit 6 = flip horizontal
+        uint8_t baseProps = (palette_idx & 0x03);
+        // Clear bit 5 (0x20) to make sprite appear in front of background
+        baseProps &= ~0x20;
+        // Set bit 6 (0x40) for horizontal flip if needed
+        if (flip_horizontal) {
+            baseProps |= 0x40;
+        }
+        
+        if (flip_horizontal) {
+            // Flipped horizontally: swap left/right tiles and use flip bit
+            // Sprite 0: Top-right tile at left position (flipped)
+            OAM_BUF[0] = baseY;
+            OAM_BUF[1] = tr_tile;
+            OAM_BUF[2] = baseProps;  // Already has flip bit set
+            OAM_BUF[3] = baseX;
+            
+            // Sprite 1: Top-left tile at right position (flipped)
+            OAM_BUF[4] = baseY;
+            OAM_BUF[5] = tl_tile;
+            OAM_BUF[6] = baseProps;  // Already has flip bit set
+            OAM_BUF[7] = baseX + 8;
+            
+            // Sprite 2: Bottom-right tile at left position (flipped)
+            OAM_BUF[8] = baseY + 8;
+            OAM_BUF[9] = br_tile;
+            OAM_BUF[10] = baseProps;  // Already has flip bit set
+            OAM_BUF[11] = baseX;
+            
+            // Sprite 3: Bottom-left tile at right position (flipped)
+            OAM_BUF[12] = baseY + 8;
+            OAM_BUF[13] = bl_tile;
+            OAM_BUF[14] = baseProps;  // Already has flip bit set
+            OAM_BUF[15] = baseX + 8;
+        } else {
+            // Normal (not flipped)
+            // Sprite 0: Top-left
+            OAM_BUF[0] = baseY;
+            OAM_BUF[1] = tl_tile;
+            OAM_BUF[2] = baseProps;
+            OAM_BUF[3] = baseX;
+            
+            // Sprite 1: Top-right
+            OAM_BUF[4] = baseY;
+            OAM_BUF[5] = tr_tile;
+            OAM_BUF[6] = baseProps;
+            OAM_BUF[7] = baseX + 8;
+            
+            // Sprite 2: Bottom-left
+            OAM_BUF[8] = baseY + 8;
+            OAM_BUF[9] = bl_tile;
+            OAM_BUF[10] = baseProps;
+            OAM_BUF[11] = baseX;
+            
+            // Sprite 3: Bottom-right
+            OAM_BUF[12] = baseY + 8;
+            OAM_BUF[13] = br_tile;
+            OAM_BUF[14] = baseProps;
+            OAM_BUF[15] = baseX + 8;
+        }
+    } else {
+        // Fallback to old method if player sprite data not found
+        uint8_t baseTile = playerData->oamTile;
+        uint8_t baseProps = playerData->oamProps;
+        baseProps &= ~0x20;
+        
+        // Sprite 0: Top-left
+        OAM_BUF[0] = baseY;
+        OAM_BUF[1] = baseTile;
+        OAM_BUF[2] = baseProps;
+        OAM_BUF[3] = baseX;
+        
+        // Sprite 1: Top-right
+        OAM_BUF[4] = baseY;
+        OAM_BUF[5] = baseTile + 1;
+        OAM_BUF[6] = baseProps;
+        OAM_BUF[7] = baseX + 8;
+        
+        // Sprite 2: Bottom-left
+        OAM_BUF[8] = baseY + 8;
+        OAM_BUF[9] = baseTile + 16;
+        OAM_BUF[10] = baseProps;
+        OAM_BUF[11] = baseX;
+        
+        // Sprite 3: Bottom-right
+        OAM_BUF[12] = baseY + 8;
+        OAM_BUF[13] = baseTile + 17;
+        OAM_BUF[14] = baseProps;
+        OAM_BUF[15] = baseX + 8;
+    }
 }
 
 void port_buildUnused(uint8_t index) {
@@ -121,10 +518,194 @@ void port_buildBigChest(uint8_t index) {
 void port_buildKey(uint8_t index) {
 }
 
-void port_buildSpring(uint8_t index) {
+// Helper function to render a 16x16 sprite from sprite data
+// sprite_data format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
+// baseX, baseY: position of the sprite
+// oamProps: properties (palette, priority, flip bits)
+// oamOffset: offset into OAM_BUF (in bytes, 4 bytes per sprite)
+static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset) {
+    if (sprite_data == NULL) {
+        return;
+    }
+    
+    uint8_t palette_idx = sprite_data[1];  // palette_index
+    uint8_t tl_tile = sprite_data[2];     // Top-left tile
+    uint8_t tr_tile = sprite_data[3];     // Top-right tile
+    uint8_t bl_tile = sprite_data[4];     // Bottom-left tile
+    uint8_t br_tile = sprite_data[5];     // Bottom-right tile
+    
+    // Set palette in properties (bits 0-1 of byte 2 in OAM entry)
+    // NES OAM format: bits 0-1 = palette (0-3), bit 5 = priority, bit 6 = flip horizontal
+    uint8_t baseProps = (palette_idx & 0x03);
+    // Clear bit 5 (0x20) to make sprite appear in front of background
+    baseProps &= ~0x20;
+    // Check if sprite should be flipped horizontally (bit 6 of oamProps)
+    bool flip_horizontal = (oamProps & 0x40) != 0;
+    // Set bit 6 (0x40) for horizontal flip if needed
+    if (flip_horizontal) {
+        baseProps |= 0x40;
+    }
+    
+    if (flip_horizontal) {
+        // Flipped horizontally: swap left/right tiles and use flip bit
+        // Sprite 0: Top-right tile at left position (flipped)
+        OAM_BUF[oamOffset + 0] = baseY;
+        OAM_BUF[oamOffset + 1] = tr_tile;
+        OAM_BUF[oamOffset + 2] = baseProps;  // Already has flip bit set
+        OAM_BUF[oamOffset + 3] = baseX;
+        
+        // Sprite 1: Top-left tile at right position (flipped)
+        OAM_BUF[oamOffset + 4] = baseY;
+        OAM_BUF[oamOffset + 5] = tl_tile;
+        OAM_BUF[oamOffset + 6] = baseProps;  // Already has flip bit set
+        OAM_BUF[oamOffset + 7] = baseX + 8;
+        
+        // Sprite 2: Bottom-right tile at left position (flipped)
+        OAM_BUF[oamOffset + 8] = baseY + 8;
+        OAM_BUF[oamOffset + 9] = br_tile;
+        OAM_BUF[oamOffset + 10] = baseProps;  // Already has flip bit set
+        OAM_BUF[oamOffset + 11] = baseX;
+        
+        // Sprite 3: Bottom-left tile at right position (flipped)
+        OAM_BUF[oamOffset + 12] = baseY + 8;
+        OAM_BUF[oamOffset + 13] = bl_tile;
+        OAM_BUF[oamOffset + 14] = baseProps;  // Already has flip bit set
+        OAM_BUF[oamOffset + 15] = baseX + 8;
+    } else {
+        // Normal (not flipped)
+        // Sprite 0: Top-left
+        OAM_BUF[oamOffset + 0] = baseY;
+        OAM_BUF[oamOffset + 1] = tl_tile;
+        OAM_BUF[oamOffset + 2] = baseProps;
+        OAM_BUF[oamOffset + 3] = baseX;
+        
+        // Sprite 1: Top-right
+        OAM_BUF[oamOffset + 4] = baseY;
+        OAM_BUF[oamOffset + 5] = tr_tile;
+        OAM_BUF[oamOffset + 6] = baseProps;
+        OAM_BUF[oamOffset + 7] = baseX + 8;
+        
+        // Sprite 2: Bottom-left
+        OAM_BUF[oamOffset + 8] = baseY + 8;
+        OAM_BUF[oamOffset + 9] = bl_tile;
+        OAM_BUF[oamOffset + 10] = baseProps;
+        OAM_BUF[oamOffset + 11] = baseX;
+        
+        // Sprite 3: Bottom-right
+        OAM_BUF[oamOffset + 12] = baseY + 8;
+        OAM_BUF[oamOffset + 13] = br_tile;
+        OAM_BUF[oamOffset + 14] = baseProps;
+        OAM_BUF[oamOffset + 15] = baseX + 8;
+    }
 }
 
-void port_buildCollapseTile(uint8_t index) {
+void port_buildSpring(uint8_t index) {    
+    OBJ_DATA *spring = &GLOBAL_OBJList[index];
+    
+    uint8_t baseX = (uint8_t)spring->pos.x;
+    uint8_t baseY = (uint8_t)spring->pos.y;
+    uint8_t frame_index = spring->oamTile;  // SPRING_SPRITE_1 or SPRING_SPRITE_2
+    
+    // Map OAM tile index to sprite sheet tile index
+    uint8_t tile_index = map_spring_sprite_to_tile_index(frame_index);
+    
+    // Look up sprite data from object_sprite array
+    const unsigned char *sprite_data = find_sprite_data_by_tile_index(tile_index);
+    
+    // Calculate OAM offset (4 sprites * 4 bytes = 16 bytes per 16x16 sprite)
+    // Player uses slots 0-3 (16 bytes), so start at s_oamIndex
+    uint16_t oamOffset = s_oamIndex * 4;  // Each sprite is 4 bytes
+    
+    if (sprite_data != NULL) {
+        // Render the 16x16 sprite
+        render_16x16_sprite(sprite_data, baseX, baseY, spring->oamProps, oamOffset);
+    } else {
+        // Fallback to old method if sprite data not found
+        uint8_t baseTile = spring->oamTile;
+        uint8_t baseProps = spring->oamProps;
+        baseProps &= ~0x20;  // Clear priority bit to appear in front
+        
+        // Sprite 0: Top-left
+        OAM_BUF[oamOffset + 0] = baseY;
+        OAM_BUF[oamOffset + 1] = baseTile;
+        OAM_BUF[oamOffset + 2] = baseProps;
+        OAM_BUF[oamOffset + 3] = baseX;
+        
+        // Sprite 1: Top-right
+        OAM_BUF[oamOffset + 4] = baseY;
+        OAM_BUF[oamOffset + 5] = baseTile + 1;
+        OAM_BUF[oamOffset + 6] = baseProps;
+        OAM_BUF[oamOffset + 7] = baseX + 8;
+        
+        // Sprite 2: Bottom-left
+        OAM_BUF[oamOffset + 8] = baseY + 8;
+        OAM_BUF[oamOffset + 9] = baseTile + 16;
+        OAM_BUF[oamOffset + 10] = baseProps;
+        OAM_BUF[oamOffset + 11] = baseX;
+        
+        // Sprite 3: Bottom-right
+        OAM_BUF[oamOffset + 12] = baseY + 8;
+        OAM_BUF[oamOffset + 13] = baseTile + 17;
+        OAM_BUF[oamOffset + 14] = baseProps;
+        OAM_BUF[oamOffset + 15] = baseX + 8;
+    }
+    
+    // Increment OAM index by 4 sprites (16x16 sprite = 4 8x8 sprites)
+    s_oamIndex += 4;
+}
+
+void port_buildCollapseTile(uint8_t index) {    
+    OBJ_DATA *collapseTile = &GLOBAL_OBJList[index];
+    uint8_t baseX = (uint8_t)collapseTile->pos.x;
+    uint8_t baseY = (uint8_t)collapseTile->pos.y;
+    uint8_t frame_index = collapseTile->oamTile;  // COLLAPSE_TILE_SPRITE_1, _2, or _3
+    
+    // Map OAM tile index to sprite sheet tile index
+    uint8_t tile_index = map_collapse_tile_sprite_to_tile_index(frame_index);
+    
+    // Look up sprite data from object_sprite array
+    const unsigned char *sprite_data = find_sprite_data_by_tile_index(tile_index);
+    
+    // Calculate OAM offset (4 sprites * 4 bytes = 16 bytes per 16x16 sprite)
+    // Player uses slots 0-3 (16 bytes), so start at s_oamIndex
+    uint16_t oamOffset = s_oamIndex * 4;  // Each sprite is 4 bytes
+    
+    if (sprite_data != NULL) {
+        // Render the 16x16 sprite
+        render_16x16_sprite(sprite_data, baseX, baseY, collapseTile->oamProps, oamOffset);
+    } else {
+        // Fallback to old method if sprite data not found
+        uint8_t baseTile = collapseTile->oamTile;
+        uint8_t baseProps = collapseTile->oamProps;
+        baseProps &= ~0x20;  // Clear priority bit to appear in front
+        
+        // Sprite 0: Top-left
+        OAM_BUF[oamOffset + 0] = baseY;
+        OAM_BUF[oamOffset + 1] = baseTile;
+        OAM_BUF[oamOffset + 2] = baseProps;
+        OAM_BUF[oamOffset + 3] = baseX;
+        
+        // Sprite 1: Top-right
+        OAM_BUF[oamOffset + 4] = baseY;
+        OAM_BUF[oamOffset + 5] = baseTile + 1;
+        OAM_BUF[oamOffset + 6] = baseProps;
+        OAM_BUF[oamOffset + 7] = baseX + 8;
+        
+        // Sprite 2: Bottom-left
+        OAM_BUF[oamOffset + 8] = baseY + 8;
+        OAM_BUF[oamOffset + 9] = baseTile + 16;
+        OAM_BUF[oamOffset + 10] = baseProps;
+        OAM_BUF[oamOffset + 11] = baseX;
+        
+        // Sprite 3: Bottom-right
+        OAM_BUF[oamOffset + 12] = baseY + 8;
+        OAM_BUF[oamOffset + 13] = baseTile + 17;
+        OAM_BUF[oamOffset + 14] = baseProps;
+        OAM_BUF[oamOffset + 15] = baseX + 8;
+    }
+    
+    // Increment OAM index by 4 sprites (16x16 sprite = 4 8x8 sprites)
+    s_oamIndex += 4;
 }
 
 void port_buildStrawberry(uint8_t index) {
@@ -156,9 +737,15 @@ void port_drawText(const unsigned char *text, uint8_t x, uint8_t y) {
 // Function pointer to pad_poll - prevents compiler from optimizing away the call
 static char (*volatile pad_poll_fn)(char) = pad_poll;
 
+// Forward declaration
+static void update_player_hair_color(void);
+
 __attribute__((noinline)) void port_vblank(void) {
     ppu_wait_nmi();
     oam_upload();
+
+    // Update player hair color based on dash count
+    update_player_hair_color();
 
     // Read controller - use volatile function pointer to prevent optimization
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
@@ -193,77 +780,128 @@ static uint8_t nes_6bit_to_palette_index(uint8_t nes_6bit) {
     return nes_6bit;
 }
 
-// Load background palettes from tilemap data
+// Palette data stored in RAM (for background and sprite palettes)
+// Lower 16 bytes (0-15): 4 background palettes * 4 colors
+// Upper 16 bytes (16-31): 4 sprite palettes * 4 colors
+static uint8_t palette_ram[32];
+
+// Load background palettes from tilemap data into RAM
 static void load_background_palettes(void) {
     // NES has 4 background palettes, each with 4 colors
     // First color (index 0) is always the universal background color
     
-    // Convert palette data to neslib format
-    // neslib pal_bg expects an array of 16 bytes (4 palettes * 4 colors)
-    // Format: [pal0_color0, pal0_color1, pal0_color2, pal0_color3, pal1_color0, ...]
-    static uint8_t bg_palette[16];
-    
     // Initialize with universal background color (0x0D = black, matching Python generation)
     // The first color of each palette (index 0) should be 0x0D for consistency
     for (uint8_t i = 0; i < 16; i++) {
-        bg_palette[i] = 0x0D; // Universal background color (matches Python: 0x0D)
+        palette_ram[i] = 0x0D; // Universal background color (matches Python: 0x0D)
     }
     
+    // Get level data (room ID is 1-indexed, array is 0-indexed)
+    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) {
+        level_idx = 0; // Default to level 1 if out of range
+    }
+    const LevelData *level = &level_data[level_idx];
+    
     // Load background palettes from tilemap data (up to 4 palettes)
-    uint8_t pal_count = PALETTE_BACKGROUND_LEVEL1_COUNT;
+    uint8_t pal_count = level->bg_palette_count;
     if (pal_count > 4) pal_count = 4;
     
     for (uint8_t pal_idx = 0; pal_idx < pal_count; pal_idx++) {
         // Each palette has 4 colors
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
-            uint8_t nes_6bit = palette_background_level1[pal_idx][col_idx];
+            uint8_t nes_6bit = level->bg_palettes[pal_idx][col_idx];
             // Use the palette data directly - it's already in NES palette index format (0-63)
-            bg_palette[pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(nes_6bit);
+            palette_ram[pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(nes_6bit);
         }
     }
     
-    pal_bg(bg_palette);
+    // Upload to PPU (lower 16 bytes for background)
+    pal_bg(palette_ram);
 }
 
-// Load sprite palettes from tilemap data
+// Load sprite palettes from tilemap data into RAM
 static void load_sprite_palettes(void) {
     // NES has 4 sprite palettes, each with 4 colors
     // Note: Color 0 in sprite palettes is transparent, not black
     
-    // Convert palette data to neslib format
-    // neslib pal_spr expects an array of 16 bytes (4 palettes * 4 colors)
-    // Format: [pal0_color0, pal0_color1, pal0_color2, pal0_color3, pal1_color0, ...]
-    static uint8_t spr_palette[16];
-    
     // Initialize with default colors (transparent for color 0)
     // Color 0 in sprite palettes is transparent, but we initialize to 0x0D for consistency
     for (uint8_t i = 0; i < 16; i++) {
-        spr_palette[i] = 0x0D; // Default to black (matches Python: 0x0D)
+        palette_ram[16 + i] = 0x0D; // Default to black (matches Python: 0x0D)
     }
     
+    // Get level data (room ID is 1-indexed, array is 0-indexed)
+    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) {
+        level_idx = 0; // Default to level 1 if out of range
+    }
+    const LevelData *level = &level_data[level_idx];
+    
     // Load sprite palettes from tilemap data (up to 4 palettes)
-    uint8_t pal_count = PALETTE_SPRITE_LEVEL1_COUNT;
+    uint8_t pal_count = level->sprite_palette_count;
     if (pal_count > 4) pal_count = 4;
     
     for (uint8_t pal_idx = 0; pal_idx < pal_count; pal_idx++) {
         // Each palette has 4 colors
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
-            uint8_t nes_6bit = palette_sprite_level1[pal_idx][col_idx];
-            spr_palette[pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(nes_6bit);
+            uint8_t nes_6bit = level->sprite_palettes[pal_idx][col_idx];
+            palette_ram[16 + pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(nes_6bit);
         }
     }
     
-    pal_spr(spr_palette);
+    // Upload to PPU (upper 16 bytes for sprites)
+    pal_spr(&palette_ram[16]);
+}
+
+// Update player hair color based on dash count
+// 0 dashes = blue (0x12), 1 dash = default (0x37), 2 dashes = green (0x1A)
+static void update_player_hair_color(void) {
+    uint8_t dashes_left = GLOBAL_PlayerData.dashesLeft;
+    uint8_t hair_color;
+    
+    // Sprite palette 3 is the player palette, color index 2 is the hair color
+    // palette_ram[16 + 3 * 4 + 1] = palette_ram[16 + 14]
+    uint8_t hair_color_index = 16 + 3 * 4 + 1; // Sprite palette 3, color 2 (offset by 16 for sprite palettes)
+    
+    if (dashes_left == 0) {
+        hair_color = 0x12; // Blue (NES palette index)
+    } else if (dashes_left == 1) {
+        hair_color = 0x15; // Default hair color
+    } else { // dashes_left >= 2
+        hair_color = 0x1A; // Green (NES palette index)
+    }
+    
+    // Only update if the color changed to avoid unnecessary PPU writes
+    if (palette_ram[hair_color_index] != hair_color) {
+        palette_ram[hair_color_index] = hair_color;
+        // Upload updated palette to PPU (upper 16 bytes for sprites)
+        pal_spr(&palette_ram[16]);
+    }
 }
 
 // Write nametable from tilemap data
 static void write_nametable(void) {
     // NES nametable is 32x30 tiles (256x240 pixels)
     // Our tilemap is 16x16 tiles, each tile is 16x16 pixels (2x2 NES tiles)
-    // So we'll write a 32x32 NES tile area (though NES only supports 32x30)
+    // So a 16x16 map = 32x32 NES tiles, but NES only supports 32x30 tiles
+    // We limit the write to 30 rows to prevent nametable overflow
     
-    const uint8_t map_width = TILEMAP_LEVEL1_WIDTH;  // 16
-    const uint8_t map_height = TILEMAP_LEVEL1_HEIGHT; // 16
+    // Get level data (room ID is 1-indexed, array is 0-indexed)
+    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) {
+        level_idx = 0; // Default to level 1 if out of range
+    }
+    const LevelData *level = &level_data[level_idx];
+    
+    uint8_t map_width = level->width;
+    uint8_t map_height = level->height;
+    const unsigned char *tilemap_gids = level->tilemap;  // Array of GIDs (one byte each)
+    uint16_t tilemap_count = level->tilemap_count;
+    
+    // Use shared GID mapping (same for all levels)
+    const unsigned char (*gid_to_tile_map)[6] = GID_TO_TILE_MAP;
+    uint16_t gid_map_count = GID_TO_TILE_MAP_COUNT;
     
     // First, write all tile indices to the nametable
     // Start at nametable 0, position (0, 0)
@@ -271,24 +909,48 @@ static void write_nametable(void) {
     
     // Write tile indices row by row
     // Each map tile becomes 2 rows of NES tiles
-    for (uint8_t nes_y = 0; nes_y < map_height * 2; nes_y++) {
+    // NES nametable only supports 30 rows (240 pixels), so limit to 30
+    uint8_t max_nes_rows = (map_height * 2 < 30) ? (map_height * 2) : 30;
+    for (uint8_t nes_y = 0; nes_y < max_nes_rows; nes_y++) {
         uint8_t map_y = nes_y / 2;
         uint8_t tile_row = nes_y % 2; // 0 = top row, 1 = bottom row
         
         for (uint8_t map_x = 0; map_x < map_width; map_x++) {
             uint16_t tilemap_idx = map_y * map_width + map_x;
-            const unsigned char *tile_entry = &tilemap_level1[tilemap_idx * 6];
+            
+            // Get GID from tilemap (one byte)
+            uint8_t gid = 0;
+            if (tilemap_idx < tilemap_count) {
+                gid = tilemap_gids[tilemap_idx];
+            }
+            
+            // Look up tile data from GID mapping
+            const unsigned char *tile_entry = NULL;
+            if (gid < gid_map_count && gid_to_tile_map != NULL) {
+                tile_entry = gid_to_tile_map[gid];
+            } else {
+                // Invalid GID, use empty tile (GID 0)
+                if (gid_to_tile_map != NULL) {
+                    tile_entry = gid_to_tile_map[0];
+                }
+            }
             
             // Check if this is an empty tile (all zeros)
             // Empty tiles are written as tile 0, which should be transparent/empty
-            if (tile_row == 0) {
-                // Top row: write left and right tiles
-                vram_put(tile_entry[0]); // TL
-                vram_put(tile_entry[1]); // TR
+            if (tile_entry != NULL) {
+                if (tile_row == 0) {
+                    // Top row: write left and right tiles
+                    vram_put(tile_entry[0]); // TL
+                    vram_put(tile_entry[1]); // TR
+                } else {
+                    // Bottom row: write left and right tiles
+                    vram_put(tile_entry[2]); // BL
+                    vram_put(tile_entry[3]); // BR
+                }
             } else {
-                // Bottom row: write left and right tiles
-                vram_put(tile_entry[2]); // BL
-                vram_put(tile_entry[3]); // BR
+                // Fallback: write empty tiles
+                vram_put(0);
+                vram_put(0);
             }
         }
     }
@@ -306,42 +968,60 @@ static void write_nametable(void) {
     
     // Write attributes - each attribute byte covers 4x4 NES tiles = 2x2 map tiles
     // So for a 16x16 map (32x32 NES tiles), we need 8x8 attribute bytes
-    for (uint8_t attr_y = 0; attr_y < map_height / 2; attr_y++) {
+    // NES nametable only supports 30 rows, so limit attributes to 15 rows (30 NES tiles / 2)
+    uint8_t max_attr_rows = (map_height / 2 < 15) ? (map_height / 2) : 15;
+    for (uint8_t attr_y = 0; attr_y < max_attr_rows; attr_y++) {
         for (uint8_t attr_x = 0; attr_x < map_width / 2; attr_x++) {
             // Get the 4 map tiles that this attribute byte covers
             // Top-left
             uint16_t tl_idx = (attr_y * 2) * map_width + (attr_x * 2);
             uint8_t tl_palette = 0;
-            if (tl_idx < TILEMAP_LEVEL1_COUNT) {
-                uint8_t palette_idx = tilemap_level1[tl_idx * 6 + 4];
-                // Extract palette index (bits 0-1) for both background (bit 7=1) and sprite (bit 7=0) palettes
-                // Since NES attribute table only supports background palettes, sprite palette indices
-                // are mapped to corresponding background palette indices (0-3)
-                tl_palette = palette_idx & 0x03;
+            if (tl_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[tl_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    uint8_t palette_idx = tile_entry[4];
+                    // Extract palette index (bits 0-1) for both background (bit 7=1) and sprite (bit 7=0) palettes
+                    // Since NES attribute table only supports background palettes, sprite palette indices
+                    // are mapped to corresponding background palette indices (0-3)
+                    tl_palette = palette_idx & 0x03;
+                }
             }
             
             // Top-right
             uint16_t tr_idx = (attr_y * 2) * map_width + (attr_x * 2) + 1;
             uint8_t tr_palette = 0;
-            if (tr_idx < TILEMAP_LEVEL1_COUNT) {
-                uint8_t palette_idx = tilemap_level1[tr_idx * 6 + 4];
-                tr_palette = palette_idx & 0x03;
+            if (tr_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[tr_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    uint8_t palette_idx = tile_entry[4];
+                    tr_palette = palette_idx & 0x03;
+                }
             }
             
             // Bottom-left
             uint16_t bl_idx = ((attr_y * 2) + 1) * map_width + (attr_x * 2);
             uint8_t bl_palette = 0;
-            if (bl_idx < TILEMAP_LEVEL1_COUNT) {
-                uint8_t palette_idx = tilemap_level1[bl_idx * 6 + 4];
-                bl_palette = palette_idx & 0x03;
+            if (bl_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[bl_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    uint8_t palette_idx = tile_entry[4];
+                    bl_palette = palette_idx & 0x03;
+                }
             }
             
             // Bottom-right
             uint16_t br_idx = ((attr_y * 2) + 1) * map_width + (attr_x * 2) + 1;
             uint8_t br_palette = 0;
-            if (br_idx < TILEMAP_LEVEL1_COUNT) {
-                uint8_t palette_idx = tilemap_level1[br_idx * 6 + 4];
-                br_palette = palette_idx & 0x03;
+            if (br_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[br_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    uint8_t palette_idx = tile_entry[4];
+                    br_palette = palette_idx & 0x03;
+                }
             }
             
             // Build attribute byte: [BR][BL][TR][TL]
@@ -356,45 +1036,51 @@ static void write_nametable(void) {
 }
 
 void port_LoadRoomData(uint16_t roomID) {
-    if (roomID == 1) {
-        // Turn off PPU during loading
-        ppu_off();
-        
-        // Set room ID and size
-        GLOBAL_ActiveLevel.currentRoomID = roomID;
-        GLOBAL_ActiveLevel.roomSizeX = TILEMAP_LEVEL1_WIDTH;
-        GLOBAL_ActiveLevel.roomSizeY = TILEMAP_LEVEL1_HEIGHT;
-        
-        // Copy collision data
-        memcpy(GLOBAL_ActiveLevel.collisionFlagsReset, collision_level1, COLLISION_LEVEL1_COUNT);
-        memcpy(GLOBAL_ActiveLevel.collisionFlagsArr, collision_level1, COLLISION_LEVEL1_COUNT);
-        
-        // Set player spawn position
-        GLOBAL_ActiveLevel.playerSpawnX = SPAWN_X_LEVEL1;
-        GLOBAL_ActiveLevel.playerSpawnY = SPAWN_Y_LEVEL1;
-        
-        // Set object count and copy object data
-        GLOBAL_ActiveLevel.objectCount = OBJECT_LEVEL1_COUNT;
-        memcpy(GLOBAL_ActiveLevel.objectData, object_level1, OBJECT_LEVEL1_COUNT * 3);
-        
-        // Set scroll point (from SNES implementation)
-        GLOBAL_ActiveLevel.scrollPointY = 72;
-        
-        // Write nametable first (tiles and attributes)
-        write_nametable();
-        
-        // Load background palettes (after nametable, so they're ready when PPU turns on)
-        load_background_palettes();
-        
-        // Load sprite palettes
-        load_sprite_palettes();
-        
-        // Mark level as loaded
-        GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
-        
-        // Turn PPU back on
-        ppu_on_all();
-        ppu_wait_nmi();
+    // Get level data (room ID is 1-indexed, array is 0-indexed)
+    uint16_t level_idx = roomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) {
+        level_idx = 0; // Default to level 1 if out of range
     }
+    const LevelData *level = &level_data[level_idx];
+    
+    // Turn off PPU during loading
+    ppu_off();
+    
+    // Set room ID and size
+    GLOBAL_ActiveLevel.currentRoomID = roomID;
+    GLOBAL_ActiveLevel.roomSizeX = level->width;
+    GLOBAL_ActiveLevel.roomSizeY = level->height;
+    
+    // Copy collision data
+    memcpy(GLOBAL_ActiveLevel.collisionFlagsReset, level->collision, level->collision_count);
+    memcpy(GLOBAL_ActiveLevel.collisionFlagsArr, level->collision, level->collision_count);
+    
+    // Set player spawn position
+    GLOBAL_ActiveLevel.playerSpawnX = level->spawn_x;
+    GLOBAL_ActiveLevel.playerSpawnY = level->spawn_y;
+    
+    // Set object count and copy object data
+    GLOBAL_ActiveLevel.objectCount = level->object_count;
+    memcpy(GLOBAL_ActiveLevel.objectData, level->objects, level->object_count * 3);
+    
+    // Set scroll point (from SNES implementation)
+    GLOBAL_ActiveLevel.scrollPointY = 72;
+
+    // Write nametable first (tiles and attributes)
+    write_nametable();
+
+    // Load background palettes (after nametable, so they're ready when PPU turns on)
+    load_background_palettes();
+    
+    // Load sprite palettes
+    load_sprite_palettes();
+    
+    // Mark level as loaded
+    GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
+    
+    // Turn PPU back on
+    ppu_on_all();
+    ppu_wait_nmi();
+    
 }
 
