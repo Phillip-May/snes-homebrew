@@ -23,6 +23,7 @@ NES_LDFLAGS  := '-Wl,-Map=$(BUILD_DIR)/celeste-nes.map' '-Wl,--gc-sections' '-Wl
 NES_LIBS     := -lneslib
 
 NES_ROM      := $(BUILD_DIR)/celeste-nes.nes
+NES_ROM_TEMP := $(BUILD_DIR)/celeste-nes-temp.nes
 NES_OBJECTS  := $(BUILD_DIR)/mainBankZero.o \
                 $(BUILD_DIR)/nes_port.o \
                 $(BUILD_DIR)/fix16.o \
@@ -50,9 +51,13 @@ $(BUILD_DIR)/sprite_chr.o: $(SRC_DIR)/assets/sprite_chr.s python/sprite_chr_comb
 	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' -c '$(SRC_DIR)/assets/sprite_chr.s' -o '$(BUILD_DIR)/sprite_chr.o' }"
 
 
-$(NES_ROM): $(NES_OBJECTS)
-	@echo [NES] Linking $(NES_ROM)
-	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/sprite_chr.o' $(NES_LIBS) -o '$(NES_ROM)' }"
+$(NES_ROM_TEMP): $(NES_OBJECTS)
+	@echo [NES] Linking $(NES_ROM_TEMP)
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/sprite_chr.o' $(NES_LIBS) -o '$(NES_ROM_TEMP)' }"
+
+$(NES_ROM): $(NES_ROM_TEMP)
+	@echo [NES] Setting horizontal mirroring in iNES header
+	@powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File fix_ines_header.ps1 -InputFile '$(NES_ROM_TEMP)' -OutputFile '$(NES_ROM)'
 
 clean:
 	@powershell -NoLogo -NoProfile -Command "if (Test-Path '$(BUILD_DIR)') { Remove-Item -Recurse -Force '$(BUILD_DIR)' }"

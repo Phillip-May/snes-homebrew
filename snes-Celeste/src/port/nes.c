@@ -31,6 +31,8 @@
 #include <neslib.h>
 #endif
 
+#define PPU_CTRL   (*(volatile uint8_t *)0x2000)
+#define PPU_SCROLL (*(volatile uint8_t *)0x2005)
 #define OAM_ADDR   (*(volatile uint8_t *)0x2003)
 #define OAM_DATA   (*(volatile uint8_t *)0x2004)
 #define OAM_DMA    (*(volatile uint8_t *)0x4014)
@@ -39,6 +41,7 @@ extern uint8_t OAM_BUF[];
 
 static volatile uint8_t s_inputState = 0;
 static uint8_t s_oamIndex = 0;
+static uint8_t s_scrollY = 0; // Vertical scroll position
 
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern struct sPlayerData GLOBAL_PlayerData;
@@ -223,6 +226,7 @@ static const LevelData level_data[] = {
         palette_sprite_level14, PALETTE_SPRITE_LEVEL14_COUNT,
         SPAWN_X_LEVEL14, SPAWN_Y_LEVEL14
     },
+    /*
     // Level 15
     {
         TILEMAP_LEVEL15_WIDTH, TILEMAP_LEVEL15_HEIGHT,
@@ -267,7 +271,6 @@ static const LevelData level_data[] = {
         palette_sprite_level18, PALETTE_SPRITE_LEVEL18_COUNT,
         SPAWN_X_LEVEL18, SPAWN_Y_LEVEL18
     },
-    /*
     // Level 19
     {
         TILEMAP_LEVEL19_WIDTH, TILEMAP_LEVEL19_HEIGHT,
@@ -316,8 +319,19 @@ void port_init(void) {
     oam_size(0);
     
     // Enable both background and sprites
-    // PPU control register will use nametable 0 (default)
     ppu_on_all();
+    
+    // Configure PPU for horizontal mirroring
+    // This allows two unique vertical nametables ($2000 and $2800)
+    // With horizontal mirroring: $2000 mirrors to $2400, $2800 mirrors to $2C00
+    // PPU_CTRL bit 0 selects base nametable (0=$2000/$2400, 1=$2800/$2C00)
+    // We start with nametable 0, but the system can use both with proper scrolling
+    // Note: Actual mirroring is typically controlled by mapper hardware,
+    // but setting PPU_CTRL bit 0 appropriately helps with nametable selection
+    // Set after ppu_on_all() to ensure our setting isn't overwritten
+    // PPU_CTRL is write-only, so we set it directly with NMI enabled and nametable $2000
+    // Bit 7 = NMI enable, bit 0 = nametable base (0 = $2000 for horizontal mirroring)
+    PPU_CTRL = 0x88; // NMI enabled (bit 7), sprite pattern $1000 (bit 3), nametable $2000 (bit 0 = 0)
     
     // Ensure palettes are set after PPU is on (in case they got cleared)
     ppu_wait_nmi();
@@ -442,7 +456,7 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     
     const struct sOBJ_DATA *playerData = &playerObj->objData;
     uint8_t baseX = (uint8_t)playerData->pos.x;
-    uint8_t baseY = (uint8_t)playerData->pos.y;
+    uint8_t baseY = (uint8_t)playerData->pos.y - s_scrollY; // Offset by scroll position
     
     // Get player frame index from oamTile (player sprite state)
     // Player sprite states: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
@@ -666,7 +680,7 @@ void port_buildSpring(uint8_t index) {
     OBJ_DATA *spring = &GLOBAL_OBJList[index];
     
     uint8_t baseX = (uint8_t)spring->pos.x;
-    uint8_t baseY = (uint8_t)spring->pos.y;
+    uint8_t baseY = (uint8_t)spring->pos.y - s_scrollY; // Offset by scroll position
     uint8_t frame_index = spring->oamTile;  // SPRING_SPRITE_1 or SPRING_SPRITE_2
     
     // Map OAM tile index to sprite sheet tile index
@@ -720,7 +734,7 @@ void port_buildSpring(uint8_t index) {
 void port_buildCollapseTile(uint8_t index) {    
     OBJ_DATA *collapseTile = &GLOBAL_OBJList[index];
     uint8_t baseX = (uint8_t)collapseTile->pos.x;
-    uint8_t baseY = (uint8_t)collapseTile->pos.y;
+    uint8_t baseY = (uint8_t)collapseTile->pos.y - s_scrollY; // Offset by scroll position
     uint8_t frame_index = collapseTile->oamTile;  // COLLAPSE_TILE_SPRITE_1, _2, or _3
     
     // Map OAM tile index to sprite sheet tile index
@@ -809,6 +823,20 @@ __attribute__((noinline)) void port_vblank(void) {
 
     // Update player hair color based on dash count
     update_player_hair_color();
+
+    // Update scroll registers
+    // PPU_SCROLL must be written twice: first X, then Y
+    // Writing must happen during vblank, before rendering starts
+    
+    // Calculate scroll based on player position
+    // Similar to SNES version: scroll starts at scrollPointY (72)
+    // Scroll ranges from 0 to 16 (the two extremes)
+    int16_t playerY = (int16_t)GLOBAL_PlayerData.objData.pos.y;
+    int16_t scrollCalc = playerY - 16 - (int16_t)GLOBAL_ActiveLevel.scrollPointY;
+    s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
+    
+    PPU_SCROLL = 0; // X scroll (horizontal, set to 0 for now)
+    PPU_SCROLL = s_scrollY; // Y scroll (vertical, based on player position)
 
     // Read controller - use volatile function pointer to prevent optimization
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
@@ -944,11 +972,15 @@ static void update_player_hair_color(void) {
 }
 
 // Write nametable from tilemap data
+// With horizontal mirroring, we have two unique vertical nametables:
+// - Nametable 0: $2000-$23FF (32x30 tiles)
+// - Nametable 2: $2800-$2BFF (32x30 tiles)
+// These are not contiguous in memory but can be smoothly scrolled between
 static void write_nametable(void) {
     // NES nametable is 32x30 tiles (256x240 pixels)
     // Our tilemap is 16x16 tiles, each tile is 16x16 pixels (2x2 NES tiles)
-    // So a 16x16 map = 32x32 NES tiles, but NES only supports 32x30 tiles
-    // We limit the write to 30 rows to prevent nametable overflow
+    // So a 16x16 map = 32x32 NES tiles
+    // We write rows 0-29 to nametable 0, rows 30-31 to nametable 2
     
     // Get level data (room ID is 1-indexed, array is 0-indexed)
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
@@ -966,22 +998,20 @@ static void write_nametable(void) {
     const unsigned char (*gid_to_tile_map)[6] = GID_TO_TILE_MAP;
     uint16_t gid_map_count = GID_TO_TILE_MAP_COUNT;
     
-    // First, write all tile indices to the nametable
-    // Start at nametable 0, position (0, 0)
-    vram_adr(NTADR_A(0, 0));
+    // Calculate total NES tile rows (each map tile = 2 NES tile rows)
+    uint8_t total_nes_rows = map_height * 2;
     
-    // Write tile indices row by row
-    // Each map tile becomes 2 rows of NES tiles
-    // NES nametable only supports 30 rows (240 pixels), so limit to 30
-    uint8_t max_nes_rows = (map_height * 2 < 30) ? (map_height * 2) : 30;
-    for (uint8_t nes_y = 0; nes_y < max_nes_rows; nes_y++) {
+    // Write tiles to nametable 0 ($2000-$23FF) - rows 0-29
+    vram_adr(NTADR_A(0, 0));
+    uint8_t nes_rows_nt0 = (total_nes_rows < 30) ? total_nes_rows : 30;
+    for (uint8_t nes_y = 0; nes_y < nes_rows_nt0; nes_y++) {
         uint8_t map_y = nes_y / 2;
         uint8_t tile_row = nes_y % 2; // 0 = top row, 1 = bottom row
         
         for (uint8_t map_x = 0; map_x < map_width; map_x++) {
             uint16_t tilemap_idx = map_y * map_width + map_x;
             
-            // Get GID from tilemap (one byte)
+            // Get GID from tilemap
             uint8_t gid = 0;
             if (tilemap_idx < tilemap_count) {
                 gid = tilemap_gids[tilemap_idx];
@@ -992,107 +1022,168 @@ static void write_nametable(void) {
             if (gid < gid_map_count && gid_to_tile_map != NULL) {
                 tile_entry = gid_to_tile_map[gid];
             } else {
-                // Invalid GID, use empty tile (GID 0)
                 if (gid_to_tile_map != NULL) {
                     tile_entry = gid_to_tile_map[0];
                 }
             }
             
-            // Check if this is an empty tile (all zeros)
-            // Empty tiles are written as tile 0, which should be transparent/empty
             if (tile_entry != NULL) {
                 if (tile_row == 0) {
-                    // Top row: write left and right tiles
                     vram_put(tile_entry[0]); // TL
                     vram_put(tile_entry[1]); // TR
                 } else {
-                    // Bottom row: write left and right tiles
                     vram_put(tile_entry[2]); // BL
                     vram_put(tile_entry[3]); // BR
                 }
             } else {
-                // Fallback: write empty tiles
                 vram_put(0);
                 vram_put(0);
             }
         }
     }
     
-    // Now write attributes to the attribute table
-    // Attribute table is at 0x23C0 in nametable 0
-    // Each attribute byte controls a 4x4 NES tile area (32x32 pixels)
-    // NES attribute format: [BR][BL][TR][TL] (2 bits each for palette, 0-3)
-    // Bits 0-1: palette for top-left 2x2 NES tiles
-    // Bits 2-3: palette for top-right 2x2 NES tiles
-    // Bits 4-5: palette for bottom-left 2x2 NES tiles
-    // Bits 6-7: palette for bottom-right 2x2 NES tiles
+    // Write tiles to nametable 2 ($2800-$2BFF) - rows 30-31 (if any)
+    if (total_nes_rows > 30) {
+        vram_adr(0x2800); // Nametable 2 start address
+        uint8_t nes_rows_nt2 = total_nes_rows - 30;
+        for (uint8_t nes_y = 0; nes_y < nes_rows_nt2; nes_y++) {
+            uint8_t map_y = (nes_y + 30) / 2;
+            uint8_t tile_row = (nes_y + 30) % 2;
+            
+            for (uint8_t map_x = 0; map_x < map_width; map_x++) {
+                uint16_t tilemap_idx = map_y * map_width + map_x;
+                
+                uint8_t gid = 0;
+                if (tilemap_idx < tilemap_count) {
+                    gid = tilemap_gids[tilemap_idx];
+                }
+                
+                const unsigned char *tile_entry = NULL;
+                if (gid < gid_map_count && gid_to_tile_map != NULL) {
+                    tile_entry = gid_to_tile_map[gid];
+                } else {
+                    if (gid_to_tile_map != NULL) {
+                        tile_entry = gid_to_tile_map[0];
+                    }
+                }
+                
+                if (tile_entry != NULL) {
+                    if (tile_row == 0) {
+                        vram_put(tile_entry[0]); // TL
+                        vram_put(tile_entry[1]); // TR
+                    } else {
+                        vram_put(tile_entry[2]); // BL
+                        vram_put(tile_entry[3]); // BR
+                    }
+                } else {
+                    vram_put(0);
+                    vram_put(0);
+                }
+            }
+        }
+    }
     
-    vram_adr(0x23C0); // Attribute table start
-    
-    // Write attributes - each attribute byte covers 4x4 NES tiles = 2x2 map tiles
-    // So for a 16x16 map (32x32 NES tiles), we need 8x8 attribute bytes
-    // NES nametable only supports 30 rows, so limit attributes to 15 rows (30 NES tiles / 2)
-    uint8_t max_attr_rows = (map_height / 2 < 15) ? (map_height / 2) : 15;
-    for (uint8_t attr_y = 0; attr_y < max_attr_rows; attr_y++) {
+    // Write attributes to nametable 0 ($23C0)
+    vram_adr(0x23C0);
+    // Write all attribute rows (each covers 2 map tile rows = 4 NES tile rows)
+    uint8_t max_attr_rows_nt0 = map_height / 2;
+    for (uint8_t attr_y = 0; attr_y < max_attr_rows_nt0; attr_y++) {
         for (uint8_t attr_x = 0; attr_x < map_width / 2; attr_x++) {
-            // Get the 4 map tiles that this attribute byte covers
-            // Top-left
             uint16_t tl_idx = (attr_y * 2) * map_width + (attr_x * 2);
             uint8_t tl_palette = 0;
             if (tl_idx < tilemap_count && gid_to_tile_map != NULL) {
                 uint8_t gid = tilemap_gids[tl_idx];
                 if (gid < gid_map_count) {
                     const unsigned char *tile_entry = gid_to_tile_map[gid];
-                    uint8_t palette_idx = tile_entry[4];
-                    // Extract palette index (bits 0-1) for both background (bit 7=1) and sprite (bit 7=0) palettes
-                    // Since NES attribute table only supports background palettes, sprite palette indices
-                    // are mapped to corresponding background palette indices (0-3)
-                    tl_palette = palette_idx & 0x03;
+                    tl_palette = tile_entry[4] & 0x03;
                 }
             }
             
-            // Top-right
             uint16_t tr_idx = (attr_y * 2) * map_width + (attr_x * 2) + 1;
             uint8_t tr_palette = 0;
             if (tr_idx < tilemap_count && gid_to_tile_map != NULL) {
                 uint8_t gid = tilemap_gids[tr_idx];
                 if (gid < gid_map_count) {
                     const unsigned char *tile_entry = gid_to_tile_map[gid];
-                    uint8_t palette_idx = tile_entry[4];
-                    tr_palette = palette_idx & 0x03;
+                    tr_palette = tile_entry[4] & 0x03;
                 }
             }
             
-            // Bottom-left
             uint16_t bl_idx = ((attr_y * 2) + 1) * map_width + (attr_x * 2);
             uint8_t bl_palette = 0;
             if (bl_idx < tilemap_count && gid_to_tile_map != NULL) {
                 uint8_t gid = tilemap_gids[bl_idx];
                 if (gid < gid_map_count) {
                     const unsigned char *tile_entry = gid_to_tile_map[gid];
-                    uint8_t palette_idx = tile_entry[4];
-                    bl_palette = palette_idx & 0x03;
+                    bl_palette = tile_entry[4] & 0x03;
                 }
             }
             
-            // Bottom-right
             uint16_t br_idx = ((attr_y * 2) + 1) * map_width + (attr_x * 2) + 1;
             uint8_t br_palette = 0;
             if (br_idx < tilemap_count && gid_to_tile_map != NULL) {
                 uint8_t gid = tilemap_gids[br_idx];
                 if (gid < gid_map_count) {
                     const unsigned char *tile_entry = gid_to_tile_map[gid];
-                    uint8_t palette_idx = tile_entry[4];
-                    br_palette = palette_idx & 0x03;
+                    br_palette = tile_entry[4] & 0x03;
                 }
             }
             
-            // Build attribute byte: [BR][BL][TR][TL]
-            uint8_t attr_byte = tl_palette | 
-                               (tr_palette << 2) |
-                               (bl_palette << 4) |
-                               (br_palette << 6);
+            uint8_t attr_byte = tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6);
+            vram_put(attr_byte);
+        }
+    }
+    
+    // Write attributes to nametable 2 ($2BC0) if needed
+    // For rows 30-31 in nametable 2, we need attribute row 0 (covers NES tile rows 0-3 in NT2's coordinate space)
+    // But in map coordinates, these are map tile row 15, which is attribute row 7
+    if (total_nes_rows > 30) {
+        vram_adr(0x2BC0); // Nametable 2 attribute table start
+        // Map tile row 15 corresponds to NES tile rows 30-31
+        // This is attribute row 7 in the full map (15 / 2 = 7, but we need the last attribute row)
+        uint8_t map_attr_row = (map_height / 2) - 1; // Last attribute row (row 7 for 16-tile map)
+        for (uint8_t attr_x = 0; attr_x < map_width / 2; attr_x++) {
+            uint16_t tl_idx = (map_attr_row * 2) * map_width + (attr_x * 2);
+            uint8_t tl_palette = 0;
+            if (tl_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[tl_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    tl_palette = tile_entry[4] & 0x03;
+                }
+            }
             
+            uint16_t tr_idx = (map_attr_row * 2) * map_width + (attr_x * 2) + 1;
+            uint8_t tr_palette = 0;
+            if (tr_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[tr_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    tr_palette = tile_entry[4] & 0x03;
+                }
+            }
+            
+            uint16_t bl_idx = ((map_attr_row * 2) + 1) * map_width + (attr_x * 2);
+            uint8_t bl_palette = 0;
+            if (bl_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[bl_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    bl_palette = tile_entry[4] & 0x03;
+                }
+            }
+            
+            uint16_t br_idx = ((map_attr_row * 2) + 1) * map_width + (attr_x * 2) + 1;
+            uint8_t br_palette = 0;
+            if (br_idx < tilemap_count && gid_to_tile_map != NULL) {
+                uint8_t gid = tilemap_gids[br_idx];
+                if (gid < gid_map_count) {
+                    const unsigned char *tile_entry = gid_to_tile_map[gid];
+                    br_palette = tile_entry[4] & 0x03;
+                }
+            }
+            
+            uint8_t attr_byte = tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6);
             vram_put(attr_byte);
         }
     }
