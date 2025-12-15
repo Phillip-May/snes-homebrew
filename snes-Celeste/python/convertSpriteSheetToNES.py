@@ -16,6 +16,9 @@ shared_gid_mapping_global = {
     'next_gid': 1  # Next available GID (0 is reserved for empty tiles)
 }
 
+# Global list to collect GID arrays for compression dictionary building
+temp_gid_arrays_collector = []
+
 """
 NES Sprite Sheet Converter
 
@@ -60,6 +63,121 @@ def get_collision_for_tile_index(tile_index):
             return 0
     else:
         return 0
+
+# Shared compression dictionary (built from all levels)
+shared_compression_dict = []  # List of (gid1, gid2) tuples, max 64 entries
+best_compression_config = {'rle_threshold': 3, 'dict_size': 64}  # Best configuration found during testing
+
+def build_shared_compression_dictionary(all_level_gid_arrays, dict_size=64):
+    """
+    Build a shared dictionary of common 2-GID sequences across all levels.
+    Returns a list of (gid1, gid2) tuples, max dict_size entries.
+    """
+    # Count frequency of 2-GID sequences
+    sequence_counts = Counter()
+    
+    for gid_array in all_level_gid_arrays:
+        for i in range(len(gid_array) - 1):
+            seq = (gid_array[i], gid_array[i + 1])
+            sequence_counts[seq] += 1
+    
+    # Get most common sequences (max dict_size)
+    most_common = sequence_counts.most_common(dict_size)
+    
+    # Build dictionary
+    dictionary = []
+    for seq, count in most_common:
+        dictionary.append(seq)
+    
+    # Pad to dict_size entries if needed (with (0, 0))
+    while len(dictionary) < dict_size:
+        dictionary.append((0, 0))
+    
+    return dictionary[:dict_size]
+
+def compress_level(gid_array, dictionary, rle_threshold=3):
+    """
+    Compress a level GID array using RLE and dictionary references.
+    
+    Format:
+    - 0x00-0x7F: Literal GID (0-127)
+    - 0x80-0xBF: RLE code (bits 0-5 = count-1, next byte = GID to repeat)
+    - 0xC0-0xFF: Dictionary sequence (bits 0-5 = dict index 0-63, represents 2 GIDs)
+    
+    Returns compressed bytearray.
+    """
+    compressed = bytearray()
+    i = 0
+    
+    while i < len(gid_array):
+        # Try to find a dictionary match first (2 GIDs)
+        if i < len(gid_array) - 1:
+            seq = (gid_array[i], gid_array[i + 1])
+            if seq in dictionary:
+                dict_idx = dictionary.index(seq)
+                # Current format only supports 64 entries (0xC0-0xFF)
+                # For larger dictionaries, would need format change
+                if dict_idx < 64:
+                    compressed.append(0xC0 + dict_idx)  # Dictionary reference
+                    i += 2
+                    continue
+                # If dict_idx >= 64, skip dictionary match and use literal/RLE instead
+        
+        # Try RLE (repeated single GID)
+        gid = gid_array[i]
+        count = 1
+        while i + count < len(gid_array) and gid_array[i + count] == gid and count < 64:
+            count += 1
+        
+        if count >= rle_threshold:  # RLE is beneficial for rle_threshold+ repeats
+            compressed.append(0x80 + (count - 1))  # RLE code
+            compressed.append(gid)  # GID to repeat
+            i += count
+        elif gid < 0x80:  # Literal GID (0-127)
+            compressed.append(gid)
+            i += 1
+        else:  # GID >= 128, must use RLE even for single
+            compressed.append(0x80)  # RLE count 1
+            compressed.append(gid)
+            i += 1
+    
+    return compressed
+
+def decompress_level(compressed_data, dictionary, expected_size):
+    """
+    Decompress a level from compressed data.
+    Returns a list of GIDs.
+    """
+    decompressed = []
+    i = 0
+    
+    while i < len(compressed_data) and len(decompressed) < expected_size:
+        byte = compressed_data[i]
+        
+        if byte < 0x80:  # Literal GID
+            decompressed.append(byte)
+            i += 1
+        elif byte < 0xC0:  # RLE code
+            count = (byte & 0x3F) + 1  # Extract count (1-64)
+            if i + 1 < len(compressed_data):
+                gid = compressed_data[i + 1]
+                decompressed.extend([gid] * count)
+                i += 2
+            else:
+                break
+        else:  # Dictionary reference (0xC0-0xFF)
+            dict_idx = byte & 0x3F  # Extract dict index (0-63)
+            if dict_idx < len(dictionary):
+                seq = dictionary[dict_idx]
+                decompressed.append(seq[0])
+                decompressed.append(seq[1])
+            i += 1
+    
+    # Pad to expected size if needed
+    while len(decompressed) < expected_size:
+        decompressed.append(0)
+    
+    return decompressed[:expected_size]
 
 def convert_tile_to_2bpp(tile_image, palette):
     """Converts an 8x8 tile image to NES 2bpp format (16 bytes)."""
@@ -337,7 +455,8 @@ def rgb_to_nes_6bit(r, g, b):
 
 
 
-def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, all_sprite_data, tile_mapping, unique_chr_tiles, all_palettes, object_palettes=None, object_palette_mapping=None, shared_gid_mapping=None):
+def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, all_sprite_data, tile_mapping, unique_chr_tiles, all_palettes, object_palettes=None, object_palette_mapping=None, shared_gid_mapping=None, use_compression=False):
+    global best_compression_config
     """
     Generate a .h file with tilemap, palette, collision, object, and spawn data for NES.
     
@@ -673,6 +792,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     
     print(f"Using shared GID mapping ({len(gid_map_data)} unique GIDs total) for layer '{layer_name}'")
     
+    # Collect GID array for compression dictionary building (if not using compression yet)
+    global temp_gid_arrays_collector
+    if not use_compression:
+        temp_gid_arrays_collector.append(gid_array[:])  # Store a copy
+    
     # Write .h file
     with open(output_filename, 'w') as f:
         # Header guard
@@ -689,23 +813,31 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
 
         # Using shared GID mapping - include reference to shared header
         f.write(f"// Using shared GID mapping (see gid_to_tile_shared.h)\n")
-        f.write(f"#include \"gid_to_tile_shared.h\"\n\n")
+        f.write(f"#include \"gid_to_tile_shared.h\"\n")
+        f.write(f"// Using shared compression dictionary (see compression_dict_shared.h)\n")
+        f.write(f"#include \"compression_dict_shared.h\"\n\n")
 
-        # Tilemap data - array of GIDs (one byte per entry)
-        f.write(f"// Tilemap data for layer '{layer_name}' (GIDs, one byte per entry)\n")
-        f.write(f"const unsigned char tilemap_{safe_layer_name}[] = {{\n")
+        # Compress tilemap data using best configuration
+        global best_compression_config
+        compressed_data = compress_level(gid_array, shared_compression_dict, best_compression_config['rle_threshold'])
+        
+        # Tilemap data - compressed array
+        f.write(f"// Compressed tilemap data for layer '{layer_name}'\n")
+        f.write(f"// Format: 0x00-0x7F = literal GID, 0x80-0xBF = RLE, 0xC0-0xFF = dict sequence\n")
+        f.write(f"const unsigned char tilemap_{safe_layer_name}_compressed[] = {{\n")
         # Write 16 values per line
-        for i in range(len(gid_array)):
+        for i in range(len(compressed_data)):
             if i % 16 == 0:
                 f.write("    ")
-            f.write(f"{gid_array[i]}")
-            if i < len(gid_array) - 1:
+            f.write(f"0x{compressed_data[i]:02x}")
+            if i < len(compressed_data) - 1:
                 f.write(",")
                 if (i + 1) % 16 == 0:
                     f.write("\n")
                 else:
                     f.write(" ")
         f.write("\n};\n\n")
+        f.write(f"#define TILEMAP_{safe_layer_name.upper()}_COMPRESSED_SIZE {len(compressed_data)}\n")
         f.write(f"#define TILEMAP_{safe_layer_name.upper()}_COUNT {len(gid_array)}\n\n")
 
         # Background palette data - NES 6-bit format (4 palettes, 4 colors per palette)
@@ -1720,6 +1852,8 @@ def main():
     tilemap_filename = os.path.join(script_dir, 'baseCelesteTileMap.json')
     if os.path.exists(tilemap_filename):
         print("\nProcessing map JSON file...")
+        # Declare globals at the start of the function
+        global shared_compression_dict, temp_gid_arrays_collector
         try:
             with open(tilemap_filename, 'r') as f:
                 tilemap_json = json.load(f)
@@ -1756,6 +1890,7 @@ def main():
                     # Process all levels to build shared GID mapping
                     print("\nBuilding shared GID mapping from all levels...")
                     all_levels_data = []  # Store level data for second pass
+                    temp_gid_arrays_collector = []  # Store GID arrays for compression dictionary
                     
                     for mapNum in range(xMaps * yMaps):
                         level_name = f"level{mapNum+1}"
@@ -1790,45 +1925,11 @@ def main():
                         
                         all_levels_data.append((level_name, flat_submap_data))
                     
-                    # First pass: process all levels to collect unique tile entries
-                    # We'll call generate_nes_tilemap_header with collect_only=True to build shared mapping
-                    # Actually, let's just process levels and collect as we go, building shared mapping incrementally
-                    # For now, process first level to initialize, then others add to it
-                    shared_gid_mapping = None  # Will be built incrementally
-                    
-                    # Generate headers for each level (shared mapping built incrementally)
+                    # First pass: generate headers to build GID arrays (for compression dictionary)
+                    print("\nFirst pass: Generating headers to collect GID arrays...")
                     for mapNum in range(xMaps * yMaps):
                         level_name = f"level{mapNum+1}"
                         flat_submap_data = all_levels_data[mapNum][1]
-                        level_name = f"level{mapNum+1}"
-
-                        # Calculate top-left corner of this submap
-                        topLeftX = (mapNum % xMaps) * map_width_tiles_local
-                        topLeftY = (mapNum // xMaps) * map_height_tiles_local
-
-                        # Extract 16x16 tile data for this level
-                        submap_data = []
-                        for y in range(map_height_tiles_local):
-                            row = []
-                            for x in range(map_width_tiles_local):
-                                global_x = topLeftX + x
-                                global_y = topLeftY + y
-
-                                # Check bounds
-                                if global_x < map_width_global and global_y < map_height_global:
-                                    index = global_y * map_width_global + global_x
-                                    if index < len(tile_data_all):
-                                        row.append(tile_data_all[index])
-                                    else:
-                                        row.append(0)
-                                else:
-                                    row.append(0)
-                            submap_data.append(row)
-
-                        # Flatten submap_data for preview and header generation
-                        flat_submap_data = []
-                        for row in submap_data:
-                            flat_submap_data.extend(row)
 
                         # Create preview for this level
                         output_map_preview = os.path.join(script_dir, f'level_map_preview_{level_name}.png')
@@ -1849,6 +1950,7 @@ def main():
                         print(f"Saved map preview to {output_map_preview}")
 
                         # Generate .h file with tilemap, palette, collision, object, and spawn data for this level
+                        # This will build the GID array internally
                         generate_nes_tilemap_header(
                             flat_submap_data,
                             level_name,
@@ -1859,7 +1961,180 @@ def main():
                             unique_chr_tiles,
                             all_palettes,
                             object_palettes,
-                            object_palette_mapping
+                            object_palette_mapping,
+                            use_compression=False
+                        )
+                    
+                    # Collect GID arrays from generated headers (they're stored in shared_gid_mapping_global during generation)
+                    # Actually, we need to collect them differently - let's regenerate headers to collect GID arrays
+                    # Better approach: modify generate_nes_tilemap_header to return GID array
+                    # For now, let's do a second pass where we regenerate with compression
+                    # But first, we need the GID arrays - let's collect them by reading the generated files or
+                    # by calling a helper function
+                    
+                    # Build compression dictionary from all levels
+                    # We need to collect GID arrays first - let's do a temporary pass
+                    print("\nCollecting GID arrays for compression dictionary...")
+                    temp_gid_arrays = []
+                    for mapNum in range(xMaps * yMaps):
+                        level_name = f"level{mapNum+1}"
+                        flat_submap_data = all_levels_data[mapNum][1]
+                        # Temporarily generate to get GID array - but this will overwrite files
+                        # Better: extract GID generation logic
+                        # For now, let's just build dict from a sample and regenerate
+                    
+                    # Actually, let's modify the approach: collect during first generation
+                    # We'll need to modify generate_nes_tilemap_header to return the GID array
+                    # For now, let's build a simple dictionary and regenerate headers
+                    
+                    # Test different compression configurations
+                    print("\n" + "="*70)
+                    print("TESTING COMPRESSION CONFIGURATIONS")
+                    print(f"Testing {len(temp_gid_arrays_collector)} levels")
+                    print("="*70)
+                    
+                    # Declare global at the start of this block
+                    global best_compression_config
+                    
+                    if len(temp_gid_arrays_collector) > 0:
+                        # Test different RLE thresholds and dictionary sizes
+                        # Note: Dictionary sizes > 64 require format changes (currently 0xC0-0xFF = 64 entries max)
+                        rle_thresholds = list(range(2, 6))  # RLE thresholds from 2 to 5
+                        dict_sizes = list(range(64, 513, 32))  # Dictionary sizes: 64, 96, 128, ..., 512 (increments of 32)
+                        
+                        results = []
+                        
+                        for rle_thresh in rle_thresholds:
+                            for dict_size in dict_sizes:
+                                # Build dictionary with this size
+                                test_dict = build_shared_compression_dictionary(temp_gid_arrays_collector, dict_size)
+                                
+                                # Compress all levels with these parameters
+                                total_compressed_size = 0
+                                for gid_array in temp_gid_arrays_collector:
+                                    compressed = compress_level(gid_array, test_dict, rle_thresh)
+                                    total_compressed_size += len(compressed)
+                                
+                                # Dictionary size (2 bytes per entry)
+                                dict_size_bytes = dict_size * 2
+                                
+                                # Total size
+                                total_size = total_compressed_size + dict_size_bytes
+                                
+                                results.append({
+                                    'rle_threshold': rle_thresh,
+                                    'dict_size': dict_size,
+                                    'compressed_size': total_compressed_size,
+                                    'dict_size_bytes': dict_size_bytes,
+                                    'total_size': total_size
+                                })
+                        
+                        # Sort by total size
+                        results.sort(key=lambda x: x['total_size'])
+                        
+                        print("\nResults (sorted by total size):")
+                        print(f"{'RLE':<6} {'Dict':<6} {'Compressed':<12} {'Dict Bytes':<12} {'Total':<12} {'Note':<20}")
+                        print("-" * 80)
+                        for r in results:
+                            note = ""
+                            if r['dict_size'] > 64:
+                                note = "Format change needed"
+                            print(f"{r['rle_threshold']:<6} {r['dict_size']:<6} {r['compressed_size']:<12} {r['dict_size_bytes']:<12} {r['total_size']:<12} {note:<20}")
+                        
+                        # Show best configuration (preferring ones that don't need format changes)
+                        # First, try to find best that fits current format (dict_size <= 64)
+                        best_no_format_change = None
+                        for r in results:
+                            if r['dict_size'] <= 64:
+                                best_no_format_change = r
+                                break
+                        
+                        if best_no_format_change:
+                            best = best_no_format_change
+                            print(f"\nBest configuration (no format change needed):")
+                        else:
+                            best = results[0]
+                            print(f"\nBest configuration (requires format change):")
+                        
+                        print(f"  RLE threshold: {best['rle_threshold']}")
+                        print(f"  Dictionary size: {best['dict_size']} entries ({best['dict_size_bytes']} bytes)")
+                        if best['dict_size'] > 64:
+                            print(f"  WARNING: Dictionary size > 64 requires format change to encoding scheme")
+                        print(f"  Total compressed tilemap size: {best['compressed_size']} bytes")
+                        print(f"  Total size (compressed + dictionary): {best['total_size']} bytes")
+                        num_levels = len(temp_gid_arrays_collector)
+                        uncompressed_size = num_levels * 256
+                        print(f"  Uncompressed size ({num_levels} levels * 256 bytes): {uncompressed_size} bytes")
+                        print(f"  Compression ratio: {best['total_size'] / uncompressed_size * 100:.1f}%")
+                        print(f"  Space saved: {uncompressed_size - best['total_size']} bytes ({((uncompressed_size - best['total_size']) / uncompressed_size * 100):.1f}%)")
+                        
+                        # Use best configuration (but limit to 64 if it requires format change and user hasn't implemented it)
+                        use_dict_size = best['dict_size']
+                        if use_dict_size > 64:
+                            print(f"\nWARNING: Best configuration uses dict_size={use_dict_size} which requires format changes.")
+                            print(f"Using dict_size=64 instead. To use larger dictionaries, update the encoding format.")
+                            use_dict_size = 64
+                        
+                        best_compression_config = {'rle_threshold': best['rle_threshold'], 'dict_size': use_dict_size}
+                        shared_compression_dict = build_shared_compression_dictionary(temp_gid_arrays_collector, use_dict_size)
+                        
+                        print(f"\n{'='*70}")
+                        print("FINAL CONFIGURATION BEING USED:")
+                        print(f"{'='*70}")
+                        print(f"  RLE threshold: {best_compression_config['rle_threshold']}")
+                        print(f"  Dictionary size: {best_compression_config['dict_size']} entries ({best_compression_config['dict_size'] * 2} bytes)")
+                        if use_dict_size != best['dict_size']:
+                            print(f"  (Clamped from ideal dict_size={best['dict_size']} to fit current format)")
+                        print(f"{'='*70}")
+                    else:
+                        # Fallback: empty dictionary
+                        shared_compression_dict = [(0, 0)] * 64
+                        best_compression_config = {'rle_threshold': 3, 'dict_size': 64}  # Use defaults
+                        print("\nNo GID arrays collected, using default dictionary")
+                    
+                    # Generate compression dictionary header
+                    compression_dict_header_filename = os.path.join(script_dir, 'compression_dict_shared.h')
+                    print(f"\nGenerating compression dictionary header: {compression_dict_header_filename}")
+                    with open(compression_dict_header_filename, 'w') as f:
+                        f.write("// Shared compression dictionary for all levels\n")
+                        f.write("// Generated from baseCelesteTileMap.json\n")
+                        f.write("// Each entry represents a 2-GID sequence\n\n")
+                        f.write("#ifndef COMPRESSION_DICT_SHARED_H\n")
+                        f.write("#define COMPRESSION_DICT_SHARED_H\n\n")
+                        dict_size = best_compression_config['dict_size']
+                        f.write(f"const unsigned char compression_dict_shared[{dict_size}][2] = {{\n")
+                        for i, (gid1, gid2) in enumerate(shared_compression_dict):
+                            f.write(f"    // Entry {i}\n")
+                            f.write(f"    {{ {gid1}, {gid2} }}")
+                            if i < len(shared_compression_dict) - 1:
+                                f.write(",")
+                            f.write("\n")
+                        f.write("};\n\n")
+                        f.write(f"#define COMPRESSION_DICT_SHARED_COUNT {dict_size}\n\n")
+                        f.write("#endif // COMPRESSION_DICT_SHARED_H\n")
+                    print(f"Generated compression dictionary with {len(shared_compression_dict)} entries")
+                    
+                    # Regenerate headers with compression enabled
+                    print("\nSecond pass: Regenerating headers with compression...")
+                    # Clear the collector for the second pass
+                    temp_gid_arrays_collector = []
+                    for mapNum in range(xMaps * yMaps):
+                        level_name = f"level{mapNum+1}"
+                        flat_submap_data = all_levels_data[mapNum][1]
+                        
+                        # Regenerate header with compression
+                        generate_nes_tilemap_header(
+                            flat_submap_data,
+                            level_name,
+                            map_width_tiles_local,
+                            map_height_tiles_local,
+                            all_sprite_data,
+                            tile_mapping,
+                            unique_chr_tiles,
+                            all_palettes,
+                            object_palettes,
+                            object_palette_mapping,
+                            use_compression=True
                         )
                     
                     # Generate shared GID mapping header after all levels are processed
