@@ -94,7 +94,7 @@ const unsigned char object_sprite_level7[] = {
     7, 3, 19, 20, 21, 22,
     11, 0, 30, 31, 0, 0,
     12, 0, 32, 33, 0, 0,
-    28, 1, 81, 82, 83, 84,
+    28, 1, 79, 80, 81, 82,
 };
 
 #define OBJECT_SPRITE_LEVEL7_COUNT 10

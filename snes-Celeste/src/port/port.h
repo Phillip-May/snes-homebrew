@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "../fixedPointSNES.h"
+#include "sprite_animation_enums.h"
 
 #define PORT_INPUT_RIGHT_MASK    0x01u
 #define PORT_INPUT_LEFT_MASK     0x02u
@@ -137,14 +138,7 @@ struct sPlayerData
 
     VEC_F spd;
 
-    enum ePlayerSprite {PLAYER_SPRITE_IDLE = 0,
-        PLAYER_SPRITE_WALK_1 = 2,
-        PLAYER_SPRITE_WALK_2 = 4,
-        PLAYER_SPRITE_WALK_3 = 6,
-        PLAYER_SPRITE_WALL = 8,
-        PLAYER_SPRITE_DOWN = 10,
-        PLAYER_SPRITE_UP = 12
-    } eSriteState;
+    enum ePlayerSprite eSriteState;
     uint8_t graceTimer;
 
     bool doubleDashUnlocked;

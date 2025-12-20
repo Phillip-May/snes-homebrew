@@ -86,7 +86,7 @@ const unsigned char object_sprite_level10[] = {
     5, 3, 11, 12, 13, 14,
     6, 3, 15, 16, 17, 18,
     7, 3, 19, 20, 21, 22,
-    23, 0, 63, 64, 65, 66,
+    23, 0, 61, 62, 63, 64,
 };
 
 #define OBJECT_SPRITE_LEVEL10_COUNT 8

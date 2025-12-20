@@ -12,6 +12,7 @@
 
 #include "../shared/src/snes_regs_xc.h"
 #include "../shared/src/initsnes.h"
+#include "port/sprite_animation_enums.h"
 #include "port/port.h"
 
 // 60fps vs 30fps physics scaling factor
@@ -48,8 +49,6 @@ void playSoundEffect(enum eSoundEffect soundEffect){
 
 
 uint8_t GLOBAL_InputState = 0;
-
-enum smokeStates {SMOKE_SPRITE_1 = 0x62,SMOKE_SPRITE_2 = 0x64,SMOKE_SPRITE_3 = 0x66};
 
 #define GLBOAL_OBJ_LIST_SIZE 30
 OBJ_DATA GLOBAL_OBJList[GLBOAL_OBJ_LIST_SIZE] = {0};
@@ -115,7 +114,6 @@ void smokeUpdate(uint8_t index) {
 
 #define COLLISION_FLAG_INDEX_FROM_TILE_XY(x,y) ((x) + (y) * 16)
 void breakableWallInit(uint8_t index) {
-    enum eBreakableWallSprite {BREAKABLE_WALL_SPRITE_1 = 0x82};
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
@@ -183,8 +181,6 @@ static void updateSimpleDecorSprite(uint8_t index) {
     GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
 }
 
-enum eFlowerSprite {FLOWER_SPRITE_1 = 0x80};
-
 void flowerInit(uint8_t index) {
     initSimpleDecorSprite(index, FLOWER_SPRITE_1, 0x32); // priority 3, palette 1
 }
@@ -192,12 +188,6 @@ void flowerInit(uint8_t index) {
 void flowerUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
-
-enum eCollapseTileSprite {
-    COLLAPSE_TILE_SPRITE_1 = 0x48,
-    COLLAPSE_TILE_SPRITE_2 = 0x4A,
-    COLLAPSE_TILE_SPRITE_3 = 0x4C,
-};
 
 enum eCollapseTileState {
     COLLAPSE_TILE_STATE_IDLE = 0,
@@ -213,6 +203,12 @@ void collapseTileInit(uint8_t index) {
     GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     |= 0x01; //Set the solid flag
     this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
     this->data.collapseTile.linkedSpringIndex = -1;
+
+    // Assign fixed OAM slot (4 sprites per 16x16 object)
+    // Player uses slots 0-3, objects start at slot 4
+    // Each object gets 4 consecutive slots based on its index
+    this->extraSpriteBase = 4 + (index * 4);
+    this->extraSpriteCount = 4;
 
     //Check if there is a spring linked to this tile
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
@@ -273,7 +269,15 @@ void collapseTileUpdate(uint8_t index) {
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
                 return;
             }
-            this->oamTile = COLLAPSE_TILE_SPRITE_1 + (uint8_t)((2 - (this->data.collapseTile.frameCount / 10)) * 2);
+            // Animation frame: 0->SPRITE_3, 10->SPRITE_2, 20->SPRITE_1
+            // On NES: values are consecutive (23, 24, 25), so add 1 per frame
+            // On SNES: values are 2 apart (0x48, 0x4A, 0x4C), so add 2 per frame
+            uint8_t frame_offset = (uint8_t)(2 - (this->data.collapseTile.frameCount / 10));
+#ifdef __NES__
+            this->oamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + frame_offset;
+#else
+            this->oamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + (frame_offset * 2);
+#endif
             break;
             
         case COLLAPSE_TILE_STATE_HIDDEN:
@@ -299,13 +303,17 @@ void collapseTileUpdate(uint8_t index) {
     }
 }
 
-enum eSpringSprite {SPRING_SPRITE_1 = 0x2E, SPRING_SPRITE_2 = 0x40};
-
 void springInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.spring.frameCount = 0;
     this->data.spring.isDisabled = false;
     this->data.spring.linkedCollapseTileIndex = -1;
+
+    // Assign fixed OAM slot (4 sprites per 16x16 object)
+    // Player uses slots 0-3, objects start at slot 4
+    // Each object gets 4 consecutive slots based on its index
+    this->extraSpriteBase = 4 + (index * 4);
+    this->extraSpriteCount = 4;
 
     this->oamTile = SPRING_SPRITE_1;
     this->oamProps = 0x32; // priority 3, palette 2
@@ -374,7 +382,6 @@ void springUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-enum eBalloonSprite {BALLOON_SPRITE_1 = 0x46, BALLOON_STRING_1 = 0x28, BALLOON_STRING_2 = 0x2A, BALLOON_STRING_3 = 0x2C};
 enum eBalloonState {BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1};
 void balloonInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -465,7 +472,6 @@ void balloonUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-enum ePlatMovSprite {PLATMOV_SPRITE_1 = 0x24, PLATMOV_SPRITE_2 = 0x26};
 void platMovInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->pos.y -= 2;
@@ -529,7 +535,6 @@ void platMovUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-enum eKeySprite {KEY_SPRITE_1 = 0x0E, KEY_SPRITE_2 = 0x20, KEY_SPRITE_3 = 0x22};
 enum eKeyState {KEY_STATE_1 = 0, KEY_STATE_2 = 1, KEY_STATE_3 = 2, KEY_STATE_4 = 3};
 
 void keyInit(uint8_t index) {
@@ -616,7 +621,6 @@ void keyUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-enum eChestSprite {CHEST_SPRITE_1 = 0x42};
 enum eChestState {CHEST_STATE_IDLE = 0, CHEST_STATE_SHAKING = 1, CHEST_STATE_OPEN = 2};
 
 void chestInit(uint8_t index) {   
@@ -673,7 +677,6 @@ void chestUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-enum eMonumentSprite {MONUMENT_SPRITE_1 = 0x84, MONUMENT_SPRITE_2 = 0x86, MONUMENT_SPRITE_3 = 0x88, MONUMENT_SPRITE_4 = 0x8A};
 void monumentInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -737,7 +740,7 @@ void monumentUpdate(uint8_t index) {
 
 enum eBigChestState {BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2};
 
-enum eBigChestSprite {BIG_CHEST_SPRITE_1 = 0x8C, BIG_CHEST_SPRITE_2 = 0x8E};
+// eBigChestSprite is defined in sprite_animation_enums.h
 void bigChestInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -787,7 +790,6 @@ void bigChestUpdate(uint8_t index) {
     }
 }
 
-enum eDoubleJumpOrbSprite {DOUBLE_JUMP_ORB_SPRITE_1 = 0xA0};
 void doubleDashOrbInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -840,8 +842,13 @@ void doubleDashOrbUpdate(uint8_t index) {
 }
 
 void strawberryInit(uint8_t index) {
-    enum eStrawberrySprite {STRAWBERRY_SPRITE_1 = 0x4E};
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
+
+    // Assign fixed OAM slot (4 sprites per 16x16 object)
+    // Player uses slots 0-3, objects start at slot 4
+    // Each object gets 4 consecutive slots based on its index
+    strawberry->extraSpriteBase = 4 + (index * 4);
+    strawberry->extraSpriteCount = 4;
 
     strawberry->data.strawberry.startY = strawberry->pos.y;
     strawberry->data.strawberry.frameCount = 0;
@@ -852,7 +859,6 @@ void strawberryInit(uint8_t index) {
 }
 
 void decoTreeInit(uint8_t index) {
-    enum eDecoTreeSprite {DECO_TREE_SPRITE_1 = 0x6E};
     initSimpleDecorSprite(index, DECO_TREE_SPRITE_1, 0x32); // priority 3, palette 2
 }
 void decoTreeUpdate(uint8_t index) {
@@ -936,9 +942,6 @@ void strawberryUpdate(uint8_t index) {
 
     this->flags |= OBJ_FLAG_DIRTY;
 }
-
-enum eFlyingBerrySprite {FLYING_BERRY_SPRITE_1 = 0x60, WING_SPRITE_1 = 0x68,
-                         WING_SPRITE_2 = 0x6A, WING_SPRITE_3 = 0x6C};
 
 void flyingBerryInit(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
@@ -1848,7 +1851,7 @@ void playerUpdate(struct sPlayerData* this) {
     }
 
     // next level
-    if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID<31) { 
+    if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
         LoadNextRoom();
         playerInit(this);
      }

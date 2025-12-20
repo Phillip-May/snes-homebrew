@@ -1,10 +1,14 @@
+// Define __NES__ before including headers to get NES-specific enum values
+#define __NES__
+
 #include "port.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-
+// sprite_animation_enums.h is already included by port.h, but we define __NES__ before port.h
+// so it's fine to include it here as well if needed, or we can rely on port.h
 #include "../../python/gid_to_tile_shared.h"
 #include "../../python/compression_dict_shared.h"
 #include "../../python/object_sprite_dict_shared.h"
@@ -419,105 +423,14 @@ void port_init(void) {
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj) {
     (void)playerObj;
-    // Player uses slots 0-3 (4 sprites), so start other objects at slot 4
-    s_oamIndex = 4;
+    // Player uses slots 0-3 (4 sprites)
+    // Objects use fixed slots based on their index: object at index i uses slots (i * 4) + 4
+    // No need to track s_oamIndex anymore - each object calculates its own fixed slot
     oam_set(0);
 }
 
 void port_finishSpriteBuild(void) {
 
-}
-
-// Map PLAYER_SPRITE_ enum values to sprite sheet tile indices
-// PLAYER_SPRITE_ macros: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
-// Sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
-static uint8_t map_player_sprite_to_tile_index(uint8_t player_sprite_state) {
-    // Map PLAYER_SPRITE_ enum to sprite sheet tile index (1-7)
-    switch (player_sprite_state) {
-        case 0:  // PLAYER_SPRITE_IDLE
-            return 1;
-        case 2:  // PLAYER_SPRITE_WALK_1
-            return 2;
-        case 4:  // PLAYER_SPRITE_WALK_2
-            return 3;
-        case 6:  // PLAYER_SPRITE_WALK_3
-            return 4;
-        case 8:  // PLAYER_SPRITE_WALL
-            return 5;
-        case 10: // PLAYER_SPRITE_DOWN
-            return 6;
-        case 12: // PLAYER_SPRITE_UP
-            return 7;
-        default:
-            return 1; // Default to IDLE
-    }
-}
-
-// Look up player sprite data from object_sprite array
-// Player frames: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
-// Maps to sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
-static const unsigned char* find_player_sprite_data(uint8_t frame_index) {
-    // Map PLAYER_SPRITE_ enum value to sprite sheet tile index
-    uint8_t tile_index = map_player_sprite_to_tile_index(frame_index);
-    
-    // Search through object_sprite array for the mapped tile index based on current level
-    // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
-    // Get level data (room ID is 1-indexed, array is 0-indexed)
-    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
-    if (level_idx >= LEVEL_DATA_COUNT) {
-        level_idx = 0; // Default to level 1 if out of range
-    }
-    // Use shared object sprite dictionary (same for all levels)
-    for (uint8_t i = 0; i < OBJECT_SPRITE_DICT_SHARED_COUNT; i++) {
-        const unsigned char *sprite_entry = (const unsigned char *)&object_sprite_dict_shared[i];
-        if (sprite_entry[0] == tile_index) {  // Match the mapped tile index
-            return sprite_entry;
-        }
-    }
-    return NULL;  // Player sprite data not found
-}
-
-// Map SPRING_SPRITE_ OAM tile values to sprite sheet tile indices
-// SPRING_SPRITE_1 = 0x2E (46), SPRING_SPRITE_2 = 0x40 (64)
-// Maps to sprite sheet tile indices: 23, 24 (or similar, adjust based on actual data)
-static uint8_t map_spring_sprite_to_tile_index(uint8_t spring_sprite_state) {
-    switch (spring_sprite_state) {
-        case 0x2E:  // SPRING_SPRITE_1
-            return 23;  // Adjust based on actual sprite sheet tile index
-        case 0x40:  // SPRING_SPRITE_2
-            return 24;  // Adjust based on actual sprite sheet tile index
-        default:
-            return 23; // Default to SPRING_SPRITE_1
-    }
-}
-
-// Map COLLAPSE_TILE_SPRITE_ OAM tile values to sprite sheet tile indices
-// COLLAPSE_TILE_SPRITE_1 = 0x48 (72), SPRITE_2 = 0x4A (74), SPRITE_3 = 0x4C (76)
-// Maps to sprite sheet tile indices: 30, 31, 32 (or similar, adjust based on actual data)
-static uint8_t map_collapse_tile_sprite_to_tile_index(uint8_t collapse_tile_sprite_state) {
-    switch (collapse_tile_sprite_state) {
-        case 0x48:  // COLLAPSE_TILE_SPRITE_1
-            return 30;  // Adjust based on actual sprite sheet tile index
-        case 0x4A:  // COLLAPSE_TILE_SPRITE_2
-            return 31;  // Adjust based on actual sprite sheet tile index
-        case 0x4C:  // COLLAPSE_TILE_SPRITE_3
-            return 32;  // Adjust based on actual sprite sheet tile index
-        default:
-            return 30; // Default to COLLAPSE_TILE_SPRITE_1
-    }
-}
-
-// Look up sprite data from object_sprite array by tile index
-static const unsigned char* find_sprite_data_by_tile_index(uint8_t tile_index) {
-    // Use shared object sprite dictionary (same for all levels)
-    // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
-    for (uint8_t i = 0; i < OBJECT_SPRITE_DICT_SHARED_COUNT; i++) {
-        const unsigned char *sprite_entry = (const unsigned char *)&object_sprite_dict_shared[i];
-        if (sprite_entry[0] == tile_index) {
-            return sprite_entry;
-        }
-    }
-    return NULL;  // Sprite data not found
 }
 
 void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
@@ -527,22 +440,22 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     
     const struct sOBJ_DATA *playerData = &playerObj->objData;
     uint8_t baseX = (uint8_t)playerData->pos.x;
-    uint8_t baseY = (uint8_t)playerData->pos.y - s_scrollY; // Offset by scroll position
+    uint8_t spriteY = (uint8_t)playerData->pos.y;
+    // Only apply scroll offset if sprite is on-screen (Y < 240)
+    // Offscreen sprites shouldn't be affected by scroll
+    uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
     
     // Get player frame index from oamTile (player sprite state)
-    // Player sprite states: IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12
-    uint8_t frame_index = playerData->oamTile;
+    // On NES, oamTile directly contains the tile index, use direct array access
+    uint8_t tile_index = playerData->oamTile;
+    const unsigned char *player_sprite = &object_sprite_dict_shared[tile_index][0];
     
-    // Look up player sprite data from object sprite array for this frame
-    const unsigned char *player_sprite = find_player_sprite_data(frame_index);
-    
-    if (player_sprite != NULL) {
-        // player_sprite format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
-        uint8_t palette_idx = player_sprite[1];  // palette_index (should be 3 for player)
-        uint8_t tl_tile = player_sprite[2];     // Top-left tile
-        uint8_t tr_tile = player_sprite[3];     // Top-right tile
-        uint8_t bl_tile = player_sprite[4];     // Bottom-left tile
-        uint8_t br_tile = player_sprite[5];     // Bottom-right tile
+    // NES format: [pal_idx, tl, tr, bl, br]
+    uint8_t palette_idx = player_sprite[0];  // palette_index (should be 3 for player)
+    uint8_t tl_tile = player_sprite[1];     // Top-left tile
+    uint8_t tr_tile = player_sprite[2];     // Top-right tile
+    uint8_t bl_tile = player_sprite[3];     // Bottom-left tile
+    uint8_t br_tile = player_sprite[4];     // Bottom-right tile
         
         // Check if sprite should be flipped horizontally (for left/right facing)
         // isFliped is stored in oamProps bit 6 (0x40)
@@ -551,6 +464,7 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
         // Set palette in properties (bits 0-1 of byte 2 in OAM entry)
         // Player uses sprite palette 3 (bits 0-1 = 3)
         // NES OAM format: bits 0-1 = palette (0-3), bit 5 = priority, bit 6 = flip horizontal
+        // IMPORTANT: Use palette from player_sprite[0], so palette stays correct when tiles are swapped
         uint8_t baseProps = (palette_idx & 0x03);
         // Clear bit 5 (0x20) to make sprite appear in front of background
         baseProps &= ~0x20;
@@ -610,36 +524,6 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
             OAM_BUF[14] = baseProps;
             OAM_BUF[15] = baseX + 8;
         }
-    } else {
-        // Fallback to old method if player sprite data not found
-        uint8_t baseTile = playerData->oamTile;
-        uint8_t baseProps = playerData->oamProps;
-        baseProps &= ~0x20;
-        
-        // Sprite 0: Top-left
-        OAM_BUF[0] = baseY;
-        OAM_BUF[1] = baseTile;
-        OAM_BUF[2] = baseProps;
-        OAM_BUF[3] = baseX;
-        
-        // Sprite 1: Top-right
-        OAM_BUF[4] = baseY;
-        OAM_BUF[5] = baseTile + 1;
-        OAM_BUF[6] = baseProps;
-        OAM_BUF[7] = baseX + 8;
-        
-        // Sprite 2: Bottom-left
-        OAM_BUF[8] = baseY + 8;
-        OAM_BUF[9] = baseTile + 16;
-        OAM_BUF[10] = baseProps;
-        OAM_BUF[11] = baseX;
-        
-        // Sprite 3: Bottom-right
-        OAM_BUF[12] = baseY + 8;
-        OAM_BUF[13] = baseTile + 17;
-        OAM_BUF[14] = baseProps;
-        OAM_BUF[15] = baseX + 8;
-    }
 }
 
 void port_buildUnused(uint8_t index) {
@@ -667,7 +551,7 @@ void port_buildKey(uint8_t index) {
 }
 
 // Helper function to render a 16x16 sprite from sprite data
-// sprite_data format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
+// sprite_data format: NES: [pal_idx, tl, tr, bl, br], SNES: [tile_idx, pal_idx, tl, tr, bl, br]
 // baseX, baseY: position of the sprite
 // oamProps: properties (palette, priority, flip bits)
 // oamOffset: offset into OAM_BUF (in bytes, 4 bytes per sprite)
@@ -676,14 +560,16 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
         return;
     }
     
-    uint8_t palette_idx = sprite_data[1];  // palette_index
-    uint8_t tl_tile = sprite_data[2];     // Top-left tile
-    uint8_t tr_tile = sprite_data[3];     // Top-right tile
-    uint8_t bl_tile = sprite_data[4];     // Bottom-left tile
-    uint8_t br_tile = sprite_data[5];     // Bottom-right tile
+    // NES format: [pal_idx, tl, tr, bl, br] (5 bytes, no tile_idx field)
+    uint8_t palette_idx = sprite_data[0];  // palette_index
+    uint8_t tl_tile = sprite_data[1];     // Top-left tile
+    uint8_t tr_tile = sprite_data[2];     // Top-right tile
+    uint8_t bl_tile = sprite_data[3];     // Bottom-left tile
+    uint8_t br_tile = sprite_data[4];     // Bottom-right tile
     
     // Set palette in properties (bits 0-1 of byte 2 in OAM entry)
     // NES OAM format: bits 0-1 = palette (0-3), bit 5 = priority, bit 6 = flip horizontal
+    // IMPORTANT: Use palette from sprite_data[0], NOT from oamProps, so palette stays correct when tiles are swapped
     uint8_t baseProps = (palette_idx & 0x03);
     // Clear bit 5 (0x20) to make sprite appear in front of background
     baseProps &= ~0x20;
@@ -750,113 +636,108 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
 void port_buildSpring(uint8_t index) {    
     OBJ_DATA *spring = &GLOBAL_OBJList[index];
     
-    uint8_t baseX = (uint8_t)spring->pos.x;
-    uint8_t baseY = (uint8_t)spring->pos.y - s_scrollY; // Offset by scroll position
-    uint8_t frame_index = spring->oamTile;  // SPRING_SPRITE_1 or SPRING_SPRITE_2
+    // Calculate fixed OAM offset based on object index
+    // Player uses slots 0-3, so object at index i uses slots (i * 4) + 4
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;  // Each sprite is 4 bytes
     
-    // Map OAM tile index to sprite sheet tile index
-    uint8_t tile_index = map_spring_sprite_to_tile_index(frame_index);
-    
-    // Look up sprite data from object_sprite array
-    const unsigned char *sprite_data = find_sprite_data_by_tile_index(tile_index);
-    
-    // Calculate OAM offset (4 sprites * 4 bytes = 16 bytes per 16x16 sprite)
-    // Player uses slots 0-3 (16 bytes), so start at s_oamIndex
-    uint16_t oamOffset = s_oamIndex * 4;  // Each sprite is 4 bytes
-    
-    if (sprite_data != NULL) {
-        // Render the 16x16 sprite
-        render_16x16_sprite(sprite_data, baseX, baseY, spring->oamProps, oamOffset);
-    } else {
-        // Fallback to old method if sprite data not found
-        uint8_t baseTile = spring->oamTile;
-        uint8_t baseProps = spring->oamProps;
-        baseProps &= ~0x20;  // Clear priority bit to appear in front
-        
-        // Sprite 0: Top-left
-        OAM_BUF[oamOffset + 0] = baseY;
-        OAM_BUF[oamOffset + 1] = baseTile;
-        OAM_BUF[oamOffset + 2] = baseProps;
-        OAM_BUF[oamOffset + 3] = baseX;
-        
-        // Sprite 1: Top-right
-        OAM_BUF[oamOffset + 4] = baseY;
-        OAM_BUF[oamOffset + 5] = baseTile + 1;
-        OAM_BUF[oamOffset + 6] = baseProps;
-        OAM_BUF[oamOffset + 7] = baseX + 8;
-        
-        // Sprite 2: Bottom-left
-        OAM_BUF[oamOffset + 8] = baseY + 8;
-        OAM_BUF[oamOffset + 9] = baseTile + 16;
-        OAM_BUF[oamOffset + 10] = baseProps;
-        OAM_BUF[oamOffset + 11] = baseX;
-        
-        // Sprite 3: Bottom-right
-        OAM_BUF[oamOffset + 12] = baseY + 8;
-        OAM_BUF[oamOffset + 13] = baseTile + 17;
-        OAM_BUF[oamOffset + 14] = baseProps;
-        OAM_BUF[oamOffset + 15] = baseX + 8;
+    // Check if object is unused - hide sprites if so
+    if (spring->eType == OBJ_UNUSED) {
+        // Hide all 4 sprites by setting Y to 240 (off-screen)
+        OAM_BUF[oamOffset + 0] = 240;  // Sprite 0 Y
+        OAM_BUF[oamOffset + 4] = 240;  // Sprite 1 Y
+        OAM_BUF[oamOffset + 8] = 240;  // Sprite 2 Y
+        OAM_BUF[oamOffset + 12] = 240; // Sprite 3 Y
+        return;
     }
     
-    // Increment OAM index by 4 sprites (16x16 sprite = 4 8x8 sprites)
-    s_oamIndex += 4;
+    uint8_t baseX = (uint8_t)spring->pos.x;
+    uint8_t spriteY = (uint8_t)spring->pos.y;
+    // Only apply scroll offset if sprite is on-screen (Y < 240)
+    // Offscreen sprites shouldn't be affected by scroll
+    uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
+    // On NES, oamTile directly contains the tile index, use direct array access
+    uint8_t tile_index = spring->oamTile;
+    const unsigned char *sprite_data = &object_sprite_dict_shared[tile_index][0];
+    // Render the 16x16 sprite
+    render_16x16_sprite(sprite_data, baseX, baseY, spring->oamProps, oamOffset);
 }
 
 void port_buildCollapseTile(uint8_t index) {    
     OBJ_DATA *collapseTile = &GLOBAL_OBJList[index];
-    uint8_t baseX = (uint8_t)collapseTile->pos.x;
-    uint8_t baseY = (uint8_t)collapseTile->pos.y - s_scrollY; // Offset by scroll position
-    uint8_t frame_index = collapseTile->oamTile;  // COLLAPSE_TILE_SPRITE_1, _2, or _3
     
-    // Map OAM tile index to sprite sheet tile index
-    uint8_t tile_index = map_collapse_tile_sprite_to_tile_index(frame_index);
+    // Calculate fixed OAM offset based on object index
+    // Player uses slots 0-3, so object at index i uses slots (i * 4) + 4
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;  // Each sprite is 4 bytes
     
-    // Look up sprite data from object_sprite array
-    const unsigned char *sprite_data = find_sprite_data_by_tile_index(tile_index);
-    
-    // Calculate OAM offset (4 sprites * 4 bytes = 16 bytes per 16x16 sprite)
-    // Player uses slots 0-3 (16 bytes), so start at s_oamIndex
-    uint16_t oamOffset = s_oamIndex * 4;  // Each sprite is 4 bytes
-    
-    if (sprite_data != NULL) {
-        // Render the 16x16 sprite
-        render_16x16_sprite(sprite_data, baseX, baseY, collapseTile->oamProps, oamOffset);
-    } else {
-        // Fallback to old method if sprite data not found
-        uint8_t baseTile = collapseTile->oamTile;
-        uint8_t baseProps = collapseTile->oamProps;
-        baseProps &= ~0x20;  // Clear priority bit to appear in front
-        
-        // Sprite 0: Top-left
-        OAM_BUF[oamOffset + 0] = baseY;
-        OAM_BUF[oamOffset + 1] = baseTile;
-        OAM_BUF[oamOffset + 2] = baseProps;
-        OAM_BUF[oamOffset + 3] = baseX;
-        
-        // Sprite 1: Top-right
-        OAM_BUF[oamOffset + 4] = baseY;
-        OAM_BUF[oamOffset + 5] = baseTile + 1;
-        OAM_BUF[oamOffset + 6] = baseProps;
-        OAM_BUF[oamOffset + 7] = baseX + 8;
-        
-        // Sprite 2: Bottom-left
-        OAM_BUF[oamOffset + 8] = baseY + 8;
-        OAM_BUF[oamOffset + 9] = baseTile + 16;
-        OAM_BUF[oamOffset + 10] = baseProps;
-        OAM_BUF[oamOffset + 11] = baseX;
-        
-        // Sprite 3: Bottom-right
-        OAM_BUF[oamOffset + 12] = baseY + 8;
-        OAM_BUF[oamOffset + 13] = baseTile + 17;
-        OAM_BUF[oamOffset + 14] = baseProps;
-        OAM_BUF[oamOffset + 15] = baseX + 8;
+    // Check if object is unused - hide sprites if so
+    if (collapseTile->eType == OBJ_UNUSED) {
+        // Hide all 4 sprites by setting Y to 240 (off-screen)
+        OAM_BUF[oamOffset + 0] = 240;  // Sprite 0 Y
+        OAM_BUF[oamOffset + 4] = 240;  // Sprite 1 Y
+        OAM_BUF[oamOffset + 8] = 240;  // Sprite 2 Y
+        OAM_BUF[oamOffset + 12] = 240; // Sprite 3 Y
+        return;
     }
     
-    // Increment OAM index by 4 sprites (16x16 sprite = 4 8x8 sprites)
-    s_oamIndex += 4;
+    // Don't render if the tile is hidden (COLLAPSE_TILE_STATE_HIDDEN = 2)
+    if (collapseTile->data.collapseTile.state == 2) {
+        // Hide all 4 sprites by setting Y to 240 (off-screen)
+        OAM_BUF[oamOffset + 0] = 240;  // Sprite 0 Y
+        OAM_BUF[oamOffset + 4] = 240;  // Sprite 1 Y
+        OAM_BUF[oamOffset + 8] = 240;  // Sprite 2 Y
+        OAM_BUF[oamOffset + 12] = 240; // Sprite 3 Y
+        return;
+    }
+    
+    uint8_t baseX = (uint8_t)collapseTile->pos.x;
+    uint8_t spriteY = (uint8_t)collapseTile->pos.y;
+    // Only apply scroll offset if sprite is on-screen (Y < 240)
+    // Offscreen sprites shouldn't be affected by scroll
+    uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
+    // On NES, oamTile directly contains the tile index, use direct array access
+    uint8_t tile_index = collapseTile->oamTile;
+    const unsigned char *sprite_data = &object_sprite_dict_shared[tile_index][0];
+    // Render the 16x16 sprite
+    render_16x16_sprite(sprite_data, baseX, baseY, collapseTile->oamProps, oamOffset);
 }
 
 void port_buildStrawberry(uint8_t index) {
+    OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
+    
+    // Calculate fixed OAM offset based on object index
+    // Player uses slots 0-3, so object at index i uses slots (i * 4) + 4
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;  // Each sprite is 4 bytes
+    
+    // Check if object is unused - hide sprites if so
+    if (strawberry->eType == OBJ_UNUSED) {
+        // Hide all 4 sprites by setting Y to 240 (off-screen)
+        OAM_BUF[oamOffset + 0] = 240;  // Sprite 0 Y
+        OAM_BUF[oamOffset + 4] = 240;  // Sprite 1 Y
+        OAM_BUF[oamOffset + 8] = 240;  // Sprite 2 Y
+        OAM_BUF[oamOffset + 12] = 240; // Sprite 3 Y
+        return;
+    }
+    
+    // Don't render if the strawberry is collected and should be hidden
+    if (strawberry->data.strawberry.isCollected && strawberry->data.strawberry.frameCount > (30 * 2)) {
+        // Hide all 4 sprites by setting Y to 240 (off-screen)
+        OAM_BUF[oamOffset + 0] = 240;  // Sprite 0 Y
+        OAM_BUF[oamOffset + 4] = 240;  // Sprite 1 Y
+        OAM_BUF[oamOffset + 8] = 240;  // Sprite 2 Y
+        OAM_BUF[oamOffset + 12] = 240; // Sprite 3 Y
+        return;
+    }
+    
+    uint8_t baseX = (uint8_t)strawberry->pos.x;
+    uint8_t spriteY = (uint8_t)strawberry->pos.y;
+    // Only apply scroll offset if sprite is on-screen (Y < 240)
+    // Offscreen sprites shouldn't be affected by scroll
+    uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
+    // On NES, oamTile directly contains the tile index, use direct array access
+    uint8_t tile_index = strawberry->oamTile;
+    const unsigned char *sprite_data = &object_sprite_dict_shared[tile_index][0];
+    // Render the 16x16 sprite
+    render_16x16_sprite(sprite_data, baseX, baseY, strawberry->oamProps, oamOffset);
 }
 
 void port_buildPlatMov(uint8_t index) {

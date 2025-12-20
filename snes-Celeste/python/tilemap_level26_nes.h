@@ -85,7 +85,7 @@ const unsigned char object_sprite_level26[] = {
     6, 3, 15, 16, 17, 18,
     7, 3, 19, 20, 21, 22,
     8, 0, 23, 24, 25, 26,
-    20, 0, 52, 53, 54, 55,
+    20, 0, 50, 51, 52, 53,
 };
 
 #define OBJECT_SPRITE_LEVEL26_COUNT 9

@@ -19,6 +19,10 @@ shared_gid_mapping_global = {
 # Global list to collect GID arrays for compression dictionary building
 temp_gid_arrays_collector = []
 
+# Shared object sprite dictionary (built from all levels)
+# Maps tile_index -> (tile_index, palette_idx, tl, tr, bl, br)
+shared_object_sprite_dict = {}
+
 """
 NES Sprite Sheet Converter
 
@@ -43,6 +47,14 @@ icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
 all_background_gids = far_background_gids + solid_gids + pointy_gids + icy_gids + deco_objects_gids
 
 arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31, 45, 46, 47, 64, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+
+# Sprite groups that should share the same palette
+# Each sublist contains sprite indices that must use the same palette
+sprite_palette_groups = [
+    [18, 19],  # Sprite 18 and 19 share palette
+    # Add more groups here as needed, e.g.:
+    # [20, 21, 22],  # Multiple sprites sharing one palette
+]
 
 def get_collision_for_tile_index(tile_index):
     """Get collision flag for a given original tile_index."""
@@ -991,6 +1003,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                     
                     object_sprite_mapping[obj_tile_idx] = len(object_sprite_data)
                     object_sprite_data.append((obj_tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx))
+                    
+                    # Collect into shared object sprite dictionary (for shared dictionary generation)
+                    # Only add if not already present (first occurrence wins, or we could merge/validate)
+                    if obj_tile_idx not in shared_object_sprite_dict:
+                        shared_object_sprite_dict[obj_tile_idx] = (obj_tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx)
             
             object_sprite_data_count = len(object_sprite_data)
             
@@ -1286,6 +1303,39 @@ def find_best_object_palette_for_tile(tile_image, object_palettes):
                 if dist < min_dist:
                     min_dist = dist
             total_distance += min_dist
+
+        if total_distance < min_total_distance:
+            min_total_distance = total_distance
+            best_palette_idx = pal_idx
+
+    return best_palette_idx, object_palettes[best_palette_idx]
+
+
+def find_best_object_palette_for_sprite_group(tile_images, object_palettes):
+    """
+    Find the best object palette for a group of sprites by minimizing total color distance across all sprites.
+    This ensures all sprites in the group use the same palette.
+    Returns (palette_index, remapped_palette) where remapped_palette is the best palette for the group.
+    """
+    best_palette_idx = 0
+    min_total_distance = float('inf')
+
+    for pal_idx, palette in enumerate(object_palettes):
+        total_distance = 0
+        
+        # Sum distances across all tiles in the group
+        for tile_image in tile_images:
+            tile_rgb = tile_image.convert('RGB')
+            pixels = list(tile_rgb.getdata())
+            
+            for r, g, b in pixels:
+                # Find closest color in palette
+                min_dist = float('inf')
+                for pr, pg, pb in palette:
+                    dist = (r - pr)**2 + (g - pg)**2 + (b - pb)**2
+                    if dist < min_dist:
+                        min_dist = dist
+                total_distance += min_dist
 
         if total_distance < min_total_distance:
             min_total_distance = total_distance
@@ -1677,6 +1727,36 @@ def main():
     # (corresponding to PLAYER_SPRITE_IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12)
     player_sprite_tile_indices = [1, 2, 3, 4, 5, 6, 7]
 
+    # First pass: Determine shared palettes for sprite groups
+    sprite_group_palette_map = {}  # Maps tile_index -> (palette_index, palette) for groups
+    
+    print("\nDetermining shared palettes for sprite groups...")
+    for group in sprite_palette_groups:
+        if not group:
+            continue
+        
+        # Collect tile images for all sprites in this group
+        group_tile_images = []
+        valid_indices = []
+        for tile_idx in group:
+            if tile_idx < tiles_per_row * num_rows:
+                y = tile_idx // tiles_per_row
+                x = tile_idx % tiles_per_row
+                box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
+                tile_8x8 = img.crop(box)
+                group_tile_images.append(tile_8x8)
+                valid_indices.append(tile_idx)
+        
+        if group_tile_images and all(idx in arrMustBeObject for idx in valid_indices):
+            # Find best palette for the entire group
+            best_palette_idx, palette = find_best_object_palette_for_sprite_group(group_tile_images, object_palettes)
+            
+            # Assign this palette to all sprites in the group
+            for tile_idx in valid_indices:
+                sprite_group_palette_map[tile_idx] = (best_palette_idx, palette)
+            print(f"  Sprite group {group}: assigned object palette {best_palette_idx}")
+    
+    # Second pass: Process all tiles
     for y in range(num_rows):
         for x in range(tiles_per_row):
             box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
@@ -1688,8 +1768,12 @@ def main():
             if tile_index in all_background_gids:
                 # Find best palette from background_palettes
                 best_palette_idx, palette = find_best_palette_for_tile(tile_8x8, background_palettes)
+            elif tile_index in sprite_group_palette_map:
+                # Use shared palette from sprite group
+                best_palette_idx, palette = sprite_group_palette_map[tile_index]
+                object_palette_mapping[tile_index] = best_palette_idx
             elif tile_index in arrMustBeObject:
-                # Use optimized object palettes
+                # Use optimized object palettes (individual assignment)
                 best_palette_idx, palette = find_best_object_palette_for_tile(tile_8x8, object_palettes)
                 object_palette_mapping[tile_index] = best_palette_idx
             elif tile_index in player_sprite_tile_indices:
@@ -2184,6 +2268,75 @@ def main():
                             f.write("#define GID_TO_TILE_SHARED_COUNT 1\n\n")
                         f.write("#endif // GID_TO_TILE_SHARED_H\n")
                     print(f"Generated shared GID mapping with {len(shared_gid_mapping_global['gid_map_data']) if len(shared_gid_mapping_global['gid_map_data']) > 0 else 1} unique GIDs")
+                    
+                    # Code-referenced objects: objects used dynamically in code but might not appear in level object data
+                    # Format: (tile_index, palette_source, base_tile_or_none, palette_fallback)
+                    # palette_source: 'inherit_from' = use palette from base_tile, 'mapping' = use object_palette_mapping, 'fixed' = use palette_fallback value
+                    code_referenced_objects = [
+                        # Spring sprite 2 - uses same palette as spring sprite 1 (tile 18)
+                        (19, 'inherit_from', 18, 2),  # SPRING_SPRITE_2, inherit from tile 18, fallback palette 2
+                        # Collapse tile sprites - sprite 1 uses mapping, sprites 2 and 3 inherit from sprite 1
+                        (23, 'mapping', None, 0),  # COLLAPSE_TILE_SPRITE_1
+                        (24, 'inherit_from', 23, 0),  # COLLAPSE_TILE_SPRITE_2, inherit from tile 23, fallback palette 0
+                        (25, 'inherit_from', 23, 0),  # COLLAPSE_TILE_SPRITE_3, inherit from tile 23, fallback palette 0
+                    ]
+                    
+                    # Add code-referenced objects if they're missing
+                    for tile_idx, palette_source, base_tile_or_none, palette_fallback in code_referenced_objects:
+                        if tile_idx not in shared_object_sprite_dict and tile_idx < len(all_sprite_data):
+                            # Get optimized tile indices for this sprite
+                            tl_opt_idx = tile_mapping.get(tile_idx * 4 + 0, 0)
+                            tr_opt_idx = tile_mapping.get(tile_idx * 4 + 1, 0)
+                            bl_opt_idx = tile_mapping.get(tile_idx * 4 + 2, 0)
+                            br_opt_idx = tile_mapping.get(tile_idx * 4 + 3, 0)
+                            
+                            # Determine palette index based on palette_source
+                            if palette_source == 'inherit_from':
+                                # Inherit palette from base tile (e.g., spring sprite 2 from spring sprite 1)
+                                if base_tile_or_none in shared_object_sprite_dict:
+                                    _, palette_idx, _, _, _, _ = shared_object_sprite_dict[base_tile_or_none]
+                                else:
+                                    palette_idx = palette_fallback
+                            elif palette_source == 'mapping':
+                                # Try to get from object_palette_mapping if available
+                                if object_palette_mapping and tile_idx in object_palette_mapping:
+                                    palette_idx = object_palette_mapping[tile_idx]
+                                    if object_palettes and palette_idx >= len(object_palettes):
+                                        palette_idx = palette_fallback
+                                else:
+                                    palette_idx = palette_fallback
+                            elif palette_source == 'fixed':
+                                # Use fixed palette value
+                                palette_idx = palette_fallback
+                            else:
+                                palette_idx = palette_fallback
+                            
+                            shared_object_sprite_dict[tile_idx] = (tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx)
+                            print(f"  Added code-referenced object sprite: tile {tile_idx}, palette {palette_idx} (source: {palette_source}), tiles [{tl_opt_idx}, {tr_opt_idx}, {bl_opt_idx}, {br_opt_idx}]")
+                    
+                    # Generate shared object sprite dictionary header
+                    object_sprite_dict_header_filename = os.path.join(script_dir, 'object_sprite_dict_shared.h')
+                    print(f"\nGenerating shared object sprite dictionary header: {object_sprite_dict_header_filename}")
+                    # Sort by tile_index for consistent output
+                    sorted_entries = sorted(shared_object_sprite_dict.items())
+                    with open(object_sprite_dict_header_filename, 'w') as f:
+                        f.write("// Shared object sprite dictionary for all levels\n")
+                        f.write("// Generated from baseCelesteTileMap.json\n")
+                        f.write("// Each entry: tile_idx, pal_idx, tl, tr, bl, br\n\n")
+                        f.write("#ifndef OBJECT_SPRITE_DICT_SHARED_H\n")
+                        f.write("#define OBJECT_SPRITE_DICT_SHARED_H\n\n")
+                        
+                        f.write(f"const unsigned char object_sprite_dict_shared[{len(sorted_entries)}][6] = {{\n")
+                        for i, (tile_idx, (t_idx, pal_idx, tl, tr, bl, br)) in enumerate(sorted_entries):
+                            f.write(f"    // Entry {i}\n")
+                            f.write(f"    {{ {t_idx}, {pal_idx}, {tl}, {tr}, {bl}, {br} }}")
+                            if i < len(sorted_entries) - 1:
+                                f.write(",")
+                            f.write("\n")
+                        f.write("};\n\n")
+                        f.write(f"#define OBJECT_SPRITE_DICT_SHARED_COUNT {len(sorted_entries)}\n\n")
+                        f.write("#endif // OBJECT_SPRITE_DICT_SHARED_H\n")
+                    print(f"Generated shared object sprite dictionary with {len(sorted_entries)} entries")
         except Exception as e:
             print(f"Error processing map JSON: {e}")
             import traceback
