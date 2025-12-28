@@ -650,6 +650,16 @@ void port_buildSpring(uint8_t index) {
         return;
     }
     
+    // Check if spring is disabled (e.g., block underneath is broken)
+    if (spring->data.spring.isDisabled) {
+        // Hide all 4 sprites by setting Y to 240 (off-screen)
+        OAM_BUF[oamOffset + 0] = 240;  // Sprite 0 Y
+        OAM_BUF[oamOffset + 4] = 240;  // Sprite 1 Y
+        OAM_BUF[oamOffset + 8] = 240;  // Sprite 2 Y
+        OAM_BUF[oamOffset + 12] = 240; // Sprite 3 Y
+        return;
+    }
+    
     uint8_t baseX = (uint8_t)spring->pos.x;
     uint8_t spriteY = (uint8_t)spring->pos.y;
     // Only apply scroll offset if sprite is on-screen (Y < 240)

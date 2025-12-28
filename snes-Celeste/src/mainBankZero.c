@@ -329,6 +329,31 @@ void springUpdate(uint8_t index) {
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
     bool isPlayerTouching = false;
 
+    // Check if the block underneath the spring is broken
+    // Spring is at (thisX, thisY) in pixels, block underneath is one tile row below
+    uint8_t tileX = thisX / 16;
+    uint8_t tileY = (thisY + 1) / 16;
+    uint8_t tileBelowY = tileY + 1;
+    
+    // Check if there's a solid block underneath the spring
+    // Spring is 16px wide (1 tile), check the tile directly below it
+    // Also check tileX+1 in case the spring is positioned at a boundary
+    bool hasSolidBelow = false;
+    if (tileBelowY < 16) {  // Make sure we're within bounds
+        uint8_t collisionBelow = GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileBelowY)];
+        hasSolidBelow = ((collisionBelow & 0x01) != 0);
+        // Also check the tile to the right in case the block is 2 tiles wide
+        if (!hasSolidBelow && tileX + 1 < 16) {
+            uint8_t collisionBelowRight = GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX + 1, tileBelowY)];
+            hasSolidBelow = ((collisionBelowRight & 0x01) != 0);
+        }
+    }
+    
+    // If there's no solid block underneath, disable the spring
+    if (!hasSolidBelow && !this->data.spring.isDisabled) {
+        this->data.spring.isDisabled = true;
+    }
+
     if (this->data.spring.isDisabled) {
         this->data.spring.frameCount = 0;
         this->oamTile = SPRING_SPRITE_1;
