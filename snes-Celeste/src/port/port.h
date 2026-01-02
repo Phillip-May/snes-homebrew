@@ -5,7 +5,13 @@
 #include <stdbool.h>
 
 #include "../fixedPointSNES.h"
-#include "sprite_animation_enums.h"
+
+// Include platform-specific sprite animation enums
+#ifdef __NES__
+    #include "sprite_animation_enums_nes.h"
+#else
+    #include "sprite_animation_enums_snes.h"
+#endif
 
 #define PORT_INPUT_RIGHT_MASK    0x01u
 #define PORT_INPUT_LEFT_MASK     0x02u

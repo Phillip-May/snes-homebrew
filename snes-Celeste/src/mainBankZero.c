@@ -12,7 +12,6 @@
 
 #include "../shared/src/snes_regs_xc.h"
 #include "../shared/src/initsnes.h"
-#include "port/sprite_animation_enums.h"
 #include "port/port.h"
 
 // 60fps vs 30fps physics scaling factor
@@ -242,7 +241,8 @@ void collapseTileUpdate(uint8_t index) {
                             thisY <= playerY + 20 && thisY + 20 >= playerY);
 
     this->oamProps = 0x32; //Ensure consistent properties
-    this->flags |= OBJ_FLAG_DIRTY;
+    uint8_t oldOamTile = this->oamTile;
+    uint8_t oldState = this->data.collapseTile.state;
 
     // State machine for collapse tile
     switch (this->data.collapseTile.state) {
@@ -267,6 +267,8 @@ void collapseTileUpdate(uint8_t index) {
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_HIDDEN;
                 this->data.collapseTile.frameCount = 120;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
+                // State changed to HIDDEN, mark dirty
+                this->flags |= OBJ_FLAG_DIRTY;
                 return;
             }
             // Animation frame: 0->SPRITE_3, 10->SPRITE_2, 20->SPRITE_1
@@ -293,6 +295,9 @@ void collapseTileUpdate(uint8_t index) {
                 uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
                 GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)] |= 0x01; //Set the solid flag
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
+                this->oamTile = COLLAPSE_TILE_SPRITE_1;
+                // State changed from HIDDEN to IDLE, mark dirty
+                this->flags |= OBJ_FLAG_DIRTY;
             } else {
                 //Don't draw the tile
                 return;
@@ -300,6 +305,11 @@ void collapseTileUpdate(uint8_t index) {
             break;
         default:
             break;
+    }
+    
+    // Only mark dirty if oamTile or state actually changed
+    if (oldOamTile != this->oamTile || oldState != this->data.collapseTile.state) {
+        this->flags |= OBJ_FLAG_DIRTY;
     }
 }
 

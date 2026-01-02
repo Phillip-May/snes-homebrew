@@ -23,6 +23,13 @@ temp_gid_arrays_collector = []
 # Maps tile_index -> (tile_index, palette_idx, tl, tr, bl, br)
 shared_object_sprite_dict = {}
 
+# Track background palette indices for collapse tiles (they use background palettes)
+# Maps collapse_tile_index -> background_palette_index
+collapse_tile_background_palette = {}
+
+# Store collapse tile GID mappings separately
+collapse_tile_gid_data = []  # List of 3 tile entries for GIDs 24, 25, 26
+
 """
 NES Sprite Sheet Converter
 
@@ -46,7 +53,9 @@ pointy_gids = [17, 27, 43, 59]
 icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
 all_background_gids = far_background_gids + solid_gids + pointy_gids + icy_gids + deco_objects_gids
 
-arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31, 45, 46, 47, 64, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26, 28, 29, 30, 31, 45, 46, 47, 64, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+# Collapse tiles (23, 24, 25) are removed from arrMustBeObject so they use background palettes
+collapse_tile_indices = [23, 24, 25]  # COLLAPSE_TILE_SPRITE_1, COLLAPSE_TILE_SPRITE_2, COLLAPSE_TILE_SPRITE_3
 
 # Sprite groups that should share the same palette
 # Each sublist contains sprite indices that must use the same palette
@@ -446,6 +455,44 @@ NES_PALETTE = [
 ]
 
 
+def reserve_collapse_tile_gids(all_sprite_data, tile_mapping):
+    """
+    Reserve GIDs 24, 25, 26 for collapse tiles (sprite indices 23, 24, 25).
+    Extract tile data and store separately for header generation.
+    Note: These GIDs are reserved but not added to the main GID array yet.
+    They will be added when we generate the shared header, ensuring they're at indices 24, 25, 26.
+    """
+    global collapse_tile_gid_data
+    
+    collapse_tile_gid_data = []
+    collapse_gids = [24, 25, 26]
+    collapse_sprite_indices = [23, 24, 25]  # COLLAPSE_TILE_SPRITE_1, 2, 3
+    
+    # Extract collapse tile data
+    for i, (sprite_idx, target_gid) in enumerate(zip(collapse_sprite_indices, collapse_gids)):
+        if sprite_idx < len(all_sprite_data):
+            # Get optimized tile indices for this collapse tile
+            tl_opt_idx = tile_mapping.get(sprite_idx * 4 + 0, 0)
+            tr_opt_idx = tile_mapping.get(sprite_idx * 4 + 1, 0)
+            bl_opt_idx = tile_mapping.get(sprite_idx * 4 + 2, 0)
+            br_opt_idx = tile_mapping.get(sprite_idx * 4 + 3, 0)
+            
+            # Collapse tiles use background palette 0 (palette_idx_encoded = 0, bit 2 = 0 for background)
+            palette_idx_encoded = 0  # Background palette 0
+            flip_flags = 0  # No flip
+            
+            tile_entry = (tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx, palette_idx_encoded, flip_flags)
+            collapse_tile_gid_data.append(tile_entry)
+            
+            print(f"Prepared collapse tile sprite {sprite_idx} for GID {target_gid} (tiles: {tl_opt_idx}, {tr_opt_idx}, {bl_opt_idx}, {br_opt_idx})")
+        else:
+            # Sprite index out of range, use empty tile
+            tile_entry = (0, 0, 0, 0, 0, 0)
+            collapse_tile_gid_data.append(tile_entry)
+            print(f"WARNING: Collapse tile sprite {sprite_idx} not found, using empty tile for GID {target_gid}")
+    
+    return collapse_tile_gid_data
+
 def rgb_to_nes_6bit(r, g, b):
     """
     Convert RGB (0-255) to NES 6-bit color index (0-63).
@@ -500,6 +547,8 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     spawn_x = 0
     spawn_y = 0
     spawn_found = False
+    # Track collapse tiles found in this level's tilemap (they need to be in object sprite dictionary)
+    collapse_tiles_in_tilemap = {}  # Maps collapse_tile_index -> background_palette_index
 
     # Collect unique palettes separately for background and sprite tiles
     # Background palettes: max 4, first color must be black
@@ -511,17 +560,40 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     sprite_palettes = []
     sprite_palette_to_index = {}  # Maps palette tuple to index in sprite_palettes
     
-    # Initialize sprite palettes with object_palettes if provided (for indices 0-2)
+    # Initialize sprite palettes with object_palettes if provided
+    # Sprite palette 0: object_palettes[0] (for objects like strawberry, flying berry, etc.)
+    # Sprite palette 1: will be set to background palette 0 (for collapse tiles)
+    # Sprite palette 2: object_palettes[1] (for other objects)
+    # Sprite palette 3: reserved for player
     if object_palettes is not None and len(object_palettes) > 0:
-        for i, obj_pal in enumerate(object_palettes[:3]):  # Use first 3 palettes (indices 0-2)
-            # Normalize palette: pad to 4 colors if needed
-            normalized_obj_pal = list(obj_pal)
-            while len(normalized_obj_pal) < 4:
-                normalized_obj_pal.append((0, 0, 0))
-            normalized_obj_pal = normalized_obj_pal[:4]
-            sprite_palettes.append(normalized_obj_pal)
-            sprite_palette_to_index[tuple(normalized_obj_pal)] = i
-            print(f"Initialized sprite palette {i} with object palette: {normalized_obj_pal}")
+        # Set sprite palette 0 to object_palettes[0] (for regular objects)
+        normalized_obj_pal_0 = list(object_palettes[0])
+        while len(normalized_obj_pal_0) < 4:
+            normalized_obj_pal_0.append((0, 0, 0))
+        normalized_obj_pal_0 = normalized_obj_pal_0[:4]
+        sprite_palettes.append(normalized_obj_pal_0)
+        sprite_palette_to_index[tuple(normalized_obj_pal_0)] = 0
+        print(f"Initialized sprite palette 0 with object palette 0: {normalized_obj_pal_0}")
+        
+        # Reserve slot 1 for background palette 0 (for collapse tiles), will be set later
+        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Placeholder for index 1
+        
+        # Set sprite palette 2 to object_palettes[1] (for objects like springs)
+        if len(object_palettes) > 1:
+            normalized_obj_pal_1 = list(object_palettes[1])
+            while len(normalized_obj_pal_1) < 4:
+                normalized_obj_pal_1.append((0, 0, 0))
+            normalized_obj_pal_1 = normalized_obj_pal_1[:4]
+            sprite_palettes.append(normalized_obj_pal_1)
+            sprite_palette_to_index[tuple(normalized_obj_pal_1)] = 2
+            print(f"Initialized sprite palette 2 with object palette 1: {normalized_obj_pal_1}")
+        else:
+            sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
+    else:
+        # No object palettes, initialize with placeholders
+        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Palette 0
+        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Palette 1 (for collapse tiles)
+        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Palette 2
     
     # Ensure sprite_palettes has at least 4 entries (pad with black if needed)
     while len(sprite_palettes) < 4:
@@ -622,8 +694,14 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         bl_opt_idx = min(bl_opt_idx, 255)
         br_opt_idx = min(br_opt_idx, 255)
 
-        # Determine if this is a background tile (includes far_background, solid, pointy, and icy)
-        is_background = tile_index in all_background_gids
+        # Determine if this is a background tile (includes far_background, solid, pointy, icy, and collapse tiles)
+        # Collapse tiles use background palettes even though they're rendered as sprites
+        is_background = tile_index in all_background_gids or tile_index in collapse_tile_indices
+        
+        # Collapse tiles need to be added to object_data so the game can track them as objects
+        # They appear in the tilemap as background tiles but are also objects
+        if tile_index in collapse_tile_indices:
+            object_data.append((tile_index, map_x_tile, map_y_tile))
 
         # Normalize palette: pad to 4 colors
         # Note: extract_palette already ensures black is color 0 for all palettes
@@ -661,6 +739,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             if palette_idx_encoded > 3:
                 print(f"ERROR: Background palette index {palette_idx_encoded} exceeds limit of 3!")
                 palette_idx_encoded = 0
+            
+            # Track background palette index for collapse tiles (they're rendered as sprites but use background palettes)
+            if tile_index in collapse_tile_indices:
+                collapse_tile_background_palette[tile_index] = palette_idx
+                collapse_tiles_in_tilemap[tile_index] = palette_idx
         else:
             # Sprite tile - use sprite palettes
             normalized_palette = list(palette)
@@ -677,23 +760,26 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if palette_key in sprite_palette_to_index:
                     palette_idx = sprite_palette_to_index[palette_key]
                 else:
-                    # Find an available slot (0, 1, or 2 - skip 3 which is reserved for player)
-                    available_slots = [0, 1, 2]
-                    palette_idx = None
-                    for slot in available_slots:
-                        if slot < len(sprite_palettes):
-                            # Check if this slot is empty (all black) or can be reused
-                            if sprite_palettes[slot] == [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]:
-                                sprite_palettes[slot] = normalized_palette
-                                sprite_palette_to_index[palette_key] = slot
-                                palette_idx = slot
-                                break
-                    
-                    if palette_idx is None:
-                        # All slots 0-2 are taken, use slot 0
-                        palette_idx = 0
-                        sprite_palettes[0] = normalized_palette
-                        sprite_palette_to_index[palette_key] = 0
+                    # Find an available slot (2 only - skip 0 which is object_palettes[0], skip 1 which is background palette for collapse tiles, skip 3 which is reserved for player)
+                    # Slot 0 is object_palettes[0], slot 1 is background palette 0 (for collapse tiles), slot 2 is object_palettes[1]
+                    if 2 < len(sprite_palettes):
+                        # Check if slot 2 is empty (all black) or can be reused
+                        if sprite_palettes[2] == [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]:
+                            sprite_palettes[2] = normalized_palette
+                            sprite_palette_to_index[palette_key] = 2
+                            palette_idx = 2
+                        else:
+                            # Slot 2 is taken, use slot 2 anyway (will overwrite)
+                            palette_idx = 2
+                            sprite_palettes[2] = normalized_palette
+                            sprite_palette_to_index[palette_key] = 2
+                    else:
+                        # Slot 2 doesn't exist, use slot 2 (will be created)
+                        palette_idx = 2
+                        while len(sprite_palettes) <= 2:
+                            sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
+                        sprite_palettes[2] = normalized_palette
+                        sprite_palette_to_index[palette_key] = 2
             else:
                 palette_idx = sprite_palette_to_index[palette_key]
 
@@ -730,6 +816,19 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         else:
             collision_data.append(0)
 
+    # Set sprite palette 1 to match background palette 0 (for collapse tiles)
+    # Collapse tiles use background palettes but are rendered as sprites using sprite palette 1
+    # This ensures collapse tiles render with the correct colors
+    # Note: Sprite palette 0 is used by regular objects (strawberry, flying berry, etc.) and uses object_palettes[0]
+    if len(background_palettes) > 0:
+        # Ensure sprite_palettes has at least 4 entries
+        while len(sprite_palettes) < 4:
+            sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
+        
+        # Set sprite palette 1 to background palette 0 (collapse tiles use sprite palette 1)
+        sprite_palettes[1] = list(background_palettes[0])
+        print(f"Set sprite palette 1 to background palette 0 for collapse tiles: {background_palettes[0]}")
+    
     # Ensure player palette is still at sprite palette index 3 (in case it got overwritten)
     # This is a safety check - player palette should already be set above
     # Player sprite frames map to sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
@@ -774,12 +873,31 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     # Generate GID array from tilemap_data using shared mapping
     # Track original tile_index for collision mapping
     gid_array = []
+    collapse_sprite_indices = [23, 24, 25]  # COLLAPSE_TILE_SPRITE_1, 2, 3
+    collapse_gids = [24, 25, 26]
+    
     for i, tile_entry_with_index in enumerate(tilemap_data):
         # Extract tile entry (first 6 elements) and original tile_index (last element)
         tile_entry = tile_entry_with_index[:6]
         original_tile_index = tile_entry_with_index[6] if len(tile_entry_with_index) > 6 else -1
         
-        if tile_entry in tile_to_gid:
+        # Check if this is a collapse tile - if so, map directly to reserved GIDs 24, 25, 26
+        if original_tile_index in collapse_sprite_indices:
+            collapse_idx = collapse_sprite_indices.index(original_tile_index)
+            gid = collapse_gids[collapse_idx]
+            # Create a normalized tile entry with palette 0 (collapse tiles always use background palette 0 in GID mapping)
+            tl, tr, bl, br, _, flip = tile_entry
+            normalized_tile_entry = (tl, tr, bl, br, 0, flip)  # Force palette to 0
+            # Ensure this entry is in the mapping
+            if normalized_tile_entry not in tile_to_gid:
+                # Reserve the GID slot if not already reserved
+                while len(gid_map_data) <= gid:
+                    gid_map_data.append((0, 0, 0, 0, 0, 0))
+                gid_map_data[gid] = normalized_tile_entry
+                tile_to_gid[normalized_tile_entry] = gid
+                if original_tile_index >= 0:
+                    shared_gid_mapping_global['gid_to_original_tile_index'][gid] = original_tile_index
+        elif tile_entry in tile_to_gid:
             # Use existing GID from shared mapping
             gid = tile_to_gid[tile_entry]
             # Update original tile_index if this is the first time we see a valid one for this GID
@@ -787,6 +905,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 shared_gid_mapping_global['gid_to_original_tile_index'][gid] = original_tile_index
         else:
             # Add new entry to shared mapping
+            # Skip GIDs 24, 25, 26 if we haven't reached them yet
+            while next_gid in collapse_gids:
+                next_gid += 1
+                shared_gid_mapping_global['next_gid'] = next_gid
+            
             if next_gid >= 256:
                 # Out of GIDs, reuse GID 0 (empty tile) as fallback
                 print(f"WARNING: Exceeded 256 GIDs limit. Reusing empty tile GID for layer '{layer_name}'.")
@@ -794,7 +917,10 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             else:
                 gid = next_gid
                 tile_to_gid[tile_entry] = gid
-                gid_map_data.append(tile_entry)
+                # Ensure gid_map_data is large enough
+                while len(gid_map_data) <= gid:
+                    gid_map_data.append((0, 0, 0, 0, 0, 0))
+                gid_map_data[gid] = tile_entry
                 # Track original tile_index for this GID
                 if original_tile_index >= 0:
                     shared_gid_mapping_global['gid_to_original_tile_index'][gid] = original_tile_index
@@ -969,6 +1095,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if player_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(player_tile_idx)
             
+            # Add collapse tiles found in this level's tilemap (they use background palettes)
+            for collapse_tile_idx, bg_palette_idx in collapse_tiles_in_tilemap.items():
+                if collapse_tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(collapse_tile_idx)
+            
             # Generate object sprite data (CHR data for each unique object)
             # Each object is a 16x16 sprite = 4 8x8 tiles = 64 bytes
             f.write(f"// Object sprite data for layer '{layer_name}'\n")
@@ -990,16 +1121,33 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                     
                     # Get palette index for this object
                     # Player frames (tile indices 1, 2, 3, 4, 5, 6, 7) use sprite palette 3 (reserved for player)
+                    # Collapse tiles (23, 24, 25) use background palette indices (0-3)
                     # Other objects use object palettes (0-2)
                     player_sprite_tile_indices = [1, 2, 3, 4, 5, 6, 7]
                     if obj_tile_idx in player_sprite_tile_indices:
                         # Player frames use sprite palette 3 (mark with 3)
                         palette_idx = 3
+                    elif obj_tile_idx in collapse_tile_indices:
+                        # Collapse tiles use sprite palette 1 (which is set to background palette 0)
+                        # All collapse tiles use sprite palette 1 regardless of which background palette they use
+                        palette_idx = 1
                     else:
-                        # Get palette index for this object (0-2, since we have 3 object palettes)
-                        palette_idx = object_palette_mapping.get(obj_tile_idx, 0)
-                        if palette_idx >= len(object_palettes):
-                            palette_idx = 0
+                        # Get palette index for this object from object_palette_mapping (0-2 for object palettes)
+                        # Map to sprite palette indices:
+                        # object_palettes[0] -> sprite palette 0
+                        # object_palettes[1] -> sprite palette 2 (springs)
+                        # object_palettes[2] is not used (we only use 2 object palettes)
+                        obj_palette_idx = object_palette_mapping.get(obj_tile_idx, 0)
+                        if obj_palette_idx >= len(object_palettes):
+                            obj_palette_idx = 0
+                        
+                        # Map object palette index to sprite palette index
+                        if obj_palette_idx == 0:
+                            palette_idx = 0  # object_palettes[0] -> sprite palette 0
+                        elif obj_palette_idx == 1:
+                            palette_idx = 2  # object_palettes[1] -> sprite palette 2 (springs)
+                        else:
+                            palette_idx = 0  # Default to sprite palette 0
                     
                     object_sprite_mapping[obj_tile_idx] = len(object_sprite_data)
                     object_sprite_data.append((obj_tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx))
@@ -1932,6 +2080,10 @@ def main():
         remaining_tiles = max_tiles - len(unique_chr_tiles)
         print(f"  Remaining capacity: {remaining_tiles} unique 8x8 tiles")
 
+    # Reserve GIDs 24, 25, 26 for collapse tiles before processing levels
+    print("\nReserving GIDs 24, 25, 26 for collapse tiles...")
+    reserve_collapse_tile_gids(all_sprite_data, tile_mapping)
+
     # Process map JSON and create level previews and .h files
     tilemap_filename = os.path.join(script_dir, 'baseCelesteTileMap.json')
     if os.path.exists(tilemap_filename):
@@ -2223,6 +2375,21 @@ def main():
                     
                     # Generate shared GID mapping header after all levels are processed
                     # Ensure it's always generated, even if empty (for compilation)
+                    # Ensure collapse tiles are at GIDs 24, 25, 26
+                    global collapse_tile_gid_data
+                    collapse_gids = [24, 25, 26]
+                    if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
+                        # Ensure gid_map_data is large enough
+                        while len(shared_gid_mapping_global['gid_map_data']) <= collapse_gids[-1]:
+                            shared_gid_mapping_global['gid_map_data'].append((0, 0, 0, 0, 0, 0))
+                        # Insert collapse tile data at GIDs 24, 25, 26
+                        for i, (target_gid, tile_entry) in enumerate(zip(collapse_gids, collapse_tile_gid_data)):
+                            shared_gid_mapping_global['gid_map_data'][target_gid] = tile_entry
+                            shared_gid_mapping_global['tile_to_gid'][tile_entry] = target_gid
+                            # Track original tile_index
+                            collapse_sprite_idx = [23, 24, 25][i]
+                            shared_gid_mapping_global['gid_to_original_tile_index'][target_gid] = collapse_sprite_idx
+                    
                     shared_gid_header_filename = os.path.join(script_dir, 'gid_to_tile_shared.h')
                     print(f"\nGenerating shared GID mapping header: {shared_gid_header_filename}")
                     with open(shared_gid_header_filename, 'w') as f:
@@ -2230,7 +2397,8 @@ def main():
                         f.write("// Generated from baseCelesteTileMap.json\n")
                         f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
                         f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
-                        f.write("// GID 0 is reserved for empty tiles\n\n")
+                        f.write("// GID 0 is reserved for empty tiles\n")
+                        f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n\n")
                         f.write("#ifndef GID_TO_TILE_SHARED_H\n")
                         f.write("#define GID_TO_TILE_SHARED_H\n\n")
                         if len(shared_gid_mapping_global['gid_map_data']) > 0:
@@ -2269,16 +2437,54 @@ def main():
                         f.write("#endif // GID_TO_TILE_SHARED_H\n")
                     print(f"Generated shared GID mapping with {len(shared_gid_mapping_global['gid_map_data']) if len(shared_gid_mapping_global['gid_map_data']) > 0 else 1} unique GIDs")
                     
+                    # Generate separate collapse tile header
+                    collapse_tile_header_filename = os.path.join(script_dir, 'gid_to_tile_collapse.h')
+                    print(f"\nGenerating collapse tile header: {collapse_tile_header_filename}")
+                    with open(collapse_tile_header_filename, 'w') as f:
+                        f.write("// Collapse tile GID to tile mapping\n")
+                        f.write("// Generated from baseCelesteSpriteSheet.png\n")
+                        f.write("// GIDs 24, 25, 26 for collapse tiles (sprite indices 23, 24, 25)\n")
+                        f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
+                        f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n\n")
+                        f.write("#ifndef GID_TO_TILE_COLLAPSE_H\n")
+                        f.write("#define GID_TO_TILE_COLLAPSE_H\n\n")
+                        if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
+                            f.write("const unsigned char gid_to_tile_collapse[3][6] = {\n")
+                            collapse_gids = [24, 25, 26]
+                            collapse_sprite_names = ["COLLAPSE_TILE_SPRITE_1 (idle)", "COLLAPSE_TILE_SPRITE_2 (collapsing)", "COLLAPSE_TILE_SPRITE_3 (collapsing)"]
+                            for i, tile_entry in enumerate(collapse_tile_gid_data):
+                                tl, tr, bl, br, pal_idx, flip = tile_entry
+                                f.write(f"    // GID {collapse_gids[i]} - {collapse_sprite_names[i]}\n")
+                                f.write(f"    {{ {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip} }}")
+                                if i < len(collapse_tile_gid_data) - 1:
+                                    f.write(",")
+                                f.write("\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_COLLAPSE_COUNT 3\n\n")
+                        else:
+                            # Default empty entries
+                            f.write("const unsigned char gid_to_tile_collapse[3][6] = {\n")
+                            f.write("    // GID 24 - COLLAPSE_TILE_SPRITE_1 (idle)\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0 },\n")
+                            f.write("    // GID 25 - COLLAPSE_TILE_SPRITE_2 (collapsing)\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0 },\n")
+                            f.write("    // GID 26 - COLLAPSE_TILE_SPRITE_3 (collapsing)\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_COLLAPSE_COUNT 3\n\n")
+                        f.write("#endif // GID_TO_TILE_COLLAPSE_H\n")
+                    print(f"Generated collapse tile header with 3 entries")
+                    
                     # Code-referenced objects: objects used dynamically in code but might not appear in level object data
                     # Format: (tile_index, palette_source, base_tile_or_none, palette_fallback)
-                    # palette_source: 'inherit_from' = use palette from base_tile, 'mapping' = use object_palette_mapping, 'fixed' = use palette_fallback value
+                    # palette_source: 'inherit_from' = use palette from base_tile, 'mapping' = use object_palette_mapping, 'fixed' = use palette_fallback value, 'background' = use background palette index
                     code_referenced_objects = [
                         # Spring sprite 2 - uses same palette as spring sprite 1 (tile 18)
                         (19, 'inherit_from', 18, 2),  # SPRING_SPRITE_2, inherit from tile 18, fallback palette 2
-                        # Collapse tile sprites - sprite 1 uses mapping, sprites 2 and 3 inherit from sprite 1
-                        (23, 'mapping', None, 0),  # COLLAPSE_TILE_SPRITE_1
-                        (24, 'inherit_from', 23, 0),  # COLLAPSE_TILE_SPRITE_2, inherit from tile 23, fallback palette 0
-                        (25, 'inherit_from', 23, 0),  # COLLAPSE_TILE_SPRITE_3, inherit from tile 23, fallback palette 0
+                        # Collapse tile sprites - use background palette indices (they're treated as background tiles)
+                        (23, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_1, use background palette
+                        (24, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_2, use background palette
+                        (25, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_3, use background palette
                     ]
                     
                     # Add code-referenced objects if they're missing
@@ -2297,6 +2503,10 @@ def main():
                                     _, palette_idx, _, _, _, _ = shared_object_sprite_dict[base_tile_or_none]
                                 else:
                                     palette_idx = palette_fallback
+                            elif palette_source == 'background':
+                                # Collapse tiles use sprite palette 1 (which is set to background palette 0)
+                                # All collapse tiles use sprite palette 1 regardless of which background palette they use
+                                palette_idx = 1
                             elif palette_source == 'mapping':
                                 # Try to get from object_palette_mapping if available
                                 if object_palette_mapping and tile_idx in object_palette_mapping:
@@ -2314,29 +2524,6 @@ def main():
                             shared_object_sprite_dict[tile_idx] = (tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx)
                             print(f"  Added code-referenced object sprite: tile {tile_idx}, palette {palette_idx} (source: {palette_source}), tiles [{tl_opt_idx}, {tr_opt_idx}, {bl_opt_idx}, {br_opt_idx}]")
                     
-                    # Generate shared object sprite dictionary header
-                    object_sprite_dict_header_filename = os.path.join(script_dir, 'object_sprite_dict_shared.h')
-                    print(f"\nGenerating shared object sprite dictionary header: {object_sprite_dict_header_filename}")
-                    # Sort by tile_index for consistent output
-                    sorted_entries = sorted(shared_object_sprite_dict.items())
-                    with open(object_sprite_dict_header_filename, 'w') as f:
-                        f.write("// Shared object sprite dictionary for all levels\n")
-                        f.write("// Generated from baseCelesteTileMap.json\n")
-                        f.write("// Each entry: tile_idx, pal_idx, tl, tr, bl, br\n\n")
-                        f.write("#ifndef OBJECT_SPRITE_DICT_SHARED_H\n")
-                        f.write("#define OBJECT_SPRITE_DICT_SHARED_H\n\n")
-                        
-                        f.write(f"const unsigned char object_sprite_dict_shared[{len(sorted_entries)}][6] = {{\n")
-                        for i, (tile_idx, (t_idx, pal_idx, tl, tr, bl, br)) in enumerate(sorted_entries):
-                            f.write(f"    // Entry {i}\n")
-                            f.write(f"    {{ {t_idx}, {pal_idx}, {tl}, {tr}, {bl}, {br} }}")
-                            if i < len(sorted_entries) - 1:
-                                f.write(",")
-                            f.write("\n")
-                        f.write("};\n\n")
-                        f.write(f"#define OBJECT_SPRITE_DICT_SHARED_COUNT {len(sorted_entries)}\n\n")
-                        f.write("#endif // OBJECT_SPRITE_DICT_SHARED_H\n")
-                    print(f"Generated shared object sprite dictionary with {len(sorted_entries)} entries")
         except Exception as e:
             print(f"Error processing map JSON: {e}")
             import traceback
@@ -2344,17 +2531,157 @@ def main():
     else:
         print(f"\nMap JSON file '{tilemap_filename}' not found, skipping map preview generation.")
     
-    # Ensure shared GID mapping header is always generated (even if no levels were processed)
+    # Ensure shared object sprite dictionary headers are always generated (even if no levels were processed)
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # If shared_object_sprite_dict is empty, try to use data from existing header file as fallback
+    if not shared_object_sprite_dict:
+        old_header_filename = os.path.join(script_dir, 'object_sprite_dict_shared.h')
+        if os.path.exists(old_header_filename):
+            print(f"shared_object_sprite_dict is empty, attempting to parse existing header: {old_header_filename}")
+            try:
+                with open(old_header_filename, 'r') as f:
+                    content = f.read()
+                    # Try to parse NES format entries from the old header
+                    import re
+                    # Match NES format: /* index: comment */ { pal, tl, tr, bl, br }
+                    nes_pattern = r'/\*\s*(\d+):[^}]*\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}'
+                    matches = re.findall(nes_pattern, content)
+                    for match in matches:
+                        tile_idx = int(match[0])
+                        pal_idx = int(match[1])
+                        tl = int(match[2])
+                        tr = int(match[3])
+                        bl = int(match[4])
+                        br = int(match[5])
+                        # Only add non-zero entries (skip unused entries)
+                        if pal_idx != 0 or tl != 0 or tr != 0 or bl != 0 or br != 0:
+                            shared_object_sprite_dict[tile_idx] = (tile_idx, pal_idx, tl, tr, bl, br)
+                    if shared_object_sprite_dict:
+                        print(f"Parsed {len(shared_object_sprite_dict)} entries from existing header file")
+            except Exception as e:
+                print(f"Warning: Could not parse existing header file: {e}")
+    
+    # Generate shared object sprite dictionary headers for NES and SNES
+    # NES format: sparse array indexed by tile_idx, format [pal_idx, tl, tr, bl, br]
+    # SNES format: array with tile_idx field, format [tile_idx, pal_idx, tl, tr, bl, br]
+    
+    # NES only uses tile indices 0-26 (based on sprite_animation_enums.h)
+    # The highest used index is 26 (STRAWBERRY_SPRITE_1), so we need 27 entries (0-26)
+    nes_max_tile_idx = 32  # Fixed at 26 for NES - this matches sprite_animation_enums.h
+    
+    # Generate NES format header (compact format with lookup table)
+    object_sprite_dict_nes_filename = os.path.join(script_dir, 'object_sprite_dict_shared_nes.h')
+    print(f"\nGenerating NES object sprite dictionary header: {object_sprite_dict_nes_filename}")
+    
+    # Build compact array with only used entries, sorted by tile_idx
+    compact_entries = []
+    for tile_idx in range(nes_max_tile_idx + 1):
+        if tile_idx in shared_object_sprite_dict:
+            t_idx, pal_idx, tl, tr, bl, br = shared_object_sprite_dict[tile_idx]
+            compact_entries.append((tile_idx, pal_idx, tl, tr, bl, br))
+    
+    # Create lookup table: maps tile_idx -> compact_index (0xFF = not found)
+    lookup_table = [0xFF] * (nes_max_tile_idx + 1)
+    for compact_idx, (tile_idx, _, _, _, _, _) in enumerate(compact_entries):
+        lookup_table[tile_idx] = compact_idx
+    
+    with open(object_sprite_dict_nes_filename, 'w') as f:
+        f.write("// Shared object sprite dictionary for all levels (NES format - compact)\n")
+        f.write("// Generated from baseCelesteTileMap.json\n")
+        f.write("// Compact format: only used entries stored, with lookup table for fast access\n")
+        f.write("// Compact array format: [pal_idx, tl, tr, bl, br] (tile_idx not stored, use lookup table)\n\n")
+        f.write("#ifndef OBJECT_SPRITE_DICT_SHARED_NES_H\n")
+        f.write("#define OBJECT_SPRITE_DICT_SHARED_NES_H\n\n")
+        
+        # Write lookup table
+        f.write(f"// Lookup table: maps tile_idx -> compact_index (0xFF = not found)\n")
+        f.write(f"const unsigned char object_sprite_lookup_table[{nes_max_tile_idx + 1}] = {{\n")
+        for tile_idx in range(nes_max_tile_idx + 1):
+            lookup_idx = lookup_table[tile_idx]
+            f.write(f"    /* tile {tile_idx} */  {lookup_idx}")
+            if tile_idx < nes_max_tile_idx:
+                f.write(",")
+            f.write("\n")
+        f.write("};\n\n")
+        
+        # Write compact array
+        f.write(f"// Compact sprite data array (only used entries)\n")
+        f.write(f"// Format: [pal_idx, tl, tr, bl, br]\n")
+        f.write(f"const unsigned char object_sprite_dict_compact[{len(compact_entries)}][5] = {{\n")
+        for compact_idx, (tile_idx, pal_idx, tl, tr, bl, br) in enumerate(compact_entries):
+            f.write(f"    /* compact_idx {compact_idx}: tile {tile_idx} */  {{ {pal_idx}, {tl}, {tr}, {bl}, {br} }}")
+            if compact_idx < len(compact_entries) - 1:
+                f.write(",")
+            f.write("\n")
+        f.write("};\n\n")
+        
+        f.write(f"#define OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE {nes_max_tile_idx + 1}\n")
+        f.write(f"#define OBJECT_SPRITE_DICT_COMPACT_COUNT {len(compact_entries)}\n\n")
+        f.write("#endif // OBJECT_SPRITE_DICT_SHARED_NES_H\n")
+    nes_entries_used = len(compact_entries)
+    old_size = (nes_max_tile_idx + 1) * 5  # Old format: full sparse array
+    new_size = (nes_max_tile_idx + 1) + (nes_entries_used * 5)  # New format: lookup table + compact array
+    saved_bytes = old_size - new_size
+    print(f"Generated NES object sprite dictionary: {nes_entries_used} used entries (compact format)")
+    print(f"  Old format: {old_size} bytes, New format: {new_size} bytes, Saved: {saved_bytes} bytes")
+    
+    # Generate SNES format header
+    object_sprite_dict_snes_filename = os.path.join(script_dir, 'object_sprite_dict_shared_snes.h')
+    print(f"\nGenerating SNES object sprite dictionary header: {object_sprite_dict_snes_filename}")
+    sorted_entries = sorted(shared_object_sprite_dict.items()) if shared_object_sprite_dict else []
+    with open(object_sprite_dict_snes_filename, 'w') as f:
+        f.write("// Shared object sprite dictionary for all levels (SNES format)\n")
+        f.write("// Generated from baseCelesteTileMap.json\n")
+        f.write("// SNES/Other: Format with tile_idx field for lookup\n")
+        f.write("// Each entry: [tile_idx, pal_idx, tl, tr, bl, br]\n\n")
+        f.write("#ifndef OBJECT_SPRITE_DICT_SHARED_SNES_H\n")
+        f.write("#define OBJECT_SPRITE_DICT_SHARED_SNES_H\n\n")
+        if sorted_entries:
+            f.write(f"const unsigned char object_sprite_dict_shared[{len(sorted_entries)}][6] = {{\n")
+            for i, (tile_idx, (t_idx, pal_idx, tl, tr, bl, br)) in enumerate(sorted_entries):
+                f.write(f"    // Entry {i}\n")
+                f.write(f"    {{ {t_idx}, {pal_idx}, {tl}, {tr}, {bl}, {br} }}")
+                if i < len(sorted_entries) - 1:
+                    f.write(",")
+                f.write("\n")
+            f.write("};\n\n")
+            f.write(f"#define OBJECT_SPRITE_DICT_SHARED_COUNT {len(sorted_entries)}\n\n")
+        else:
+            # Empty array for compilation
+            f.write("const unsigned char object_sprite_dict_shared[1][6] = {\n")
+            f.write("    // Empty entry\n")
+            f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+            f.write("};\n\n")
+            f.write("#define OBJECT_SPRITE_DICT_SHARED_COUNT 1\n\n")
+        f.write("#endif // OBJECT_SPRITE_DICT_SHARED_SNES_H\n")
+    print(f"Generated SNES object sprite dictionary with {len(sorted_entries)} entries")
+    
+    # Ensure shared GID mapping header is always generated (even if no levels were processed)
     shared_gid_header_filename = os.path.join(script_dir, 'gid_to_tile_shared.h')
     if not os.path.exists(shared_gid_header_filename) or len(shared_gid_mapping_global['gid_map_data']) == 0:
+        # Ensure collapse tiles are at GIDs 24, 25, 26
+        collapse_gids = [24, 25, 26]
+        if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
+            # Ensure gid_map_data is large enough
+            while len(shared_gid_mapping_global['gid_map_data']) <= collapse_gids[-1]:
+                shared_gid_mapping_global['gid_map_data'].append((0, 0, 0, 0, 0, 0))
+            # Insert collapse tile data at GIDs 24, 25, 26
+            for i, (target_gid, tile_entry) in enumerate(zip(collapse_gids, collapse_tile_gid_data)):
+                shared_gid_mapping_global['gid_map_data'][target_gid] = tile_entry
+                shared_gid_mapping_global['tile_to_gid'][tile_entry] = target_gid
+                # Track original tile_index
+                collapse_sprite_idx = [23, 24, 25][i]
+                shared_gid_mapping_global['gid_to_original_tile_index'][target_gid] = collapse_sprite_idx
+        
         print(f"\nGenerating shared GID mapping header: {shared_gid_header_filename}")
         with open(shared_gid_header_filename, 'w') as f:
             f.write("// Shared GID to tile mapping for all levels\n")
             f.write("// Generated from baseCelesteTileMap.json\n")
             f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
             f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
-            f.write("// GID 0 is reserved for empty tiles\n\n")
+            f.write("// GID 0 is reserved for empty tiles\n")
+            f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n\n")
             f.write("#ifndef GID_TO_TILE_SHARED_H\n")
             f.write("#define GID_TO_TILE_SHARED_H\n\n")
             if len(shared_gid_mapping_global['gid_map_data']) > 0:
@@ -2392,6 +2719,44 @@ def main():
                 f.write("#define GID_TO_TILE_SHARED_COUNT 1\n\n")
             f.write("#endif // GID_TO_TILE_SHARED_H\n")
         print(f"Generated shared GID mapping with {len(shared_gid_mapping_global['gid_map_data']) if len(shared_gid_mapping_global['gid_map_data']) > 0 else 1} unique GIDs")
+        
+        # Generate separate collapse tile header
+        collapse_tile_header_filename = os.path.join(script_dir, 'gid_to_tile_collapse.h')
+        print(f"\nGenerating collapse tile header: {collapse_tile_header_filename}")
+        with open(collapse_tile_header_filename, 'w') as f:
+            f.write("// Collapse tile GID to tile mapping\n")
+            f.write("// Generated from baseCelesteSpriteSheet.png\n")
+            f.write("// GIDs 24, 25, 26 for collapse tiles (sprite indices 23, 24, 25)\n")
+            f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
+            f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n\n")
+            f.write("#ifndef GID_TO_TILE_COLLAPSE_H\n")
+            f.write("#define GID_TO_TILE_COLLAPSE_H\n\n")
+            if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
+                f.write("const unsigned char gid_to_tile_collapse[3][6] = {\n")
+                collapse_gids = [24, 25, 26]
+                collapse_sprite_names = ["COLLAPSE_TILE_SPRITE_1 (idle)", "COLLAPSE_TILE_SPRITE_2 (collapsing)", "COLLAPSE_TILE_SPRITE_3 (collapsing)"]
+                for i, tile_entry in enumerate(collapse_tile_gid_data):
+                    tl, tr, bl, br, pal_idx, flip = tile_entry
+                    f.write(f"    // GID {collapse_gids[i]} - {collapse_sprite_names[i]}\n")
+                    f.write(f"    {{ {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip} }}")
+                    if i < len(collapse_tile_gid_data) - 1:
+                        f.write(",")
+                    f.write("\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_COLLAPSE_COUNT 3\n\n")
+            else:
+                # Default empty entries
+                f.write("const unsigned char gid_to_tile_collapse[3][6] = {\n")
+                f.write("    // GID 24 - COLLAPSE_TILE_SPRITE_1 (idle)\n")
+                f.write("    { 0, 0, 0, 0, 0, 0 },\n")
+                f.write("    // GID 25 - COLLAPSE_TILE_SPRITE_2 (collapsing)\n")
+                f.write("    { 0, 0, 0, 0, 0, 0 },\n")
+                f.write("    // GID 26 - COLLAPSE_TILE_SPRITE_3 (collapsing)\n")
+                f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_COLLAPSE_COUNT 3\n\n")
+            f.write("#endif // GID_TO_TILE_COLLAPSE_H\n")
+        print(f"Generated collapse tile header with 3 entries")
 
 
     print(f"\nConversion complete!")

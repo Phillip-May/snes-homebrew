@@ -37,7 +37,7 @@ $(BUILD_DIR):
 	@if not exist "$(BUILD_DIR)" mkdir "$(BUILD_DIR)"
 
 $(BUILD_DIR)/mainBankZero.o: $(SRC_DIR)/mainBankZero.c
-	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_PORT_CFLAGS) $(NES_INCLUDES) -c '$(SRC_DIR)/mainBankZero.c' -o '$(BUILD_DIR)/mainBankZero.o' }"
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_PORT_CFLAGS) $(NES_INCLUDES) -D__NES__ -c '$(SRC_DIR)/mainBankZero.c' -o '$(BUILD_DIR)/mainBankZero.o' }"
 
 $(BUILD_DIR)/nes_port.o: $(PORT_DIR)/nes.c
 	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_PORT_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes.c' -o '$(BUILD_DIR)/nes_port.o' }"
