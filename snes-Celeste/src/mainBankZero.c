@@ -228,7 +228,7 @@ void collapseTileInit(uint8_t index) {
 
     this->oamTile = COLLAPSE_TILE_SPRITE_1;
     this->oamProps = 0x32; //Set palette to 7
-    this->flags |= OBJ_FLAG_DIRTY;
+    port_updateCollapseTileNametable(index);
 }
 
 void collapseTileUpdate(uint8_t index) {
@@ -241,8 +241,6 @@ void collapseTileUpdate(uint8_t index) {
                             thisY <= playerY + 20 && thisY + 20 >= playerY);
 
     this->oamProps = 0x32; //Ensure consistent properties
-    uint8_t oldOamTile = this->oamTile;
-    uint8_t oldState = this->data.collapseTile.state;
 
     // State machine for collapse tile
     switch (this->data.collapseTile.state) {
@@ -254,6 +252,7 @@ void collapseTileUpdate(uint8_t index) {
             if (isPlayerTouching) {
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_COLLAPSING;
                 this->data.collapseTile.frameCount = 30;
+                port_updateCollapseTileNametable(index);
             }
             this->oamTile = COLLAPSE_TILE_SPRITE_1;
             break;
@@ -267,19 +266,23 @@ void collapseTileUpdate(uint8_t index) {
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_HIDDEN;
                 this->data.collapseTile.frameCount = 120;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
-                // State changed to HIDDEN, mark dirty
-                this->flags |= OBJ_FLAG_DIRTY;
+                port_updateCollapseTileNametable(index);
                 return;
             }
             // Animation frame: 0->SPRITE_3, 10->SPRITE_2, 20->SPRITE_1
             // On NES: values are consecutive (23, 24, 25), so add 1 per frame
             // On SNES: values are 2 apart (0x48, 0x4A, 0x4C), so add 2 per frame
             uint8_t frame_offset = (uint8_t)(2 - (this->data.collapseTile.frameCount / 10));
+            uint8_t newOamTile;
 #ifdef __NES__
-            this->oamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + frame_offset;
+            newOamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + frame_offset;
 #else
-            this->oamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + (frame_offset * 2);
+            newOamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + (frame_offset * 2);
 #endif
+            if (this->oamTile != newOamTile) {
+                this->oamTile = newOamTile;
+                port_updateCollapseTileNametable(index);
+            }
             break;
             
         case COLLAPSE_TILE_STATE_HIDDEN:
@@ -296,8 +299,7 @@ void collapseTileUpdate(uint8_t index) {
                 GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)] |= 0x01; //Set the solid flag
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
-                // State changed from HIDDEN to IDLE, mark dirty
-                this->flags |= OBJ_FLAG_DIRTY;
+                port_updateCollapseTileNametable(index);
             } else {
                 //Don't draw the tile
                 return;
@@ -305,11 +307,6 @@ void collapseTileUpdate(uint8_t index) {
             break;
         default:
             break;
-    }
-    
-    // Only mark dirty if oamTile or state actually changed
-    if (oldOamTile != this->oamTile || oldState != this->data.collapseTile.state) {
-        this->flags |= OBJ_FLAG_DIRTY;
     }
 }
 

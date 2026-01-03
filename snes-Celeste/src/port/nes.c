@@ -63,10 +63,12 @@ extern uint8_t OAM_BUF[];
 static volatile uint8_t s_inputState = 0;
 static uint8_t s_oamIndex = 0;
 static uint8_t s_scrollY = 0; // Vertical scroll position
+static uint8_t s_frameCounter = 0; // For screenshake pattern
 
-// List of collapse tile object indices (built once during level load)
-static uint8_t s_collapseTileIndices[30]; // Max 30 objects
-static uint8_t s_collapseTileCount = 0;
+// Queue of pending collapse tile updates (simplified - just track indices)
+#define MAX_PENDING_COLLAPSE_TILE_UPDATES 30
+static uint8_t s_pendingCollapseTileUpdates[MAX_PENDING_COLLAPSE_TILE_UPDATES];
+static uint8_t s_pendingCollapseTileCount = 0;
 
 // Pre-calculated VRAM write operations for collapse tiles (to move calculations before vblank)
 #define MAX_COLLAPSE_TILE_WRITES 30
@@ -298,6 +300,7 @@ static const LevelData level_data[] = {
         SPAWN_X_LEVEL25, SPAWN_Y_LEVEL25
     },
     // Level 26
+    /*
     {
         tilemap_level26_compressed,
         object_level26, OBJECT_LEVEL26_COUNT,
@@ -305,7 +308,6 @@ static const LevelData level_data[] = {
         palette_sprite_level26,
         SPAWN_X_LEVEL26, SPAWN_Y_LEVEL26
     }
-    /*
     // Level 27
     {
         tilemap_level27_compressed,
@@ -525,23 +527,34 @@ void port_buildSpring(uint8_t index) {
     render_object_sprite(spring, oamOffset);
 }
 
-static void build_collapse_tile_list(void) {
-    if (s_collapseTileCount > 0) return;
-    s_collapseTileCount = 0;
-    for (uint8_t i = 0; i < 30; i++) {
-        if (GLOBAL_OBJList[i].eType == OBJ_COLLAPSE_TILE) {
-            s_collapseTileIndices[s_collapseTileCount++] = i;
+// Queue a collapse tile update (called from mainBankZero.c when state changes)
+void port_updateCollapseTileNametable(uint8_t index) {
+    // Check if already in queue (avoid duplicates)
+    for (uint8_t i = 0; i < s_pendingCollapseTileCount; i++) {
+        if (s_pendingCollapseTileUpdates[i] == index) {
+            return; // Already queued
         }
+    }
+    // Add to queue if there's space
+    if (s_pendingCollapseTileCount < MAX_PENDING_COLLAPSE_TILE_UPDATES) {
+        s_pendingCollapseTileUpdates[s_pendingCollapseTileCount++] = index;
     }
 }
 
 static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
-    build_collapse_tile_list();
-    for (uint8_t list_idx = 0; list_idx < s_collapseTileCount; list_idx++) {
-        uint8_t i = s_collapseTileIndices[list_idx];
-        OBJ_DATA *collapseTile = &GLOBAL_OBJList[i];
-        if (!(collapseTile->flags & OBJ_FLAG_DIRTY)) continue;
+    if (s_pendingCollapseTileCount == 0) return;
+    
+    // Limit to 2 updates per frame
+    const uint8_t MAX_UPDATES_PER_FRAME = 2;
+    uint8_t updates_this_frame = 0;
+    uint8_t processed_count = 0;
+    
+    // Process pending updates (up to 2 per frame)
+    while (processed_count < s_pendingCollapseTileCount && updates_this_frame < MAX_UPDATES_PER_FRAME) {
+        uint8_t index = s_pendingCollapseTileUpdates[processed_count];
+        OBJ_DATA *collapseTile = &GLOBAL_OBJList[index];
+        
         uint8_t tileX = collapseTile->pos.x / 16;
         uint8_t tileY = (collapseTile->pos.y + 1) / 16;
         const unsigned char *tile_entry = NULL;
@@ -557,13 +570,21 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
         uint8_t nes_tile_y_adj_bottom = (nes_tile_y_bottom < 30) ? nes_tile_y_bottom : (nes_tile_y_bottom - 30);
         uint16_t addr_top = nametable_base_top + ((uint16_t)nes_tile_y_adj_top * 32) + nes_tile_x;
         uint16_t addr_bottom = nametable_base_bottom + ((uint16_t)nes_tile_y_adj_bottom * 32) + nes_tile_x;
-        if (*write_count < MAX_COLLAPSE_TILE_WRITES) {
-            CollapseTileWrite *write = &writes[(*write_count)++];
-            write->addr_top = addr_top;
-            write->addr_bottom = addr_bottom;
-            write->tile_data = tile_entry;
-            collapseTile->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+        
+        CollapseTileWrite *write = &writes[(*write_count)++];
+        write->addr_top = addr_top;
+        write->addr_bottom = addr_bottom;
+        write->tile_data = tile_entry;
+        updates_this_frame++;
+        processed_count++;
+    }
+    
+    // Remove processed updates from queue (shift remaining items)
+    if (processed_count > 0) {
+        for (uint8_t i = 0; i < s_pendingCollapseTileCount - processed_count; i++) {
+            s_pendingCollapseTileUpdates[i] = s_pendingCollapseTileUpdates[i + processed_count];
         }
+        s_pendingCollapseTileCount -= processed_count;
     }
 }
 
@@ -664,11 +685,19 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_LEFT)   mapped_state |= PORT_INPUT_LEFT_MASK;
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
-    oam_upload();
+    //oam_upload(); //This appears to trigger anyway looking in mesen
     execute_collapse_tiles_nametable_writes(collapseTileWrites, collapseTileWriteCount);
     update_player_hair_color();
+    
+    // Apply screenshake to scroll if active
+    int8_t shakeOffset = 0;
+    if (GLOBAL_ActiveLevel.shakeFrames > 0) {
+        shakeOffset = (s_frameCounter & 1) ? 2 : -2;
+        s_frameCounter++;
+    }
+    
     PPU_SCROLL = 0;
-    PPU_SCROLL = s_scrollY;
+    PPU_SCROLL = (uint8_t)CLAMP((int16_t)s_scrollY + shakeOffset, 0, 255);
 }
 
 uint8_t port_getInputs(void) {
@@ -827,11 +856,11 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
 }
 
 void port_LoadRoomData(uint16_t roomID) {
+    ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
     const LevelData *level = &level_data[level_idx];
-    s_collapseTileCount = 0;
-    ppu_off();
+    s_pendingCollapseTileCount = 0;
     GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = LEVEL_WIDTH;
     GLOBAL_ActiveLevel.roomSizeY = LEVEL_HEIGHT;
@@ -853,7 +882,8 @@ void port_LoadRoomData(uint16_t roomID) {
     load_background_palettes();
     load_sprite_palettes();
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
-    ppu_on_all();
     ppu_wait_nmi();
+    ppu_wait_nmi();
+    ppu_on_all();
 }
 

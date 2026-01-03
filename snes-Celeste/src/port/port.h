@@ -205,6 +205,7 @@ void port_buildBigChest(uint8_t index);
 void port_buildKey(uint8_t index);
 void port_buildSpring(uint8_t index);
 void port_buildCollapseTile(uint8_t index);
+void port_updateCollapseTileNametable(uint8_t index);
 void port_buildStrawberry(uint8_t index);
 void port_buildPlatMov(uint8_t index);
 void port_buildFlyingBerry(uint8_t index);
