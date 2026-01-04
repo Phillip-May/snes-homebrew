@@ -70,6 +70,9 @@ struct sPlayerData GLOBAL_PlayerData;
 
 void initObject(enum eOBJType eType, int16_t x, int16_t y);
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void smokeInit(uint8_t index) {
     GLOBAL_OBJList[index].data.smoke.frameCount = 0;
     GLOBAL_OBJList[index].data.smoke.smokeSpriteState = SMOKE_SPRITE_1;
@@ -93,6 +96,9 @@ void smokeInit(uint8_t index) {
     }
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void smokeUpdate(uint8_t index) {
     OBJ_DATA *smoke = &GLOBAL_OBJList[index];
     smoke->data.smoke.frameCount++;
@@ -112,6 +118,9 @@ void smokeUpdate(uint8_t index) {
 
 
 #define COLLISION_FLAG_INDEX_FROM_TILE_XY(x,y) ((x) + (y) * 16)
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void breakableWallInit(uint8_t index) {
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
@@ -132,6 +141,9 @@ void breakableWallInit(uint8_t index) {
 
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void breakableWallUpdate(uint8_t index) {
     //Check if player is touching the wall
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
@@ -169,6 +181,9 @@ void breakableWallUpdate(uint8_t index) {
     wall->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t properties) {
     OBJ_DATA *decor = &GLOBAL_OBJList[index];
     decor->oamTile = tile;
@@ -176,14 +191,26 @@ static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t propertie
     decor->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static void updateSimpleDecorSprite(uint8_t index) {
     GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void flowerInit(uint8_t index) {
     initSimpleDecorSprite(index, FLOWER_SPRITE_1, 0x32); // priority 3, palette 1
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void flowerUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
@@ -194,6 +221,9 @@ enum eCollapseTileState {
     COLLAPSE_TILE_STATE_HIDDEN = 2,
 };
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void collapseTileInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
@@ -231,6 +261,9 @@ void collapseTileInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void collapseTileUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint16_t thisX = this->pos.x;
@@ -310,6 +343,9 @@ void collapseTileUpdate(uint8_t index) {
     }
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void springInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.spring.frameCount = 0;
@@ -327,6 +363,9 @@ void springInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void springUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     struct sPlayerData *player = &GLOBAL_PlayerData;
@@ -415,6 +454,9 @@ void springUpdate(uint8_t index) {
 }
 
 enum eBalloonState {BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1};
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void balloonInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.balloon.state = BALLOON_STATE_IDLE;
@@ -430,6 +472,9 @@ void balloonInit(uint8_t index) {
 
 
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void balloonUpdate(uint8_t index) {
     static const uint8_t balloonStringFrames[75] = {
         40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 42, 42, 42, 42, 42, 42, 42, 42, 42,
@@ -569,6 +614,9 @@ void platMovUpdate(uint8_t index) {
 
 enum eKeyState {KEY_STATE_1 = 0, KEY_STATE_2 = 1, KEY_STATE_3 = 2, KEY_STATE_4 = 3};
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void keyInit(uint8_t index) {
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -590,6 +638,9 @@ void keyInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void keyUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t properties = 0x30; // priority 3 baseline
@@ -655,6 +706,9 @@ void keyUpdate(uint8_t index) {
 
 enum eChestState {CHEST_STATE_IDLE = 0, CHEST_STATE_SHAKING = 1, CHEST_STATE_OPEN = 2};
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void chestInit(uint8_t index) {   
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -675,6 +729,9 @@ void chestInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void chestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     int16_t shakeAmount = 0;
@@ -709,6 +766,9 @@ void chestUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void monumentInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -725,6 +785,9 @@ static const char monumentText[][25] = {
     " PERISHED ON THE CLIMB "
 };
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void monumentUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching;
@@ -773,6 +836,9 @@ void monumentUpdate(uint8_t index) {
 enum eBigChestState {BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2};
 
 // eBigChestSprite is defined in sprite_animation_enums.h
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void bigChestInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -784,6 +850,9 @@ void bigChestInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void bigChestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) && 
@@ -822,6 +891,9 @@ void bigChestUpdate(uint8_t index) {
     }
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void doubleDashOrbInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -832,6 +904,9 @@ void doubleDashOrbInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Speed starts at -8 and goes down by 0.5 every frame
@@ -873,6 +948,9 @@ void doubleDashOrbUpdate(uint8_t index) {
     }
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void strawberryInit(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
 
@@ -1066,7 +1144,9 @@ void flyingBerryUpdate(uint8_t index) {
 }
 
 // Returns the index of the object in the list
+__attribute__((section(".prg_rom_5")))
 void initObject(enum eOBJType eType, int16_t x, int16_t y) {
+    // initObject is in bank 5, all Init functions are also in bank 5, so no bank switching needed
     // Find a free slot
     uint8_t i;
     //Starts from 1 to account for the fact that hardcoded player is using slot 0
@@ -1080,59 +1160,41 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
             GLOBAL_OBJList[i].oamProps = 0;
             GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
             GLOBAL_OBJList[i].extraSpriteCount = 0;
-            switch (eType)
-            {
-            case OBJ_SMOKE:
+            // Use if-else instead of switch to avoid jump table issues with banking
+            if (eType == OBJ_SMOKE) {
                 smokeInit(i);
-                break;
-            case OBJ_BREAKABLE_WALL:
+            } else if (eType == OBJ_BREAKABLE_WALL) {
                 breakableWallInit(i);
-                break;
-            case OBJ_DECO_FLOWER:
+            } else if (eType == OBJ_DECO_FLOWER) {
                 flowerInit(i);
-                break;
-            case OBJ_STRAWBERRY:
+            } else if (eType == OBJ_STRAWBERRY) {
                 strawberryInit(i);
-                break;
-            case OBJ_DECO_TREE:
+            } else if (eType == OBJ_DECO_TREE) {
                 decoTreeInit(i);
-                break;
-            case OBJ_SPRING:
+            } else if (eType == OBJ_SPRING) {
                 springInit(i);
-                break;
-            case OBJ_FLYING_BERRY:
+            } else if (eType == OBJ_FLYING_BERRY) {
                 flyingBerryInit(i);
-                break;
-            case OBJ_COLLAPSE_TILE:
+            } else if (eType == OBJ_COLLAPSE_TILE) {
                 collapseTileInit(i);
-                break;
-            case OBJ_BALLOON:
+            } else if (eType == OBJ_BALLOON) {
                 balloonInit(i);
-                break;
-            case OBJ_PLATMOV_L:
-            case OBJ_PLATMOV_R:
+            } else if (eType == OBJ_PLATMOV_L || eType == OBJ_PLATMOV_R) {
                 platMovInit(i);
-                break;
-            case OBJ_KEY:
+            } else if (eType == OBJ_KEY) {
                 keyInit(i);
-                break;
-            case OBJ_CHEST:
+            } else if (eType == OBJ_CHEST) {
                 chestInit(i);
-                break;
-            case OBJ_MONUMENT:
+            } else if (eType == OBJ_MONUMENT) {
                 monumentInit(i);
-                break;
-            case OBJ_BIG_CHEST:
+            } else if (eType == OBJ_BIG_CHEST) {
                 bigChestInit(i);
-                break;
-            case OBJ_DOUBLE_JUMP_ORB:
+            } else if (eType == OBJ_DOUBLE_JUMP_ORB) {
                 doubleDashOrbInit(i);
-                break;            
-            default:
+            } else {
                 GLOBAL_OBJList[i].eType = OBJ_UNUSED;
                 GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
                 GLOBAL_OBJList[i].extraSpriteCount = 0;
-                break;
             }
             return;
         }
@@ -1140,11 +1202,17 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
 }
 
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static void clearObjectDirtyFlag(uint8_t index)
 {
     GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static void buildSpriteIfDirty(uint8_t index, void (*builder)(uint8_t))
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -1162,12 +1230,14 @@ static void buildSpriteIfDirty(uint8_t index, void (*builder)(uint8_t))
     builder(index);
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static void processObject(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    switch (obj->eType)
-    {
-    case OBJ_UNUSED:
+    // Use if-else instead of switch to avoid jump table issues with banking
+    if (obj->eType == OBJ_UNUSED) {
         if (obj->flags & OBJ_FLAG_DIRTY) {
             if (index == 0U) {
                 clearObjectDirtyFlag(index);
@@ -1175,87 +1245,79 @@ static void processObject(uint8_t index)
                 port_buildUnused(index);
             }
         }
-        break;
-    case OBJ_SMOKE:
+    } else if (obj->eType == OBJ_SMOKE) {
         smokeUpdate(index);
         buildSpriteIfDirty(index, port_buildSmoke);
-        break;
-    case OBJ_BREAKABLE_WALL:
-        breakableWallUpdate(index);
-        buildSpriteIfDirty(index, port_buildBreakableWall);
-        break;
-    case OBJ_DECO_FLOWER:
-        flowerUpdate(index);
-        buildSpriteIfDirty(index, port_buildStaticDecor);
-        break;
-    case OBJ_STRAWBERRY:
-        strawberryUpdate(index);
-        buildSpriteIfDirty(index, port_buildStrawberry);
-        break;
-    case OBJ_DECO_TREE:
-        decoTreeUpdate(index);
-        buildSpriteIfDirty(index, port_buildStaticDecor);
-        break;
-    case OBJ_SPRING:
-        springUpdate(index);
-        buildSpriteIfDirty(index, port_buildSpring);
-        break;
-    case OBJ_FLYING_BERRY:
-        flyingBerryUpdate(index);
-        buildSpriteIfDirty(index, port_buildFlyingBerry);
-        break;
-    case OBJ_COLLAPSE_TILE:
-        collapseTileUpdate(index);
-        buildSpriteIfDirty(index, port_buildCollapseTile);
-        break;
-    case OBJ_BALLOON:
-        balloonUpdate(index);
-        buildSpriteIfDirty(index, port_buildBalloon);
-        break;
-    case OBJ_PLATMOV_L:
-    case OBJ_PLATMOV_R:
-        platMovUpdate(index);
-        buildSpriteIfDirty(index, port_buildPlatMov);
-        break;
-    case OBJ_KEY:
-        keyUpdate(index);
-        buildSpriteIfDirty(index, port_buildKey);
-        break;
-    case OBJ_CHEST:
-        chestUpdate(index);
-        buildSpriteIfDirty(index, port_buildChest);
-        break;
-    case OBJ_MONUMENT:
-        monumentUpdate(index);
-        buildSpriteIfDirty(index, port_buildMonument);
-        break;
-    case OBJ_BIG_CHEST:
-        bigChestUpdate(index);
-        buildSpriteIfDirty(index, port_buildBigChest);
-        break;
-    case OBJ_DOUBLE_JUMP_ORB:
+    } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
         doubleDashOrbUpdate(index);
         buildSpriteIfDirty(index, port_buildDoubleDashOrb);
-        break;
-    default:
+    } else if (obj->eType == OBJ_KEY) {
+        keyUpdate(index);
+        buildSpriteIfDirty(index, port_buildKey);
+    } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
+        platMovUpdate(index);
+        buildSpriteIfDirty(index, port_buildPlatMov);
+    } else if (obj->eType == OBJ_SPRING) {
+        springUpdate(index);
+        buildSpriteIfDirty(index, port_buildSpring);
+    } else if (obj->eType == OBJ_CHEST) {
+        chestUpdate(index);
+        buildSpriteIfDirty(index, port_buildChest);
+    } else if (obj->eType == OBJ_BALLOON) {
+        balloonUpdate(index);
+        buildSpriteIfDirty(index, port_buildBalloon);
+    } else if (obj->eType == OBJ_COLLAPSE_TILE) {
+        collapseTileUpdate(index);
+        buildSpriteIfDirty(index, port_buildCollapseTile);
+    } else if (obj->eType == OBJ_STRAWBERRY) {
+        strawberryUpdate(index);
+        buildSpriteIfDirty(index, port_buildStrawberry);
+    } else if (obj->eType == OBJ_FLYING_BERRY) {
+        flyingBerryUpdate(index);
+        buildSpriteIfDirty(index, port_buildFlyingBerry);
+    } else if (obj->eType == OBJ_DECO_TREE) {
+        decoTreeUpdate(index);
+        buildSpriteIfDirty(index, port_buildStaticDecor);
+    } else if (obj->eType == OBJ_DECO_FLOWER) {
+        flowerUpdate(index);
+        buildSpriteIfDirty(index, port_buildStaticDecor);
+    } else if (obj->eType == OBJ_BREAKABLE_WALL) {
+        breakableWallUpdate(index);
+        buildSpriteIfDirty(index, port_buildBreakableWall);
+    } else if (obj->eType == OBJ_MONUMENT) {
+        monumentUpdate(index);
+        buildSpriteIfDirty(index, port_buildMonument);
+    } else if (obj->eType == OBJ_BIG_CHEST) {
+        bigChestUpdate(index);
+        buildSpriteIfDirty(index, port_buildBigChest);
+    } else {
         if (obj->flags & OBJ_FLAG_DIRTY) {
             clearObjectDirtyFlag(index);
         }
-        break;
     }
 }
 
 void updateAllObjects(void) {
     uint8_t i;
     port_beginSpriteBuild(&GLOBAL_PlayerData);
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(5);  // Switch to object bank
+#endif
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
         processObject(i);
     }
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(0);  // Switch back to fixed bank
+#endif
     port_finishSpriteBuild();
 }
 
 
 void playerInit(struct sPlayerData* this);
+
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 void onVblank(void);
 
 
@@ -1270,13 +1332,25 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.swapCloudPal = false;
     GLOBAL_ActiveLevel.swapActivePalette = true;
     GLOBAL_ActiveLevel.textFlashActive = false;
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(5);  // Switch to bank 5 for port_LoadRoomData
+#endif
     port_LoadRoomData(roomID);
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(0);  // Switch back to fixed bank for playerInit
+#endif
     playerInit(&GLOBAL_PlayerData);
     port_updatePlayerSprite(&GLOBAL_PlayerData);
     port_beginSpriteBuild(&GLOBAL_PlayerData);
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(5);  // Switch to bank 5 for processObject
+#endif
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; ++i) {
         processObject(i);
     }
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(0);  // Switch back to fixed bank
+#endif
     port_finishSpriteBuild();
 
 }
@@ -1324,7 +1398,6 @@ fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     return target;
 }
 
-
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;
@@ -1370,6 +1443,9 @@ void playerInit(struct sPlayerData* this){
     }
 
     port_resetSprites();
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(5);  // Switch to bank 5 for initObject
+#endif
     for (i = 0; i < (GLOBAL_ActiveLevel.objectCount*3); i+=3) {
         if (GLOBAL_ActiveLevel.objectData[i] != 0) {
             //Player spawn, remove from generated code in future
@@ -1379,9 +1455,15 @@ void playerInit(struct sPlayerData* this){
             initObject(GLOBAL_ActiveLevel.objectData[i], GLOBAL_ActiveLevel.objectData[i+1]*16, GLOBAL_ActiveLevel.objectData[i+2]*16-1);
         }
     }
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(0);  // Switch back to fixed bank
+#endif
 
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, int16_t yspd) {
     int i, j;
     int collisionIndex;
@@ -1467,6 +1549,9 @@ bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, in
     return false;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x + xOffset;
     int16_t y = this->objData.pos.y + yOffset;
@@ -1477,8 +1562,9 @@ static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     return isDeathAtPoint(x, y, w, h, FIXED_TO_INT(this->spd.x), FIXED_TO_INT(this->spd.y));
 }
 
-
-
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     int tileX;
     int tileY;
@@ -1501,6 +1587,9 @@ static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     return GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x01;
 }
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x; 
     int16_t y = this->objData.pos.y;
@@ -1535,6 +1624,9 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
 
 #define FPS60_SCALE_FACTOR 1.0f
 void playerUpdate(struct sPlayerData* this) {
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(5);  // Switch to bank 5 for collision functions
+#endif
     int16_t prevPosX = this->objData.pos.x;
     int16_t prevPosY = this->objData.pos.y;
     uint8_t prevTile = this->objData.oamTile;
@@ -1610,6 +1702,7 @@ void playerUpdate(struct sPlayerData* this) {
     //Smoke particles when landing
     static bool wasOnGround = false;
     if (onGround && !wasOnGround) {
+        // initObject is in bank 5, we're already in bank 5 (switched at start of function)
         initObject(OBJ_SMOKE, this->objData.pos.x, this->objData.pos.y + 4);
     }
     wasOnGround = onGround;
@@ -1658,6 +1751,7 @@ void playerUpdate(struct sPlayerData* this) {
             maxfall=FLOAT_TO_FIXED(0.4f * 2);
             onWall = true;
             if (randint16(0,10)<2) {
+                // initObject is in bank 5, we're already in bank 5 (switched at start of function)
                 initObject(OBJ_SMOKE,this->objData.pos.x+inputX*6*2,this->objData.pos.y);
             }
         }
@@ -1700,6 +1794,7 @@ void playerUpdate(struct sPlayerData* this) {
                     jumpBuffer = 0;
                     this->spd.y = INT_TO_FIXED(-2*2);
                     this->spd.x = FIXED_MUL(INT_TO_FIXED(-wall_dir), FIXED_ADD(maxrun, INT_TO_FIXED(1*2)));
+                    // initObject is in bank 5, we're already in bank 5 (switched at start of function)
                     initObject(OBJ_SMOKE,this->objData.pos.x+wall_dir*6*2,this->objData.pos.y);
                 }
             }
@@ -1875,8 +1970,14 @@ void playerUpdate(struct sPlayerData* this) {
     if (OBJ_isDeathAt(this, 0, 0) || this->objData.pos.y >= (255)) {
         playSoundEffect(SOUND_EFFECT_DEATH);
         this->objData.pos.y = 240; //offscreen
-        GLOBAL_ActiveLevel.shakeFrames = 10 * 2;        
+        GLOBAL_ActiveLevel.shakeFrames = 10 * 2;
+#ifdef __NES_UNROM_512__
+        prg_bank_switch(5);  // Switch to bank 5 for playerInit
+#endif
         playerInit(this);
+#ifdef __NES_UNROM_512__
+        prg_bank_switch(0);  // Switch back to fixed bank
+#endif
         return;
     }
 
@@ -1884,8 +1985,14 @@ void playerUpdate(struct sPlayerData* this) {
 
     // next level
     if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
+#ifdef __NES_UNROM_512__
+        prg_bank_switch(5);  // Switch to bank 5 for LoadNextRoom and playerInit
+#endif
         LoadNextRoom();
         playerInit(this);
+#ifdef __NES_UNROM_512__
+        prg_bank_switch(0);  // Switch back to fixed bank
+#endif
      }
 
     //Animation
@@ -1909,6 +2016,9 @@ void playerUpdate(struct sPlayerData* this) {
     this->objData.oamTile = (uint8_t)this->eSriteState;
     this->objData.oamProps = this->isFliped ? (uint8_t)(0x38u | 0x40u) : 0x38u;
     this->objData.flags |= OBJ_FLAG_DIRTY;
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(0);  // Switch back to fixed bank
+#endif
 }
 
 
@@ -1950,12 +2060,18 @@ static const uint16_t rand_table[256] = {
 
 // Table-based random number generator
 static uint8_t global_randSeed = 0xDEADBEEE; // You can set this to time(NULL) for more randomness
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 uint16_t my_rand() {
     global_randSeed = (global_randSeed + 1) % 256;
     return rand_table[global_randSeed];
 }
 
 // Returns a random integer in [min, max]
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 int16_t randint16(int16_t min, int16_t max) {
     uint16_t range;
     uint16_t randomValue;

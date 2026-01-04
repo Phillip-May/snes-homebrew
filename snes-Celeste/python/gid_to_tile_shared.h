@@ -8,6 +8,9 @@
 #ifndef GID_TO_TILE_SHARED_H
 #define GID_TO_TILE_SHARED_H
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 const unsigned char gid_to_tile_shared[76][6] = {
     // GID 0
     { 0, 0, 0, 0, 0, 0 },
@@ -167,6 +170,9 @@ const unsigned char gid_to_tile_shared[76][6] = {
 
 // GID to collision flags mapping
 // Collision flags: 0 = no collision, 1 = solid, 4/8/16/32 = pointy variants
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {
     0,
     1,

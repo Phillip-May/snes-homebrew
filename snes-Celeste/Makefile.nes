@@ -1,5 +1,7 @@
 #
-# NES NROM build using llvm-mos
+# NES UNROM-512 build using llvm-mos
+# UNROM-512: 16KB fixed PRG-ROM + 16KB switchable (up to 512KB total)
+# Level data and music data are placed in switchable banks
 #
 
 PROJECT_NAME := nes-Celeste
@@ -14,12 +16,12 @@ LLVM_MOS_PATH ?= C:/llvm-mos
 LLVM_MOS_PATH_WIN   := $(subst /,\,$(LLVM_MOS_PATH))
 LLVM_MOS_PATH_POSIX := $(subst \,/,$(LLVM_MOS_PATH_WIN))
 NES_CLANG_POSIX     := $(LLVM_MOS_PATH_POSIX)/bin/mos-clang.exe
-NES_CONFIG_POSIX    := $(LLVM_MOS_PATH_POSIX)/bin/mos-nes-nrom.cfg
+NES_CONFIG_POSIX    := $(LLVM_MOS_PATH_POSIX)/bin/mos-nes-unrom-512.cfg
 
 NES_CFLAGS   := -Os -flto -ffunction-sections -fdata-sections -fomit-frame-pointer -fno-common -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signaling-nans -Wall -Wextra -Wno-unused-parameter -std=c17
 NES_PORT_CFLAGS := -Os -flto -ffunction-sections -fdata-sections -fomit-frame-pointer -funroll-loops -finline-functions -fno-strict-aliasing -fno-common -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signaling-nans -fno-signed-zeros -fno-rounding-math -Wall -Wextra -Wno-unused-parameter -std=c17
 NES_INCLUDES := -I$(SRC_DIR) -I$(PORT_DIR) -I$(SHARED_DIR) -I$(LIBFIX_DIR) -Ipython -I$(LLVM_MOS_PATH_POSIX)/mos-platform/nes/include
-NES_LDFLAGS  := '-Wl,-Map=$(BUILD_DIR)/celeste-nes.map' '-Wl,--gc-sections' '-Wl,--relax'
+NES_LDFLAGS  := '-Wl,-Map=$(BUILD_DIR)/celeste-nes.map' '-Wl,--gc-sections' '-Wl,--relax' '-Wl,--defsym=__chr_rom_size=8'
 NES_LIBS     := -lneslib
 
 NES_ROM      := $(BUILD_DIR)/celeste-nes.nes

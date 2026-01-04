@@ -7,6 +7,9 @@
 #define OBJECT_SPRITE_DICT_SHARED_NES_H
 
 // Lookup table: maps tile_idx -> compact_index (0xFF = not found)
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 const unsigned char object_sprite_lookup_table[33] = {
     /* tile 0 */  255,
     /* tile 1 */  0,
@@ -45,6 +48,9 @@ const unsigned char object_sprite_lookup_table[33] = {
 
 // Compact sprite data array (only used entries)
 // Format: [pal_idx, tl, tr, bl, br]
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 const unsigned char object_sprite_dict_compact[19][5] = {
     /* compact_idx 0: tile 1 */  { 3, 1, 2, 3, 4 },
     /* compact_idx 1: tile 2 */  { 3, 1, 2, 3, 5 },

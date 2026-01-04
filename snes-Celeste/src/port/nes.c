@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <mapper.h>
 
 // sprite_animation_enums_nes.h is included by port.h when __NES__ is defined
 #include "../../python/gid_to_tile_shared.h"
@@ -39,10 +40,10 @@
 #include "../../python/tilemap_level25_nes.h"
 #include "../../python/tilemap_level26_nes.h"
 #include "../../python/tilemap_level27_nes.h"
-// #include "../../python/tilemap_level28_nes.h"
-// #include "../../python/tilemap_level29_nes.h"
-// #include "../../python/tilemap_level30_nes.h"
-// #include "../../python/tilemap_level31_nes.h"
+#include "../../python/tilemap_level28_nes.h"
+#include "../../python/tilemap_level29_nes.h"
+#include "../../python/tilemap_level30_nes.h"
+#include "../../python/tilemap_level31_nes.h"
 
 #ifndef _WIN32 //Fix linter
 #include <neslib.h>
@@ -98,6 +99,7 @@ typedef struct {
     uint8_t spawn_y;
 } LevelData;
 
+__attribute__((section(".prg_rom_1")))
 static const LevelData level_data[] = {
     // Level 1
     {
@@ -108,6 +110,7 @@ static const LevelData level_data[] = {
         SPAWN_X_LEVEL1, SPAWN_Y_LEVEL1
     },
     // Level 2
+    /*
     {
         tilemap_level2_compressed,
         object_level2, OBJECT_LEVEL2_COUNT,
@@ -300,14 +303,13 @@ static const LevelData level_data[] = {
         SPAWN_X_LEVEL25, SPAWN_Y_LEVEL25
     },
     // Level 26
-    /*
     {
         tilemap_level26_compressed,
         object_level26, OBJECT_LEVEL26_COUNT,
         palette_background_level26,
         palette_sprite_level26,
         SPAWN_X_LEVEL26, SPAWN_Y_LEVEL26
-    }
+    },
     // Level 27
     {
         tilemap_level27_compressed,
@@ -315,7 +317,7 @@ static const LevelData level_data[] = {
         palette_background_level27,
         palette_sprite_level27,
         SPAWN_X_LEVEL27, SPAWN_Y_LEVEL27
-    }
+    },
     // Level 28
     {
         tilemap_level28_compressed,
@@ -324,7 +326,7 @@ static const LevelData level_data[] = {
         palette_sprite_level28,
         SPAWN_X_LEVEL28, SPAWN_Y_LEVEL28
     },
-    Level 29
+    // Level 29
     {
         tilemap_level29_compressed,
         object_level29, OBJECT_LEVEL29_COUNT,
@@ -332,7 +334,7 @@ static const LevelData level_data[] = {
         palette_sprite_level29,
         SPAWN_X_LEVEL29, SPAWN_Y_LEVEL29
     },
-    Level 30
+    // Level 30
     {
         tilemap_level30_compressed,
         object_level30, OBJECT_LEVEL30_COUNT,
@@ -340,14 +342,14 @@ static const LevelData level_data[] = {
         palette_sprite_level30,
         SPAWN_X_LEVEL30, SPAWN_Y_LEVEL30
     },
-    Level 31
+    // Level 31
     {
         tilemap_level31_compressed,
         object_level31, OBJECT_LEVEL31_COUNT,
         palette_background_level31,
         palette_sprite_level31,
         SPAWN_X_LEVEL31, SPAWN_Y_LEVEL31
-    } */
+    }*/
 };
 
 #define LEVEL_DATA_COUNT (sizeof(level_data) / sizeof(level_data[0]))
@@ -357,7 +359,10 @@ static const LevelData level_data[] = {
 #define GID_TO_TILE_MAP_COUNT GID_TO_TILE_SHARED_COUNT
 #define GID_TO_COLLISION_COUNT 72
 
-static void decompress_tilemap(const unsigned char *compressed_data, uint8_t *output) {
+// decompress_tilemap must be in fixed bank (no section attribute) so it can be called from any bank
+// Caller must have level data bank active to read compressed_data
+// Function switches to bank 5 when needed to read compression_dict_shared
+static void decompress_tilemap(const unsigned char *compressed_data, uint8_t *output, uint8_t data_bank) {
     uint16_t comp_idx = 0, out_idx = 0;
     while (out_idx < LEVEL_TILE_COUNT) {
         uint8_t byte = compressed_data[comp_idx];
@@ -374,8 +379,12 @@ static void decompress_tilemap(const unsigned char *compressed_data, uint8_t *ou
         } else {
             uint8_t dict_idx = byte & 0x3F;
             if (dict_idx < COMPRESSION_DICT_SHARED_COUNT) {
+                // compression_dict_shared is in bank 5, switch to it to access
+                prg_bank_switch(5);
                 output[out_idx++] = compression_dict_shared[dict_idx][0];
                 if (out_idx < LEVEL_TILE_COUNT) output[out_idx++] = compression_dict_shared[dict_idx][1];
+                // Switch back to level data bank to continue reading compressed_data
+                prg_bank_switch(data_bank);
             }
             comp_idx++;
         }
@@ -393,11 +402,19 @@ static void hide_sprites(uint16_t oamOffset);
 static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset);
 static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset);
 
+// get_object_sprite_data must stay in fixed bank - used by port_updatePlayerSprite (fixed bank)
+// object_sprite_lookup_table and object_sprite_dict_compact are in bank 5
+// Note: This function switches to bank 5 and does NOT switch back - caller must switch back after using the sprite data
 static const unsigned char* get_object_sprite_data(uint8_t tile_index) {
     if (tile_index >= OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE) return NULL;
+    prg_bank_switch(5);  // Switch to bank 5 to access sprite data
     uint8_t compact_idx = object_sprite_lookup_table[tile_index];
-    if (compact_idx == 0xFF || compact_idx >= OBJECT_SPRITE_DICT_COMPACT_COUNT) return NULL;
+    if (compact_idx == 0xFF || compact_idx >= OBJECT_SPRITE_DICT_COMPACT_COUNT) {
+        prg_bank_switch(0);  // Switch back to fixed bank on error
+        return NULL;
+    }
     return &object_sprite_dict_compact[compact_idx][0];
+    // Note: Bank 5 remains active - caller must switch back to bank 0 after using the sprite data
 }
 
 static void hide_sprites(uint16_t oamOffset) {
@@ -407,6 +424,7 @@ static void hide_sprites(uint16_t oamOffset) {
     OAM_BUF[oamOffset + 12] = 240;
 }
 
+__attribute__((section(".text.prg_rom_5")))
 static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset) {
     if (obj->eType == OBJ_UNUSED) {
         hide_sprites(oamOffset);
@@ -464,34 +482,44 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     uint8_t tile_index = playerData->oamTile;
     const unsigned char *player_sprite = get_object_sprite_data(tile_index);
     if (player_sprite == NULL) {
+        prg_bank_switch(0);  // get_object_sprite_data may have switched to bank 5, switch back
         hide_sprites(0);
         return;
     }
     
     render_16x16_sprite(player_sprite, baseX, baseY, playerData->oamProps, 0);
+    prg_bank_switch(0);  // get_object_sprite_data switched to bank 5, switch back to fixed bank
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildUnused(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildSmoke(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildBreakableWall(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildBalloon(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildMonument(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildChest(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildBigChest(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildKey(uint8_t index) {
 }
 
@@ -517,6 +545,7 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
     }
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildSpring(uint8_t index) {
     OBJ_DATA *spring = &GLOBAL_OBJList[index];
     uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
@@ -528,6 +557,8 @@ void port_buildSpring(uint8_t index) {
 }
 
 // Queue a collapse tile update (called from mainBankZero.c when state changes)
+__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".text.prg_rom_5")))
 void port_updateCollapseTileNametable(uint8_t index) {
     // Check if already in queue (avoid duplicates)
     for (uint8_t i = 0; i < s_pendingCollapseTileCount; i++) {
@@ -541,6 +572,9 @@ void port_updateCollapseTileNametable(uint8_t index) {
     }
 }
 
+__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".text.prg_rom_5")))
 static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
     if (s_pendingCollapseTileCount == 0) return;
@@ -588,6 +622,7 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
     }
 }
 
+__attribute__((section(".text.prg_rom_5")))
 static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *writes, uint8_t write_count) {
     for (uint8_t i = 0; i < write_count; i++) {
         const CollapseTileWrite *write = &writes[i];
@@ -614,10 +649,12 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
     }
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildCollapseTile(uint8_t index) {
     (void)index;
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildStrawberry(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
     uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
@@ -629,9 +666,11 @@ void port_buildStrawberry(uint8_t index) {
     render_object_sprite(strawberry, oamOffset);
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildPlatMov(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildFlyingBerry(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
     uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
@@ -643,9 +682,11 @@ void port_buildFlyingBerry(uint8_t index) {
     render_object_sprite(berry, oamOffset);
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildDoubleDashOrb(uint8_t index) {
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_buildStaticDecor(uint8_t index) {
 }
 
@@ -654,6 +695,7 @@ void port_resetSprites(void) {
     s_inputState = 0;
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y) {
     (void)text;
     (void)x;
@@ -671,6 +713,7 @@ __attribute__((noinline)) void port_vblank(void) {
     s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
     CollapseTileWrite collapseTileWrites[MAX_COLLAPSE_TILE_WRITES];
     uint8_t collapseTileWriteCount = 0;
+    prg_bank_switch(5);  // Switch to object bank for collapse tile functions
     prepare_collapse_tiles_nametable(collapseTileWrites, &collapseTileWriteCount);
     ppu_wait_nmi();
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
@@ -686,7 +729,9 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
     //oam_upload(); //This appears to trigger anyway looking in mesen
+    // execute_collapse_tiles_nametable_writes is in bank 5, bank already switched above
     execute_collapse_tiles_nametable_writes(collapseTileWrites, collapseTileWriteCount);
+    prg_bank_switch(0);  // Switch back to fixed bank
     update_player_hair_color();
     
     // Apply screenshake to scroll if active
@@ -713,30 +758,52 @@ static uint8_t nes_6bit_to_palette_index(uint8_t nes_6bit) {
 // Upper 16 bytes (16-31): 4 sprite palettes * 4 colors
 static uint8_t palette_ram[32];
 
+// Determine which PRG-ROM bank contains a given level
+// Levels are organized: 1-10 in bank 1, 11-20 in bank 2, 21-31 in bank 3
+static inline uint8_t get_level_bank(uint16_t level_idx) {
+    if (level_idx < 10) return 1;   // Levels 1-10
+    if (level_idx < 20) return 2;   // Levels 11-20
+    return 3;                       // Levels 21-31
+}
+
+__attribute__((section(".text.prg_rom_5")))
 static void load_background_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
     const LevelData *level = &level_data[level_idx];
+    uint8_t level_bank = get_level_bank(level_idx);
+    if (level_bank != 1) {
+        prg_bank_switch(level_bank);  // Switch to level data bank if different
+    }
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             palette_ram[pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(level->bg_palettes[pal_idx][col_idx]);
         }
     }
     pal_bg(palette_ram);
+    prg_bank_switch(5);  // Switch back to bank 5 before returning (load_background_palettes is in bank 5)
 }
 
+__attribute__((section(".text.prg_rom_5")))
 static void load_sprite_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[16 + i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
     const LevelData *level = &level_data[level_idx];
+    uint8_t level_bank = get_level_bank(level_idx);
+    if (level_bank != 1) {
+        prg_bank_switch(level_bank);  // Switch to level data bank if different
+    }
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             palette_ram[16 + pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(level->sprite_palettes[pal_idx][col_idx]);
         }
     }
     pal_spr(&palette_ram[16]);
+    prg_bank_switch(5);  // Switch back to bank 5 before returning (load_sprite_palettes is in bank 5)
 }
 
 static void update_player_hair_color(void) {
@@ -749,17 +816,28 @@ static void update_player_hair_color(void) {
     }
 }
 
+__attribute__((section(".text.prg_rom_5")))
 static uint8_t get_palette_from_gid(uint8_t gid, const unsigned char (*gid_to_tile_map)[6], uint16_t gid_map_count) {
     if (gid >= gid_map_count || !gid_to_tile_map) return 0;
     return (gid_to_tile_map[gid][4] & 0x03);
 }
 
+__attribute__((section(".text.prg_rom_5")))
 static void write_nametable(void) {
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
     const LevelData *level = &level_data[level_idx];
+    uint8_t level_bank = get_level_bank(level_idx);
+    if (level_bank != 1) {
+        prg_bank_switch(level_bank);  // Switch to level data bank if different
+    }
+    // decompress_tilemap is in fixed bank, so it can be called from any bank
+    // compressed_data pointer is in the level data bank (currently active)
     uint8_t *decompressed_tilemap = (uint8_t *)GLOBAL_OBJList;
-    decompress_tilemap(level->tilemap_compressed, decompressed_tilemap);
+    decompress_tilemap(level->tilemap_compressed, decompressed_tilemap, level_bank);
+    // Switch to bank 5 to access gid_to_tile_shared (which is in bank 5)
+    prg_bank_switch(5);
     const unsigned char *tilemap_gids = decompressed_tilemap;
     const unsigned char (*gid_to_tile_map)[6] = GID_TO_TILE_MAP;
     uint16_t gid_map_count = GID_TO_TILE_MAP_COUNT;
@@ -831,6 +909,7 @@ static void write_nametable(void) {
             vram_put(tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6));
         }
     }
+    prg_bank_switch(5);  // Switch back to bank 5 before returning (write_nametable is in bank 5)
 }
 
 static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
@@ -855,27 +934,45 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
     }
 }
 
+__attribute__((section(".text.prg_rom_5")))
 void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
     const LevelData *level = &level_data[level_idx];
+    uint8_t level_bank = get_level_bank(level_idx);
+    if (level_bank != 1) {
+        prg_bank_switch(level_bank);  // Switch to level data bank if different
+    }
     s_pendingCollapseTileCount = 0;
     GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = LEVEL_WIDTH;
     GLOBAL_ActiveLevel.roomSizeY = LEVEL_HEIGHT;
+    // decompress_tilemap is in fixed bank, so it can be called from any bank
+    // compressed_data pointer is in the level data bank (currently active)
     uint8_t *decompressed_tilemap = (uint8_t *)GLOBAL_OBJList;
-    decompress_tilemap(level->tilemap_compressed, decompressed_tilemap);
+    decompress_tilemap(level->tilemap_compressed, decompressed_tilemap, level_bank);
+    // Switch to bank 5 to access gid_to_collision (which is in bank 5)
+    prg_bank_switch(5);
     for (uint16_t i = 0; i < LEVEL_TILE_COUNT && i < 256; i++) {
         uint8_t gid = decompressed_tilemap[i];
         uint8_t collision_flag = (gid < GID_TO_COLLISION_COUNT) ? gid_to_collision[gid] : 0;
         GLOBAL_ActiveLevel.collisionFlagsReset[i] = collision_flag;
         GLOBAL_ActiveLevel.collisionFlagsArr[i] = collision_flag;
     }
-    GLOBAL_ActiveLevel.playerSpawnX = level->spawn_x;
-    GLOBAL_ActiveLevel.playerSpawnY = level->spawn_y;
-    GLOBAL_ActiveLevel.objectCount = level->object_count;
-    memcpy(GLOBAL_ActiveLevel.objectData, level->objects, level->object_count * 3);
+    // Switch back to bank 1 to access level_data array for spawn_x, spawn_y, object_count
+    prg_bank_switch(1);
+    const LevelData *level_for_struct = &level_data[level_idx];  // Re-get pointer while in bank 1
+    GLOBAL_ActiveLevel.playerSpawnX = level_for_struct->spawn_x;
+    GLOBAL_ActiveLevel.playerSpawnY = level_for_struct->spawn_y;
+    GLOBAL_ActiveLevel.objectCount = level_for_struct->object_count;
+    // Switch to level data bank to access level->objects
+    if (level_bank != 1) {
+        prg_bank_switch(level_bank);
+    }
+    const LevelData *level_for_objects = &level_data[level_idx];  // Re-get pointer while in level data bank
+    memcpy(GLOBAL_ActiveLevel.objectData, level_for_objects->objects, level_for_objects->object_count * 3);
     GLOBAL_ActiveLevel.scrollPointY = 72;
     write_nametable();
     fix_collapse_tile_palettes(decompressed_tilemap);
@@ -885,5 +982,6 @@ void port_LoadRoomData(uint16_t roomID) {
     ppu_wait_nmi();
     ppu_wait_nmi();
     ppu_on_all();
+    prg_bank_switch(5);  // Switch back to bank 5 before returning (port_LoadRoomData is in bank 5)
 }
 

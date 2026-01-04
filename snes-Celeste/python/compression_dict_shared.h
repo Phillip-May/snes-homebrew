@@ -5,6 +5,9 @@
 #ifndef COMPRESSION_DICT_SHARED_H
 #define COMPRESSION_DICT_SHARED_H
 
+#ifdef __NES_UNROM_512__
+__attribute__((section(".prg_rom_5")))
+#endif
 const unsigned char compression_dict_shared[64][2] = {
     // Entry 0
     { 0, 0 },

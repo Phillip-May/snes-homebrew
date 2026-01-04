@@ -15,6 +15,7 @@
 
 // Compressed tilemap data for layer 'level15'
 // Format: 0x00-0x7F = literal GID, 0x80-0xBF = RLE, 0xC0-0xFF = dict sequence
+__attribute__((section(".prg_rom_2")))
 const unsigned char tilemap_level15_compressed[] = {
     0xc2, 0xe7, 0xee, 0xc7, 0xf9, 0xd2, 0xc2, 0xd2, 0xc2, 0xda, 0xc1, 0xc4, 0xf0, 0xe7, 0xc3, 0xc3,
     0xc2, 0xda, 0xd3, 0xc0, 0xf0, 0xed, 0xc6, 0x0d, 0x0c, 0xc3, 0xee, 0xc1, 0xc0, 0x28, 0xfd, 0xd0,
@@ -33,6 +34,7 @@ const unsigned char tilemap_level15_compressed[] = {
 // Background palette data for layer 'level15' (NES 6-bit format)
 // 4 background palettes, each with 4 colors: [color0=black, color1, color2, color3]
 // Used by tiles in all_background_gids (far_background, solid, pointy, and icy)
+__attribute__((section(".prg_rom_2")))
 const unsigned char palette_background_level15[4][4] = {
     // Background Palette 0
     { 0x0d, 0x20, 0x21, 0x00 },
@@ -50,6 +52,7 @@ const unsigned char palette_background_level15[4][4] = {
 // 4 sprite palettes, each with 4 colors: [color0, color1, color2, color3]
 // Used by non-background tiles
 // Palette 3 is reserved for player sprites
+__attribute__((section(".prg_rom_2")))
 const unsigned char palette_sprite_level15[4][4] = {
     // Sprite Palette 0
     { 0x0d, 0x20, 0x28, 0x15 },
@@ -64,6 +67,7 @@ const unsigned char palette_sprite_level15[4][4] = {
 #define PALETTE_SPRITE_LEVEL15_COUNT 4
 
 // Object data for layer 'level15'
+__attribute__((section(".prg_rom_2")))
 const unsigned char object_level15[] = {
     20, 7, 5,
     8, 3, 9,
@@ -82,6 +86,7 @@ const unsigned char object_level15[] = {
 // Object sprite data for layer 'level15'
 // Each object sprite is 16x16 (4 8x8 tiles = 64 bytes)
 // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile, ...]
+__attribute__((section(".prg_rom_2")))
 const unsigned char object_sprite_level15[] = {
     // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
     1, 3, 1, 2, 3, 4,
