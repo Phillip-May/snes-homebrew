@@ -555,7 +555,6 @@ void port_buildSpring(uint8_t index) {
 }
 
 // Queue a collapse tile update (called from mainBankZero.c when state changes)
-__attribute__((section(".prg_rom_6")))
 void port_updateCollapseTileNametable(uint8_t index) {
     // Check if already in queue (avoid duplicates)
     for (uint8_t i = 0; i < s_pendingCollapseTileCount; i++) {
@@ -569,13 +568,12 @@ void port_updateCollapseTileNametable(uint8_t index) {
     }
 }
 
-__attribute__((section(".prg_rom_6")))
 static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
     if (s_pendingCollapseTileCount == 0) return;
     
     // Limit to 2 updates per frame
-    const uint8_t MAX_UPDATES_PER_FRAME = 2;
+    const uint8_t MAX_UPDATES_PER_FRAME = 1;
     uint8_t updates_this_frame = 0;
     uint8_t processed_count = 0;
     
@@ -588,7 +586,11 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
         uint8_t tileY = (collapseTile->pos.y + 1) / 16;
         const unsigned char *tile_entry = NULL;
         if (collapseTile->data.collapseTile.state != 2 && collapseTile->oamTile >= COLLAPSE_TILE_SPRITE_1 && collapseTile->oamTile <= COLLAPSE_TILE_SPRITE_3) {
+            // gid_to_tile_collapse is in bank 5, switch to it before accessing
+            prg_bank_switch(5);
             tile_entry = gid_to_tile_collapse[collapseTile->oamTile - COLLAPSE_TILE_SPRITE_1];
+            // Switch back to bank 6 (prepare_collapse_tiles_nametable is called from bank 6 context)
+            prg_bank_switch(6);
         }
         uint8_t nes_tile_x = tileX * 2;
         uint8_t nes_tile_y_top = tileY * 2;
@@ -617,8 +619,21 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
     }
 }
 
-__attribute__((section(".prg_rom_6")))
 static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *writes, uint8_t write_count) {
+    // Check if any writes need bank 5 data
+    bool needs_bank5 = false;
+    for (uint8_t i = 0; i < write_count; i++) {
+        if (writes[i].tile_data != NULL) {
+            needs_bank5 = true;
+            break;
+        }
+    }
+    
+    // Switch to bank 5 if needed (tile_data pointers point to data in bank 5)
+    if (needs_bank5) {
+        prg_bank_switch(5);
+    }
+    
     for (uint8_t i = 0; i < write_count; i++) {
         const CollapseTileWrite *write = &writes[i];
         if (write->tile_data != NULL) {
@@ -637,6 +652,11 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
             vram_put(0);
         }
     }
+    
+    // Switch back to bank 6 (execute_collapse_tiles_nametable_writes is called from bank 6 context)
+    if (needs_bank5) {
+        prg_bank_switch(6);
+    }
     if (write_count > 0) {
         (void)PPU_STATUS;
         PPU_ADDR = 0;
@@ -644,7 +664,6 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
     }
 }
 
-__attribute__((section(".prg_rom_6")))
 void port_buildCollapseTile(uint8_t index) {
     (void)index;
 }
