@@ -218,14 +218,37 @@ uint8_t port_getInputs(void);
 void port_vblank(void);
 void port_LoadRoomData(uint16_t roomID);
 
-#ifdef __mos__
-// For LLVM-MOS UNROM-512, use mapper.h API for bank switching
-#include <mapper.h>
-#define prg_bank_switch set_prg_bank
-#elif defined(__NES_UNROM_512__)
+#ifdef defined(__NES_UNROM_512__)
 // PRG-ROM bank switching for UNROM-512 (non-LLVM-MOS compilers)
+#include <mapper.h>
 void prg_bank_switch(uint8_t bank);
 #endif
+
+// Macros for function section attributes (bank placement)
+#ifdef __NES_UNROM_512__
+#define PORT_FUNC_BANK6 __attribute__((section(".prg_rom_6")))
+#define PORT_FUNC_BANK5 __attribute__((section(".prg_rom_5")))
+#define PORT_FUNC_BANK4 __attribute__((section(".prg_rom_4")))
+#define PORT_FUNC_BANK3 __attribute__((section(".prg_rom_3")))
+#define PORT_FUNC_BANK2 __attribute__((section(".prg_rom_2")))
+#define PORT_FUNC_BANK1 __attribute__((section(".prg_rom_1")))
+#define PORT_FUNC_BANK0 __attribute__((section(".prg_rom_0")))
+#else
+#define PORT_FUNC_BANK6
+#define PORT_FUNC_BANK5
+#define PORT_FUNC_BANK4
+#define PORT_FUNC_BANK3
+#define PORT_FUNC_BANK2
+#define PORT_FUNC_BANK1
+#define PORT_FUNC_BANK0
+#endif
+
+// Wrapper function for bank switching (portable interface)
+static inline void port_prg_bank_switch(uint8_t bank) {
+#ifdef __NES_UNROM_512__
+    prg_bank_switch(bank);
+#endif
+}
 
 #endif /* PORT_H */
 

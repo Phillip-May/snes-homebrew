@@ -1159,6 +1159,12 @@ void port_buildCollapseTile(uint8_t index)
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
+void port_updateCollapseTileNametable(uint8_t index)
+{
+    // SNES version doesn't need nametable updates for collapse tiles
+    (void)index;
+}
+
 void port_buildStrawberry(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -1197,9 +1203,48 @@ void port_buildStaticDecor(uint8_t index)
 
 void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
 {
-    // SNES version doesn't need this - sprites are built differently
-    (void)index;
-    (void)eType;
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
+    if ((obj->flags & OBJ_FLAG_DIRTY) == 0U) {
+        return;
+    }
+    if (index == 0U) {
+        obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+        return;
+    }
+    if (eType == OBJ_UNUSED) {
+        port_buildUnused(index);
+        return;
+    }
+
+    if (eType == OBJ_SMOKE) {
+        port_buildSmoke(index);
+    } else if (eType == OBJ_DOUBLE_JUMP_ORB) {
+        port_buildDoubleDashOrb(index);
+    } else if (eType == OBJ_KEY) {
+        port_buildKey(index);
+    } else if (eType == OBJ_PLATMOV_R || eType == OBJ_PLATMOV_L) {
+        port_buildPlatMov(index);
+    } else if (eType == OBJ_SPRING) {
+        port_buildSpring(index);
+    } else if (eType == OBJ_CHEST) {
+        port_buildChest(index);
+    } else if (eType == OBJ_BALLOON) {
+        port_buildBalloon(index);
+    } else if (eType == OBJ_COLLAPSE_TILE) {
+        port_buildCollapseTile(index);
+    } else if (eType == OBJ_STRAWBERRY) {
+        port_buildStrawberry(index);
+    } else if (eType == OBJ_FLYING_BERRY) {
+        port_buildFlyingBerry(index);
+    } else if (eType == OBJ_DECO_TREE || eType == OBJ_DECO_FLOWER) {
+        port_buildStaticDecor(index);
+    } else if (eType == OBJ_BREAKABLE_WALL) {
+        port_buildBreakableWall(index);
+    } else if (eType == OBJ_MONUMENT) {
+        port_buildMonument(index);
+    } else if (eType == OBJ_BIG_CHEST) {
+        port_buildBigChest(index);
+    }
 }
 
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y)

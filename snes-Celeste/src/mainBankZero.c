@@ -20,9 +20,7 @@
 int16_t randint16(int16_t min, int16_t max);
 
 //Basic math functions that a compiler should have
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static int16_t sign(int16_t v) {
     return v > 0 ? 1 : (v < 0 ? -1 : 0);
 }
@@ -73,9 +71,7 @@ struct sPlayerData GLOBAL_PlayerData;
 
 void initObject(enum eOBJType eType, int16_t x, int16_t y);
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void smokeInit(uint8_t index) {
     GLOBAL_OBJList[index].data.smoke.frameCount = 0;
     GLOBAL_OBJList[index].data.smoke.smokeSpriteState = SMOKE_SPRITE_1;
@@ -99,9 +95,7 @@ void smokeInit(uint8_t index) {
     }
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void smokeUpdate(uint8_t index) {
     OBJ_DATA *smoke = &GLOBAL_OBJList[index];
     smoke->data.smoke.frameCount++;
@@ -121,9 +115,7 @@ void smokeUpdate(uint8_t index) {
 
 
 #define COLLISION_FLAG_INDEX_FROM_TILE_XY(x,y) ((x) + (y) * 16)
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void breakableWallInit(uint8_t index) {
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
@@ -144,9 +136,7 @@ void breakableWallInit(uint8_t index) {
 
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void breakableWallUpdate(uint8_t index) {
     //Check if player is touching the wall
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
@@ -184,9 +174,7 @@ void breakableWallUpdate(uint8_t index) {
     wall->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t properties) {
     OBJ_DATA *decor = &GLOBAL_OBJList[index];
     decor->oamTile = tile;
@@ -194,26 +182,17 @@ static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t propertie
     decor->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static void updateSimpleDecorSprite(uint8_t index) {
     GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void flowerInit(uint8_t index) {
     initSimpleDecorSprite(index, FLOWER_SPRITE_1, 0x32); // priority 3, palette 1
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void flowerUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
@@ -224,9 +203,7 @@ enum eCollapseTileState {
     COLLAPSE_TILE_STATE_HIDDEN = 2,
 };
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void collapseTileInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
@@ -264,9 +241,7 @@ void collapseTileInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void collapseTileUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint16_t thisX = this->pos.x;
@@ -291,6 +266,7 @@ void collapseTileUpdate(uint8_t index) {
                 port_updateCollapseTileNametable(index);
             }
             this->oamTile = COLLAPSE_TILE_SPRITE_1;
+            this->flags |= OBJ_FLAG_DIRTY;
             break;
             
         case COLLAPSE_TILE_STATE_COLLAPSING:
@@ -303,6 +279,7 @@ void collapseTileUpdate(uint8_t index) {
                 this->data.collapseTile.frameCount = 120;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
                 port_updateCollapseTileNametable(index);
+                this->flags |= OBJ_FLAG_DIRTY;
                 return;
             }
             // Animation frame: 0->SPRITE_3, 10->SPRITE_2, 20->SPRITE_1
@@ -319,6 +296,7 @@ void collapseTileUpdate(uint8_t index) {
                 this->oamTile = newOamTile;
                 port_updateCollapseTileNametable(index);
             }
+            this->flags |= OBJ_FLAG_DIRTY;
             break;
             
         case COLLAPSE_TILE_STATE_HIDDEN:
@@ -336,8 +314,10 @@ void collapseTileUpdate(uint8_t index) {
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
                 port_updateCollapseTileNametable(index);
+                this->flags |= OBJ_FLAG_DIRTY;
             } else {
-                //Don't draw the tile
+                //Don't draw the tile, but still mark dirty so sprite position updates with scroll
+                this->flags |= OBJ_FLAG_DIRTY;
                 return;
             }
             break;
@@ -346,9 +326,7 @@ void collapseTileUpdate(uint8_t index) {
     }
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void springInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.spring.frameCount = 0;
@@ -366,9 +344,7 @@ void springInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void springUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     struct sPlayerData *player = &GLOBAL_PlayerData;
@@ -457,9 +433,7 @@ void springUpdate(uint8_t index) {
 }
 
 enum eBalloonState {BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1};
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void balloonInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.balloon.state = BALLOON_STATE_IDLE;
@@ -475,9 +449,7 @@ void balloonInit(uint8_t index) {
 
 
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void balloonUpdate(uint8_t index) {
     static const uint8_t balloonStringFrames[75] = {
         40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 42, 42, 42, 42, 42, 42, 42, 42, 42,
@@ -552,9 +524,7 @@ void balloonUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void platMovInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->pos.y -= 2;
@@ -579,9 +549,7 @@ void platMovInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void platMovUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t hitboxIndex = this->data.platMov.hitboxIndex;
@@ -623,9 +591,7 @@ void platMovUpdate(uint8_t index) {
 
 enum eKeyState {KEY_STATE_1 = 0, KEY_STATE_2 = 1, KEY_STATE_3 = 2, KEY_STATE_4 = 3};
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void keyInit(uint8_t index) {
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -647,9 +613,7 @@ void keyInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void keyUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t properties = 0x30; // priority 3 baseline
@@ -715,9 +679,7 @@ void keyUpdate(uint8_t index) {
 
 enum eChestState {CHEST_STATE_IDLE = 0, CHEST_STATE_SHAKING = 1, CHEST_STATE_OPEN = 2};
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void chestInit(uint8_t index) {   
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -738,9 +700,7 @@ void chestInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void chestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     int16_t shakeAmount = 0;
@@ -775,9 +735,7 @@ void chestUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void monumentInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -794,9 +752,7 @@ static const char monumentText[][25] = {
     " PERISHED ON THE CLIMB "
 };
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void monumentUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching;
@@ -845,9 +801,7 @@ void monumentUpdate(uint8_t index) {
 enum eBigChestState {BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2};
 
 // eBigChestSprite is defined in sprite_animation_enums.h
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void bigChestInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -859,9 +813,7 @@ void bigChestInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void bigChestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) && 
@@ -900,9 +852,7 @@ void bigChestUpdate(uint8_t index) {
     }
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void doubleDashOrbInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -913,9 +863,7 @@ void doubleDashOrbInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Speed starts at -8 and goes down by 0.5 every frame
@@ -974,15 +922,11 @@ void strawberryInit(uint8_t index) {
     strawberry->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void decoTreeInit(uint8_t index) {
     initSimpleDecorSprite(index, DECO_TREE_SPRITE_1, 0x32); // priority 3, palette 2
 }
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void decoTreeUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
@@ -1065,9 +1009,7 @@ void strawberryUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void flyingBerryInit(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
     berry->data.strawberry.frameCount = 0;
@@ -1078,9 +1020,7 @@ void flyingBerryInit(uint8_t index) {
     berry->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void flyingBerryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     static const int8_t y_positions[40] = {
@@ -1162,9 +1102,7 @@ void flyingBerryUpdate(uint8_t index) {
 }
 
 // Returns the index of the object in the list
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void initObject(enum eOBJType eType, int16_t x, int16_t y) {
     // Find a free slot
     uint8_t i;
@@ -1221,17 +1159,13 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
 }
 
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static void clearObjectDirtyFlag(uint8_t index)
 {
     GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static void processObject(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -1299,24 +1233,18 @@ static void processObject(uint8_t index)
 void updateAllObjects(void) {
     uint8_t i;
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(6);  // Switch to object bank (code is in bank 6)
-#endif
+    port_prg_bank_switch(6);  // Switch to object bank (code is in bank 6)
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
         processObject(i);
     }
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(0);  // Switch back to fixed bank
-#endif
+    port_prg_bank_switch(0);  // Switch back to fixed bank
     port_finishSpriteBuild();
 }
 
 
 void playerInit(struct sPlayerData* this);
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 void onVblank(void);
 
 
@@ -1331,25 +1259,17 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.swapCloudPal = false;
     GLOBAL_ActiveLevel.swapActivePalette = true;
     GLOBAL_ActiveLevel.textFlashActive = false;
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(6);  // Switch to bank 6 for port_LoadRoomData (code is in bank 6)
-#endif
+    port_prg_bank_switch(6);  // Switch to bank 6 for port_LoadRoomData (code is in bank 6)
     port_LoadRoomData(roomID);
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(0);  // Switch back to fixed bank for playerInit
-#endif
+    port_prg_bank_switch(0);  // Switch back to fixed bank for playerInit
     playerInit(&GLOBAL_PlayerData);
     port_updatePlayerSprite(&GLOBAL_PlayerData);
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(6);  // Switch to bank 6 for processObject (code is in bank 6)
-#endif
+    port_prg_bank_switch(6);  // Switch to bank 6 for processObject (code is in bank 6)
     for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; ++i) {
         processObject(i);
     }
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(0);  // Switch back to fixed bank
-#endif
+    port_prg_bank_switch(0);  // Switch back to fixed bank
     port_finishSpriteBuild();
 
 }
@@ -1442,9 +1362,7 @@ void playerInit(struct sPlayerData* this){
     }
 
     port_resetSprites();
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(6);  // Switch to bank 6 for initObject (code is in bank 6)
-#endif
+    port_prg_bank_switch(6);  // Switch to bank 6 for initObject (code is in bank 6)
     for (i = 0; i < (GLOBAL_ActiveLevel.objectCount*3); i+=3) {
         if (GLOBAL_ActiveLevel.objectData[i] != 0) {
             //Player spawn, remove from generated code in future
@@ -1454,15 +1372,11 @@ void playerInit(struct sPlayerData* this){
             initObject(GLOBAL_ActiveLevel.objectData[i], GLOBAL_ActiveLevel.objectData[i+1]*16, GLOBAL_ActiveLevel.objectData[i+2]*16-1);
         }
     }
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(0);  // Switch back to fixed bank
-#endif
+    port_prg_bank_switch(0);  // Switch back to fixed bank
 
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, int16_t yspd) {
     int i, j;
     int collisionIndex;
@@ -1548,9 +1462,7 @@ bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, in
     return false;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x + xOffset;
     int16_t y = this->objData.pos.y + yOffset;
@@ -1561,9 +1473,7 @@ static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     return isDeathAtPoint(x, y, w, h, FIXED_TO_INT(this->spd.x), FIXED_TO_INT(this->spd.y));
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     int tileX;
     int tileY;
@@ -1586,9 +1496,7 @@ static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     return GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x01;
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x; 
     int16_t y = this->objData.pos.y;
@@ -1623,9 +1531,7 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
 
 #define FPS60_SCALE_FACTOR 1.0f
 void playerUpdate(struct sPlayerData* this) {
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(6);  // Switch to bank 6 for collision functions (code is in bank 6)
-#endif
+    port_prg_bank_switch(6);  // Switch to bank 6 for collision functions (code is in bank 6)
     int16_t prevPosX = this->objData.pos.x;
     int16_t prevPosY = this->objData.pos.y;
     uint8_t prevTile = this->objData.oamTile;
@@ -1970,13 +1876,9 @@ void playerUpdate(struct sPlayerData* this) {
         playSoundEffect(SOUND_EFFECT_DEATH);
         this->objData.pos.y = 240; //offscreen
         GLOBAL_ActiveLevel.shakeFrames = 10 * 2;
-#ifdef __NES_UNROM_512__
-        prg_bank_switch(6);  // Switch to bank 6 for playerInit (code is in bank 6)
-#endif
+        port_prg_bank_switch(6);  // Switch to bank 6 for playerInit (code is in bank 6)
         playerInit(this);
-#ifdef __NES_UNROM_512__
-        prg_bank_switch(0);  // Switch back to fixed bank
-#endif
+        port_prg_bank_switch(0);  // Switch back to fixed bank
         return;
     }
 
@@ -1984,14 +1886,10 @@ void playerUpdate(struct sPlayerData* this) {
 
     // next level
     if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
-#ifdef __NES_UNROM_512__
-        prg_bank_switch(6);  // Switch to bank 6 for LoadNextRoom and playerInit (code is in bank 6)
-#endif
+        port_prg_bank_switch(6);  // Switch to bank 6 for LoadNextRoom and playerInit (code is in bank 6)
         LoadNextRoom();
         playerInit(this);
-#ifdef __NES_UNROM_512__
-        prg_bank_switch(0);  // Switch back to fixed bank
-#endif
+        port_prg_bank_switch(0);  // Switch back to fixed bank
      }
 
     //Animation
@@ -2015,9 +1913,7 @@ void playerUpdate(struct sPlayerData* this) {
     this->objData.oamTile = (uint8_t)this->eSriteState;
     this->objData.oamProps = this->isFliped ? (uint8_t)(0x38u | 0x40u) : 0x38u;
     this->objData.flags |= OBJ_FLAG_DIRTY;
-#ifdef __NES_UNROM_512__
-    prg_bank_switch(0);  // Switch back to fixed bank
-#endif
+    port_prg_bank_switch(0);  // Switch back to fixed bank
 }
 
 
@@ -2059,18 +1955,14 @@ static const uint16_t rand_table[256] = {
 
 // Table-based random number generator
 static uint8_t global_randSeed = 0xDEADBEEE; // You can set this to time(NULL) for more randomness
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 uint16_t my_rand() {
     global_randSeed = (global_randSeed + 1) % 256;
     return rand_table[global_randSeed];
 }
 
 // Returns a random integer in [min, max]
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
+PORT_FUNC_BANK6
 int16_t randint16(int16_t min, int16_t max) {
     uint16_t range;
     uint16_t randomValue;
@@ -2135,20 +2027,5 @@ void snesXC_abort(void) {
 void snesXC_nmi(void) {
     interuptVBlank();
 }
-
-
-#ifdef __VBCC__
-/*
-__near __interrupt void __irq_vblank(void) {
-    interuptVBlank();
-}
-*/
-#endif
-
-#ifdef __WDC816CC__
-void far IRQHandler(void){
-    interuptVBlank();
-}
-#endif
 
 
