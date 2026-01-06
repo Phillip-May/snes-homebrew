@@ -110,7 +110,6 @@ static const LevelData level_data[] = {
         SPAWN_X_LEVEL1, SPAWN_Y_LEVEL1
     },
     // Level 2
-    /*
     {
         tilemap_level2_compressed,
         object_level2, OBJECT_LEVEL2_COUNT,
@@ -134,6 +133,7 @@ static const LevelData level_data[] = {
         palette_sprite_level4,
         SPAWN_X_LEVEL4, SPAWN_Y_LEVEL4
     },
+    /*
     // Level 5
     {
         tilemap_level5_compressed,
@@ -424,7 +424,7 @@ static void hide_sprites(uint16_t oamOffset) {
     OAM_BUF[oamOffset + 12] = 240;
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset) {
     if (obj->eType == OBJ_UNUSED) {
         hide_sprites(oamOffset);
@@ -491,35 +491,35 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     prg_bank_switch(0);  // get_object_sprite_data switched to bank 5, switch back to fixed bank
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildUnused(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildSmoke(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildBreakableWall(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildBalloon(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildMonument(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildChest(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildBigChest(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildKey(uint8_t index) {
 }
 
@@ -545,7 +545,7 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
     }
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildSpring(uint8_t index) {
     OBJ_DATA *spring = &GLOBAL_OBJList[index];
     uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
@@ -557,8 +557,7 @@ void port_buildSpring(uint8_t index) {
 }
 
 // Queue a collapse tile update (called from mainBankZero.c when state changes)
-__attribute__((section(".text.prg_rom_5")))
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_updateCollapseTileNametable(uint8_t index) {
     // Check if already in queue (avoid duplicates)
     for (uint8_t i = 0; i < s_pendingCollapseTileCount; i++) {
@@ -572,9 +571,7 @@ void port_updateCollapseTileNametable(uint8_t index) {
     }
 }
 
-__attribute__((section(".text.prg_rom_5")))
-__attribute__((section(".text.prg_rom_5")))
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
     if (s_pendingCollapseTileCount == 0) return;
@@ -622,7 +619,7 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
     }
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *writes, uint8_t write_count) {
     for (uint8_t i = 0; i < write_count; i++) {
         const CollapseTileWrite *write = &writes[i];
@@ -649,12 +646,12 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
     }
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildCollapseTile(uint8_t index) {
     (void)index;
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildStrawberry(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
     uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
@@ -666,11 +663,11 @@ void port_buildStrawberry(uint8_t index) {
     render_object_sprite(strawberry, oamOffset);
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildPlatMov(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildFlyingBerry(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
     uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
@@ -682,11 +679,11 @@ void port_buildFlyingBerry(uint8_t index) {
     render_object_sprite(berry, oamOffset);
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildDoubleDashOrb(uint8_t index) {
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_buildStaticDecor(uint8_t index) {
 }
 
@@ -695,7 +692,7 @@ void port_resetSprites(void) {
     s_inputState = 0;
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y) {
     (void)text;
     (void)x;
@@ -713,7 +710,7 @@ __attribute__((noinline)) void port_vblank(void) {
     s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
     CollapseTileWrite collapseTileWrites[MAX_COLLAPSE_TILE_WRITES];
     uint8_t collapseTileWriteCount = 0;
-    prg_bank_switch(5);  // Switch to object bank for collapse tile functions
+    prg_bank_switch(6);  // Switch to bank 6 for collapse tile functions (code is in bank 6)
     prepare_collapse_tiles_nametable(collapseTileWrites, &collapseTileWriteCount);
     ppu_wait_nmi();
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
@@ -766,7 +763,7 @@ static inline uint8_t get_level_bank(uint16_t level_idx) {
     return 3;                       // Levels 21-31
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static void load_background_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
@@ -783,10 +780,10 @@ static void load_background_palettes(void) {
         }
     }
     pal_bg(palette_ram);
-    prg_bank_switch(5);  // Switch back to bank 5 before returning (load_background_palettes is in bank 5)
+    prg_bank_switch(6);  // Switch back to bank 6 before returning (load_background_palettes is in bank 6)
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static void load_sprite_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[16 + i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
@@ -803,7 +800,7 @@ static void load_sprite_palettes(void) {
         }
     }
     pal_spr(&palette_ram[16]);
-    prg_bank_switch(5);  // Switch back to bank 5 before returning (load_sprite_palettes is in bank 5)
+    prg_bank_switch(6);  // Switch back to bank 6 before returning (load_sprite_palettes is in bank 6)
 }
 
 static void update_player_hair_color(void) {
@@ -816,13 +813,13 @@ static void update_player_hair_color(void) {
     }
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static uint8_t get_palette_from_gid(uint8_t gid, const unsigned char (*gid_to_tile_map)[6], uint16_t gid_map_count) {
     if (gid >= gid_map_count || !gid_to_tile_map) return 0;
     return (gid_to_tile_map[gid][4] & 0x03);
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 static void write_nametable(void) {
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
@@ -909,7 +906,7 @@ static void write_nametable(void) {
             vram_put(tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6));
         }
     }
-    prg_bank_switch(5);  // Switch back to bank 5 before returning (write_nametable is in bank 5)
+    prg_bank_switch(6);  // Switch back to bank 6 before returning (write_nametable is in bank 6)
 }
 
 static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
@@ -934,7 +931,7 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
     }
 }
 
-__attribute__((section(".text.prg_rom_5")))
+__attribute__((section(".prg_rom_6")))
 void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
@@ -982,6 +979,6 @@ void port_LoadRoomData(uint16_t roomID) {
     ppu_wait_nmi();
     ppu_wait_nmi();
     ppu_on_all();
-    prg_bank_switch(5);  // Switch back to bank 5 before returning (port_LoadRoomData is in bank 5)
+    prg_bank_switch(6);  // Switch back to bank 6 before returning (port_LoadRoomData is in bank 6)
 }
 
