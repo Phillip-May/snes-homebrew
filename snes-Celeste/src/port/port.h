@@ -218,7 +218,7 @@ uint8_t port_getInputs(void);
 void port_vblank(void);
 void port_LoadRoomData(uint16_t roomID);
 
-#ifdef defined(__NES_UNROM_512__)
+#ifdef __NES_UNROM_512__
 // PRG-ROM bank switching for UNROM-512 (non-LLVM-MOS compilers)
 #include <mapper.h>
 void prg_bank_switch(uint8_t bank);

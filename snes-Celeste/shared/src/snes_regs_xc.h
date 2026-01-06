@@ -733,7 +733,7 @@ union uOAMCopy{
 		uint8_t CHARNUM016;
 		uint8_t PROPERTIES016;
 		uint8_t OBJ017X;
-		uint8_t OBJ07Y;
+		uint8_t OBJ017Y;
 		uint8_t CHARNUM017;
 		uint8_t PROPERTIES017;
 		uint8_t OBJ018X;

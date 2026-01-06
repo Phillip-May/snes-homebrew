@@ -9,8 +9,8 @@
 #pragma clang section rodata="rom_bank_1"
 #endif
 #include "../clouds.h"
-#include "sprite_data.h"
-#include "snes_font.h"
+#include "../sprite_data.h"
+#include "../snes_font.h"
 #include <string.h>
 
 //Level data, ideally place these ocntiguiously in the same bank
@@ -1076,10 +1076,17 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj)
     }
     const struct sOBJ_DATA *playerData = &playerObj->objData;
     int16_t screenY = (int16_t)(playerData->pos.y - (int16_t)GLOBAL_ScrollBG2Y);
-    GLOBAL_OAMCopy.Names.OBJ000X = (uint8_t)playerData->pos.x;
-    GLOBAL_OAMCopy.Names.OBJ000Y = (uint8_t)screenY;
-    GLOBAL_OAMCopy.Names.CHARNUM000 = playerData->oamTile;
-    GLOBAL_OAMCopy.Names.PROPERTIES000 = playerData->oamProps;
+    uint8_t table2Index = 0u; // Sprite 0 is at index 0
+    uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
+    // Calculate X high bit (bit 8 of X coordinate)
+    uint8_t xBit = (uint8_t)((playerData->pos.x >= 256u) ? 1u : 0u);
+    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(0u, 1u, xBit, currentByte);
+    // Write directly to bytes array to avoid vbcc65816 struct layout issues
+    // SNES OAM format: byte 0 = X, byte 1 = Y, byte 2 = Tile, byte 3 = Properties
+    GLOBAL_OAMCopy.Bytes[0] = (uint8_t)playerData->pos.x;  // X position (low 8 bits)
+    GLOBAL_OAMCopy.Bytes[1] = (uint8_t)screenY;           // Y position
+    GLOBAL_OAMCopy.Bytes[2] = playerData->oamTile;        // Tile number
+    GLOBAL_OAMCopy.Bytes[3] = playerData->oamProps;      // Properties
 }
 
 void port_buildUnused(uint8_t index)
@@ -1522,10 +1529,13 @@ void port_resetSprites(void)
     for (uint8_t slot = PORT_EXTRA_SPRITE_START; slot < PORT_OAM_ENTRY_COUNT; ++slot) {
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = 240;
     }
-    GLOBAL_OAMCopy.Names.OBJ000X = 0;
-    GLOBAL_OAMCopy.Names.OBJ000Y = 0x00;
-    GLOBAL_OAMCopy.Names.CHARNUM000 = 0x00;
-    GLOBAL_OAMCopy.Names.OAMTABLE2BYTE00 = 0x56; //Enable the first sprite, set size to 16x16
+    // Reset player sprite (sprite 0) using direct byte access for vbcc65816 compatibility
+    // SNES OAM format: byte 0 = X, byte 1 = Y, byte 2 = Tile, byte 3 = Properties
+    GLOBAL_OAMCopy.Bytes[0] = 0;  // X position
+    GLOBAL_OAMCopy.Bytes[1] = 0;  // Y position
+    GLOBAL_OAMCopy.Bytes[2] = 0;  // Tile number
+    GLOBAL_OAMCopy.Bytes[3] = 0;  // Properties
+    GLOBAL_OAMCopy.arr.OAMTable2[0] = 0x56; //Enable the first sprite, set size to 16x16
 
 }
 
