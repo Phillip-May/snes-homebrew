@@ -43,7 +43,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(LIBFIXMATH_SOURCES) $(PORT_SOURCES)
 	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o $(BUILD_DIR)/fix16.o $(BUILD_DIR)/snes.o
 	# Override CCFLAGS to remove -I"lib" and add project src directory
-	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"$(PROJECT_SRC_DIR)" $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES) -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__ -c
+	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I$(SHARED_SRC_DIR) -I$(PROJECT_SRC_DIR) $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES) -Iinclude -Ielua-0.9/inc -Ielua-0.9/inc/snes -Ielua-0.9/src/lua -Ielua-0.9/inc/newlib -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__ -c
 	vpath %.c $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port $(PROJECT_SRC_DIR)/libfixmath $(SHARED_SRC_DIR) .
 	vpath %.h $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port .
 endif
