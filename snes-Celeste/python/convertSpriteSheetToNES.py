@@ -961,17 +961,13 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         compressed_data = compress_level(gid_array, shared_compression_dict, best_compression_config['rle_threshold'])
         
         # Determine PRG-ROM bank number based on level number (for UNROM-512 banking)
-        # Levels 1-10: bank 1, Levels 11-20: bank 2, Levels 21-31: bank 3
+        # All levels go to bank 1
         level_num_match = re.search(r'(\d+)', safe_layer_name)
         bank_num = 0  # Default (no banking)
         if level_num_match:
             level_num = int(level_num_match.group(1))
-            if level_num <= 10:
-                bank_num = 1
-            elif level_num <= 20:
-                bank_num = 2
-            else:
-                bank_num = 3
+            # All levels go to bank 1
+            bank_num = 1
         
         # Section attribute for UNROM-512 banking
         section_attr = f'__attribute__((section(".prg_rom_{bank_num}")))' if bank_num > 0 else ''
@@ -980,8 +976,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         f.write(f"// Compressed tilemap data for layer '{layer_name}'\n")
         f.write(f"// Format: 0x00-0x7F = literal GID, 0x80-0xBF = RLE, 0xC0-0xFF = dict sequence\n")
         if section_attr:
-            f.write(f"{section_attr}\n")
-        f.write(f"const unsigned char tilemap_{safe_layer_name}_compressed[] = {{\n")
+            f.write(f"{section_attr} const unsigned char tilemap_{safe_layer_name}_compressed[] = {{\n")
+        else:
+            f.write(f"const unsigned char tilemap_{safe_layer_name}_compressed[] = {{\n")
         # Write 16 values per line
         for i in range(len(compressed_data)):
             if i % 16 == 0:
@@ -1003,8 +1000,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         f.write(f"// 4 background palettes, each with 4 colors: [color0=black, color1, color2, color3]\n")
         f.write(f"// Used by tiles in all_background_gids (far_background, solid, pointy, and icy)\n")
         if section_attr:
-            f.write(f"{section_attr}\n")
-        f.write(f"const unsigned char palette_background_{safe_layer_name}[4][4] = {{\n")
+            f.write(f"{section_attr} const unsigned char palette_background_{safe_layer_name}[4][4] = {{\n")
+        else:
+            f.write(f"const unsigned char palette_background_{safe_layer_name}[4][4] = {{\n")
         for pal_idx in range(4):
             if pal_idx < len(background_palettes):
                 palette = background_palettes[pal_idx]
@@ -1057,8 +1055,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         f.write(f"// Used by non-background tiles\n")
         f.write(f"// Palette 3 is reserved for player sprites\n")
         if section_attr:
-            f.write(f"{section_attr}\n")
-        f.write(f"const unsigned char palette_sprite_{safe_layer_name}[4][4] = {{\n")
+            f.write(f"{section_attr} const unsigned char palette_sprite_{safe_layer_name}[4][4] = {{\n")
+        else:
+            f.write(f"const unsigned char palette_sprite_{safe_layer_name}[4][4] = {{\n")
         for pal_idx in range(4):
             if pal_idx < len(sprite_palettes):
                 palette = sprite_palettes[pal_idx]
@@ -1093,16 +1092,18 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         f.write(f"// Object data for layer '{layer_name}'\n")
         if object_data:
             if section_attr:
-                f.write(f"{section_attr}\n")
-            f.write(f"const unsigned char object_{safe_layer_name}[] = {{\n")
+                f.write(f"{section_attr} const unsigned char object_{safe_layer_name}[] = {{\n")
+            else:
+                f.write(f"const unsigned char object_{safe_layer_name}[] = {{\n")
             for obj_tile, obj_x, obj_y in object_data:
                 f.write(f"    {obj_tile}, {obj_x}, {obj_y},\n")
             f.write("};\n\n")
             f.write(f"#define OBJECT_{safe_layer_name.upper()}_COUNT {len(object_data)}\n\n")
         else:
             if section_attr:
-                f.write(f"{section_attr}\n")
-            f.write(f"const unsigned char object_{safe_layer_name}[] = {{}};\n\n")
+                f.write(f"{section_attr} const unsigned char object_{safe_layer_name}[] = {{}};\n\n")
+            else:
+                f.write(f"const unsigned char object_{safe_layer_name}[] = {{}};\n\n")
             f.write(f"#define OBJECT_{safe_layer_name.upper()}_COUNT 0\n\n")
 
         # Object sprite data and palettes
@@ -1188,8 +1189,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             
             # Write object sprite data array
             if section_attr:
-                f.write(f"{section_attr}\n")
-            f.write(f"const unsigned char object_sprite_{safe_layer_name}[] = {{\n")
+                f.write(f"{section_attr} const unsigned char object_sprite_{safe_layer_name}[] = {{\n")
+            else:
+                f.write(f"const unsigned char object_sprite_{safe_layer_name}[] = {{\n")
             f.write(f"    // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]\n")
             for obj_tile_idx, palette_idx, tl, tr, bl, br in object_sprite_data:
                 f.write(f"    {obj_tile_idx}, {palette_idx}, {tl}, {tr}, {bl}, {br},\n")
@@ -1200,7 +1202,10 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             f.write(f"// Object palette data for layer '{layer_name}' (NES 6-bit format)\n")
             f.write(f"// 3 object palettes, each with 4 colors: [color0, color1, color2, color3]\n")
             f.write(f"// Note: Palette 3 is reserved for the player\n")
-            f.write(f"const unsigned char palette_object_{safe_layer_name}[3][4] = {{\n")
+            if section_attr:
+                f.write(f"{section_attr} const unsigned char palette_object_{safe_layer_name}[3][4] = {{\n")
+            else:
+                f.write(f"const unsigned char palette_object_{safe_layer_name}[3][4] = {{\n")
             for pal_idx in range(3):
                 if pal_idx < len(object_palettes):
                     palette = object_palettes[pal_idx]
@@ -1226,7 +1231,10 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             f.write(f"const unsigned char object_sprite_{safe_layer_name}[] = {{}};\n\n")
             f.write(f"#define OBJECT_SPRITE_{safe_layer_name.upper()}_COUNT 0\n\n")
             f.write(f"// Object palette data for layer '{layer_name}'\n")
-            f.write(f"const unsigned char palette_object_{safe_layer_name}[3][4] = {{\n")
+            if section_attr:
+                f.write(f"{section_attr} const unsigned char palette_object_{safe_layer_name}[3][4] = {{\n")
+            else:
+                f.write(f"const unsigned char palette_object_{safe_layer_name}[3][4] = {{\n")
             f.write(f"    {{ 0x00, 0x00, 0x00, 0x00 }},\n")
             f.write(f"    {{ 0x00, 0x00, 0x00, 0x00 }},\n")
             f.write(f"    {{ 0x00, 0x00, 0x00, 0x00 }}\n")
@@ -2367,7 +2375,11 @@ def main():
                         f.write("#ifndef COMPRESSION_DICT_SHARED_H\n")
                         f.write("#define COMPRESSION_DICT_SHARED_H\n\n")
                         dict_size = best_compression_config['dict_size']
+                        f.write("#ifdef __NES_UNROM_512__\n")
+                        f.write(f"__attribute__((section(\".prg_rom_5\"))) const unsigned char compression_dict_shared[{dict_size}][2] = {{\n")
+                        f.write("#else\n")
                         f.write(f"const unsigned char compression_dict_shared[{dict_size}][2] = {{\n")
+                        f.write("#endif\n")
                         for i, (gid1, gid2) in enumerate(shared_compression_dict):
                             f.write(f"    // Entry {i}\n")
                             f.write(f"    {{ {gid1}, {gid2} }}")
@@ -2431,7 +2443,11 @@ def main():
                         f.write("#ifndef GID_TO_TILE_SHARED_H\n")
                         f.write("#define GID_TO_TILE_SHARED_H\n\n")
                         if len(shared_gid_mapping_global['gid_map_data']) > 0:
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write(f"__attribute__((section(\".prg_rom_5\"))) const unsigned char gid_to_tile_shared[{len(shared_gid_mapping_global['gid_map_data'])}][6] = {{\n")
+                            f.write("#else\n")
                             f.write(f"const unsigned char gid_to_tile_shared[{len(shared_gid_mapping_global['gid_map_data'])}][6] = {{\n")
+                            f.write("#endif\n")
                             for gid in range(len(shared_gid_mapping_global['gid_map_data'])):
                                 tl, tr, bl, br, pal_idx, flip = shared_gid_mapping_global['gid_map_data'][gid]
                                 f.write(f"    // GID {gid}\n")
@@ -2446,9 +2462,10 @@ def main():
                             f.write("// GID to collision flags mapping\n")
                             f.write("// Collision flags: 0 = no collision, 1 = solid, 4/8/16/32 = pointy variants\n")
                             f.write("#ifdef __NES_UNROM_512__\n")
-                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
-                            f.write("#endif\n")
+                            f.write("__attribute__((section(\".prg_rom_5\"))) const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {\n")
+                            f.write("#else\n")
                             f.write("const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {\n")
+                            f.write("#endif\n")
                             gid_to_original = shared_gid_mapping_global['gid_to_original_tile_index']
                             for gid in range(len(shared_gid_mapping_global['gid_map_data'])):
                                 original_tile_index = gid_to_original.get(gid, -1)
@@ -2461,7 +2478,11 @@ def main():
                             f.write("#define GID_TO_COLLISION_COUNT GID_TO_TILE_SHARED_COUNT\n\n")
                         else:
                             # Empty mapping (just empty tile)
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\"))) const unsigned char gid_to_tile_shared[1][6] = {\n")
+                            f.write("#else\n")
                             f.write("const unsigned char gid_to_tile_shared[1][6] = {\n")
+                            f.write("#endif\n")
                             f.write("    // GID 0 (empty tile)\n")
                             f.write("    { 0, 0, 0, 0, 0, 0 }\n")
                             f.write("};\n\n")
@@ -2634,9 +2655,6 @@ def main():
         
         # Write lookup table
         f.write(f"// Lookup table: maps tile_idx -> compact_index (0xFF = not found)\n")
-        f.write("#ifdef __NES_UNROM_512__\n")
-        f.write("__attribute__((section(\".prg_rom_5\")))\n")
-        f.write("#endif\n")
         f.write(f"const unsigned char object_sprite_lookup_table[{nes_max_tile_idx + 1}] = {{\n")
         for tile_idx in range(nes_max_tile_idx + 1):
             lookup_idx = lookup_table[tile_idx]
@@ -2726,7 +2744,11 @@ def main():
             f.write("#ifndef GID_TO_TILE_SHARED_H\n")
             f.write("#define GID_TO_TILE_SHARED_H\n\n")
             if len(shared_gid_mapping_global['gid_map_data']) > 0:
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write(f"__attribute__((section(\".prg_rom_5\"))) const unsigned char gid_to_tile_shared[{len(shared_gid_mapping_global['gid_map_data'])}][6] = {{\n")
+                f.write("#else\n")
                 f.write(f"const unsigned char gid_to_tile_shared[{len(shared_gid_mapping_global['gid_map_data'])}][6] = {{\n")
+                f.write("#endif\n")
                 for gid in range(len(shared_gid_mapping_global['gid_map_data'])):
                     tl, tr, bl, br, pal_idx, flip = shared_gid_mapping_global['gid_map_data'][gid]
                     f.write(f"    // GID {gid}\n")
@@ -2740,7 +2762,11 @@ def main():
                 # Generate GID to collision mapping
                 f.write("// GID to collision flags mapping\n")
                 f.write("// Collision flags: 0 = no collision, 1 = solid, 4/8/16/32 = pointy variants\n")
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\"))) const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {\n")
+                f.write("#else\n")
                 f.write("const unsigned char gid_to_collision[GID_TO_TILE_SHARED_COUNT] = {\n")
+                f.write("#endif\n")
                 gid_to_original = shared_gid_mapping_global['gid_to_original_tile_index']
                 for gid in range(len(shared_gid_mapping_global['gid_map_data'])):
                     original_tile_index = gid_to_original.get(gid, -1)
@@ -2753,7 +2779,11 @@ def main():
                 f.write("#define GID_TO_COLLISION_COUNT GID_TO_TILE_SHARED_COUNT\n\n")
             else:
                 # Empty mapping (just empty tile)
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\"))) const unsigned char gid_to_tile_shared[1][6] = {\n")
+                f.write("#else\n")
                 f.write("const unsigned char gid_to_tile_shared[1][6] = {\n")
+                f.write("#endif\n")
                 f.write("    // GID 0 (empty tile)\n")
                 f.write("    { 0, 0, 0, 0, 0, 0 }\n")
                 f.write("};\n\n")

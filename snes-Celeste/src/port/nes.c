@@ -277,7 +277,6 @@ static const LevelData level_data[] = {
         palette_sprite_level22,
         SPAWN_X_LEVEL22, SPAWN_Y_LEVEL22
     },
-    /*
     // Level 23
     {
         tilemap_level23_compressed,
@@ -349,7 +348,7 @@ static const LevelData level_data[] = {
         palette_background_level31,
         palette_sprite_level31,
         SPAWN_X_LEVEL31, SPAWN_Y_LEVEL31
-    }*/
+    }
 };
 
 #define LEVEL_DATA_COUNT (sizeof(level_data) / sizeof(level_data[0]))
@@ -804,9 +803,7 @@ static uint8_t palette_ram[32];
 // Determine which PRG-ROM bank contains a given level
 // Levels are organized: 1-10 in bank 1, 11-20 in bank 2, 21-31 in bank 3
 static inline uint8_t get_level_bank(uint16_t level_idx) {
-    if (level_idx < 10) return 1;   // Levels 1-10
-    if (level_idx < 20) return 2;   // Levels 11-20
-    return 3;                       // Levels 21-31
+    return 1;  // All levels are in bank 1
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -814,12 +811,9 @@ static void load_background_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
-    uint8_t level_bank = get_level_bank(level_idx);
-    if (level_bank != 1) {
-        prg_bank_switch(level_bank);  // Switch to level data bank if different
-    }
+    uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             palette_ram[pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(level->bg_palettes[pal_idx][col_idx]);
@@ -834,12 +828,9 @@ static void load_sprite_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[16 + i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
-    uint8_t level_bank = get_level_bank(level_idx);
-    if (level_bank != 1) {
-        prg_bank_switch(level_bank);  // Switch to level data bank if different
-    }
+    uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             palette_ram[16 + pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(level->sprite_palettes[pal_idx][col_idx]);
@@ -869,14 +860,11 @@ __attribute__((section(".prg_rom_6")))
 static void write_nametable(void) {
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
-    uint8_t level_bank = get_level_bank(level_idx);
-    if (level_bank != 1) {
-        prg_bank_switch(level_bank);  // Switch to level data bank if different
-    }
+    uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     // decompress_tilemap is in fixed bank, so it can be called from any bank
-    // compressed_data pointer is in the level data bank (currently active)
+    // compressed_data pointer is in bank 1 (all levels are in bank 1)
     uint8_t *decompressed_tilemap = (uint8_t *)GLOBAL_OBJList;
     decompress_tilemap(level->tilemap_compressed, decompressed_tilemap, level_bank);
     // Switch to bank 5 to access gid_to_tile_shared (which is in bank 5)
@@ -982,18 +970,15 @@ void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array
+    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
-    uint8_t level_bank = get_level_bank(level_idx);
-    if (level_bank != 1) {
-        prg_bank_switch(level_bank);  // Switch to level data bank if different
-    }
+    uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     s_pendingCollapseTileCount = 0;
     GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = LEVEL_WIDTH;
     GLOBAL_ActiveLevel.roomSizeY = LEVEL_HEIGHT;
     // decompress_tilemap is in fixed bank, so it can be called from any bank
-    // compressed_data pointer is in the level data bank (currently active)
+    // compressed_data pointer is in bank 1 (all levels are in bank 1)
     uint8_t *decompressed_tilemap = (uint8_t *)GLOBAL_OBJList;
     decompress_tilemap(level->tilemap_compressed, decompressed_tilemap, level_bank);
     // Switch to bank 5 to access gid_to_collision (which is in bank 5)
@@ -1004,17 +989,14 @@ void port_LoadRoomData(uint16_t roomID) {
         GLOBAL_ActiveLevel.collisionFlagsReset[i] = collision_flag;
         GLOBAL_ActiveLevel.collisionFlagsArr[i] = collision_flag;
     }
-    // Switch back to bank 1 to access level_data array for spawn_x, spawn_y, object_count
+    // Switch back to bank 1 to access level_data array (all levels are in bank 1)
     prg_bank_switch(1);
     const LevelData *level_for_struct = &level_data[level_idx];  // Re-get pointer while in bank 1
     GLOBAL_ActiveLevel.playerSpawnX = level_for_struct->spawn_x;
     GLOBAL_ActiveLevel.playerSpawnY = level_for_struct->spawn_y;
     GLOBAL_ActiveLevel.objectCount = level_for_struct->object_count;
-    // Switch to level data bank to access level->objects
-    if (level_bank != 1) {
-        prg_bank_switch(level_bank);
-    }
-    const LevelData *level_for_objects = &level_data[level_idx];  // Re-get pointer while in level data bank
+    // level->objects is also in bank 1 (all levels are in bank 1)
+    const LevelData *level_for_objects = &level_data[level_idx];  // Re-get pointer while in bank 1
     memcpy(GLOBAL_ActiveLevel.objectData, level_for_objects->objects, level_for_objects->object_count * 3);
     GLOBAL_ActiveLevel.scrollPointY = 72;
     write_nametable();
