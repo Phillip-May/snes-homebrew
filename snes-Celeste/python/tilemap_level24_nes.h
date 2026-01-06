@@ -92,6 +92,7 @@ const unsigned char object_sprite_level24[] = {
 // Object palette data for layer 'level24' (NES 6-bit format)
 // 3 object palettes, each with 4 colors: [color0, color1, color2, color3]
 // Note: Palette 3 is reserved for the player
+__attribute__((section(".prg_rom_3")))
 const unsigned char palette_object_level24[3][4] = {
     // Object Palette 0
     { 0x0d, 0x20, 0x28, 0x15 },

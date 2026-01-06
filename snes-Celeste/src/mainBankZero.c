@@ -957,9 +957,6 @@ void doubleDashOrbUpdate(uint8_t index) {
     }
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
 void strawberryInit(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
 
@@ -990,9 +987,6 @@ void decoTreeUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
 
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
 void strawberryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Pre computed sine table
@@ -1172,7 +1166,6 @@ void flyingBerryUpdate(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 #endif
 void initObject(enum eOBJType eType, int16_t x, int16_t y) {
-    // initObject is in bank 6, all Init functions are also in bank 6, so no bank switching needed
     // Find a free slot
     uint8_t i;
     //Starts from 1 to account for the fact that hardcoded player is using slot 0
@@ -1239,26 +1232,6 @@ static void clearObjectDirtyFlag(uint8_t index)
 #ifdef __NES_UNROM_512__
 __attribute__((section(".prg_rom_6")))
 #endif
-static void buildSpriteIfDirty(uint8_t index, void (*builder)(uint8_t))
-{
-    OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    if ((obj->flags & OBJ_FLAG_DIRTY) == 0U) {
-        return;
-    }
-    if (index == 0U) {
-        clearObjectDirtyFlag(index);
-        return;
-    }
-    if (obj->eType == OBJ_UNUSED) {
-        port_buildUnused(index);
-        return;
-    }
-    builder(index);
-}
-
-#ifdef __NES_UNROM_512__
-__attribute__((section(".prg_rom_6")))
-#endif
 static void processObject(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -1273,49 +1246,49 @@ static void processObject(uint8_t index)
         }
     } else if (obj->eType == OBJ_SMOKE) {
         smokeUpdate(index);
-        buildSpriteIfDirty(index, port_buildSmoke);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
         doubleDashOrbUpdate(index);
-        buildSpriteIfDirty(index, port_buildDoubleDashOrb);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_KEY) {
         keyUpdate(index);
-        buildSpriteIfDirty(index, port_buildKey);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
         platMovUpdate(index);
-        buildSpriteIfDirty(index, port_buildPlatMov);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_SPRING) {
         springUpdate(index);
-        buildSpriteIfDirty(index, port_buildSpring);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_CHEST) {
         chestUpdate(index);
-        buildSpriteIfDirty(index, port_buildChest);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_BALLOON) {
         balloonUpdate(index);
-        buildSpriteIfDirty(index, port_buildBalloon);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_COLLAPSE_TILE) {
         collapseTileUpdate(index);
-        buildSpriteIfDirty(index, port_buildCollapseTile);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_STRAWBERRY) {
         strawberryUpdate(index);
-        buildSpriteIfDirty(index, port_buildStrawberry);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_FLYING_BERRY) {
         flyingBerryUpdate(index);
-        buildSpriteIfDirty(index, port_buildFlyingBerry);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_DECO_TREE) {
         decoTreeUpdate(index);
-        buildSpriteIfDirty(index, port_buildStaticDecor);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_DECO_FLOWER) {
         flowerUpdate(index);
-        buildSpriteIfDirty(index, port_buildStaticDecor);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_BREAKABLE_WALL) {
         breakableWallUpdate(index);
-        buildSpriteIfDirty(index, port_buildBreakableWall);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_MONUMENT) {
         monumentUpdate(index);
-        buildSpriteIfDirty(index, port_buildMonument);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_BIG_CHEST) {
         bigChestUpdate(index);
-        buildSpriteIfDirty(index, port_buildBigChest);
+        port_buildSpriteIfDirty(index, obj->eType);
     } else {
         if (obj->flags & OBJ_FLAG_DIRTY) {
             clearObjectDirtyFlag(index);

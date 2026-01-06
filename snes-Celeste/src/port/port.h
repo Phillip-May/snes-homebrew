@@ -211,6 +211,7 @@ void port_buildPlatMov(uint8_t index);
 void port_buildFlyingBerry(uint8_t index);
 void port_buildDoubleDashOrb(uint8_t index);
 void port_buildStaticDecor(uint8_t index);
+void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType);
 void port_resetSprites(void);
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y);
 uint8_t port_getInputs(void);

@@ -133,7 +133,6 @@ static const LevelData level_data[] = {
         palette_sprite_level4,
         SPAWN_X_LEVEL4, SPAWN_Y_LEVEL4
     },
-    /*
     // Level 5
     {
         tilemap_level5_compressed,
@@ -278,6 +277,7 @@ static const LevelData level_data[] = {
         palette_sprite_level22,
         SPAWN_X_LEVEL22, SPAWN_Y_LEVEL22
     },
+    /*
     // Level 23
     {
         tilemap_level23_compressed,
@@ -407,7 +407,6 @@ static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset);
 // Note: This function switches to bank 5 and does NOT switch back - caller must switch back after using the sprite data
 static const unsigned char* get_object_sprite_data(uint8_t tile_index) {
     if (tile_index >= OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE) return NULL;
-    prg_bank_switch(5);  // Switch to bank 5 to access sprite data
     uint8_t compact_idx = object_sprite_lookup_table[tile_index];
     if (compact_idx == 0xFF || compact_idx >= OBJECT_SPRITE_DICT_COMPACT_COUNT) {
         prg_bank_switch(0);  // Switch back to fixed bank on error
@@ -685,6 +684,53 @@ void port_buildDoubleDashOrb(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildStaticDecor(uint8_t index) {
+}
+
+__attribute__((section(".prg_rom_6")))
+void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
+{
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
+    if ((obj->flags & OBJ_FLAG_DIRTY) == 0U) {
+        return;
+    }
+    if (index == 0U) {
+        obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+        return;
+    }
+    if (eType == OBJ_UNUSED) {
+        port_buildUnused(index);
+        return;
+    }
+
+    if (eType == OBJ_SMOKE) {
+        port_buildSmoke(index);
+    } else if (eType == OBJ_DOUBLE_JUMP_ORB) {
+        port_buildDoubleDashOrb(index);
+    } else if (eType == OBJ_KEY) {
+        port_buildKey(index);
+    } else if (eType == OBJ_PLATMOV_R || eType == OBJ_PLATMOV_L) {
+        port_buildPlatMov(index);
+    } else if (eType == OBJ_SPRING) {
+        port_buildSpring(index);
+    } else if (eType == OBJ_CHEST) {
+        port_buildChest(index);
+    } else if (eType == OBJ_BALLOON) {
+        port_buildBalloon(index);
+    } else if (eType == OBJ_COLLAPSE_TILE) {
+        port_buildCollapseTile(index);
+    } else if (eType == OBJ_STRAWBERRY) {
+        port_buildStrawberry(index);
+    } else if (eType == OBJ_FLYING_BERRY) {
+        port_buildFlyingBerry(index);
+    } else if (eType == OBJ_DECO_TREE || eType == OBJ_DECO_FLOWER) {
+        port_buildStaticDecor(index);
+    } else if (eType == OBJ_BREAKABLE_WALL) {
+        port_buildBreakableWall(index);
+    } else if (eType == OBJ_MONUMENT) {
+        port_buildMonument(index);
+    } else if (eType == OBJ_BIG_CHEST) {
+        port_buildBigChest(index);
+    }
 }
 
 void port_resetSprites(void) {

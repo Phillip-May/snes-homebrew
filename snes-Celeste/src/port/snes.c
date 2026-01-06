@@ -1195,6 +1195,13 @@ void port_buildStaticDecor(uint8_t index)
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
+void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
+{
+    // SNES version doesn't need this - sprites are built differently
+    (void)index;
+    (void)eType;
+}
+
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y)
 {
     uint16_t tileX = (uint16_t)(x / 8u);
