@@ -245,13 +245,13 @@ void port_LoadRoomData(uint16_t roomID);
 // Macros for data/rodata section attributes (bank placement)
 // For const/rodata, we need to use .rodata.prg_rom_X to avoid conflicts with code sections
 #ifdef __NES_UNROM_512__
-#define PORT_DATA_BANK6 __attribute__((section(".rodata.prg_rom_6")))
-#define PORT_DATA_BANK5 __attribute__((section(".rodata.prg_rom_5")))
-#define PORT_DATA_BANK4 __attribute__((section(".rodata.prg_rom_4")))
-#define PORT_DATA_BANK3 __attribute__((section(".rodata.prg_rom_3")))
-#define PORT_DATA_BANK2 __attribute__((section(".rodata.prg_rom_2")))
-#define PORT_DATA_BANK1 __attribute__((section(".rodata.prg_rom_1")))
-#define PORT_DATA_BANK0 __attribute__((section(".rodata.prg_rom_0")))
+#define PORT_DATA_BANK6 __attribute__((section(".prg_rom_6.rodata")))
+#define PORT_DATA_BANK5 __attribute__((section(".prg_rom_5.rodata")))
+#define PORT_DATA_BANK4 __attribute__((section(".prg_rom_4.rodata")))
+#define PORT_DATA_BANK3 __attribute__((section(".prg_rom_3.rodata")))
+#define PORT_DATA_BANK2 __attribute__((section(".prg_rom_2.rodata")))
+#define PORT_DATA_BANK1 __attribute__((section(".prg_rom_1.rodata")))
+#define PORT_DATA_BANK0 __attribute__((section(".prg_rom_0.rodata")))
 #else
 #define PORT_DATA_BANK6
 #define PORT_DATA_BANK5
