@@ -508,6 +508,47 @@ void port_buildBreakableWall(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildBalloon(uint8_t index) {
+    OBJ_DATA *balloon = &GLOBAL_OBJList[index];
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    
+    // Check if balloon should be hidden (unused, popped, or hidden)
+    // BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1
+    if (balloon->eType == OBJ_UNUSED || 
+        balloon->data.balloon.state == 1 ||
+        balloon->data.balloon.hideFrameCount > 0) {
+        // Hide both balloon and string sprites
+        hide_sprites(oamOffset);
+        hide_sprites(oamOffset + 16);  // String sprite offset (4 sprites * 4 bytes)
+        return;
+    }
+    
+    // Calculate balloon position with Y offset for bob animation
+    uint8_t baseX = (uint8_t)balloon->pos.x;
+    uint8_t spriteY = (uint8_t)balloon->pos.y;
+    int8_t yOffset = balloon->data.balloon.spriteYOffset;
+    uint8_t balloonY = (spriteY < 240) ? ((uint8_t)((int16_t)spriteY - (int16_t)s_scrollY + (int16_t)yOffset)) : ((uint8_t)((int16_t)spriteY + (int16_t)yOffset));
+    
+    // Render balloon sprite (top 16x16 sprite)
+    uint8_t tile_index = balloon->oamTile;  // BALLOON_SPRITE_1 = 22
+    const unsigned char *balloon_sprite_data = get_object_sprite_data(tile_index);
+    if (balloon_sprite_data == NULL) {
+        hide_sprites(oamOffset);
+        hide_sprites(oamOffset + 16);
+        return;
+    }
+    render_16x16_sprite(balloon_sprite_data, baseX, balloonY, balloon->oamProps, oamOffset);
+    
+    // Render string sprite (bottom 16x16 sprite, positioned below balloon)
+    uint8_t stringTile = balloon->data.balloon.stringTile;  // BALLOON_STRING_1, BALLOON_STRING_2, or BALLOON_STRING_3
+    const unsigned char *string_sprite_data = get_object_sprite_data(stringTile);
+    if (string_sprite_data == NULL) {
+        hide_sprites(oamOffset + 16);
+        return;
+    }
+    // String sprite is positioned 16 pixels below the balloon
+    uint8_t stringY = balloonY + 16;
+    // Use same palette as balloon
+    render_16x16_sprite(string_sprite_data, baseX, stringY, balloon->oamProps, oamOffset + 16);
 }
 
 __attribute__((section(".prg_rom_6")))

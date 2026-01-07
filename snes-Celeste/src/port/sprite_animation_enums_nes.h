@@ -48,7 +48,7 @@ enum eFlowerSprite {
 };
 
 enum eBalloonSprite {
-    BALLOON_SPRITE_1 = 0x16,
+    BALLOON_SPRITE_1 = 22,
     BALLOON_STRING_1 = 13,
     BALLOON_STRING_2 = 14,
     BALLOON_STRING_3 = 15

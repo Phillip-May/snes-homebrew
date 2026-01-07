@@ -2628,6 +2628,12 @@ def main():
                     code_referenced_objects = [
                         # Spring sprite 2 - uses same palette as spring sprite 1 (tile 18)
                         (19, 'inherit_from', 18, 2),  # SPRING_SPRITE_2, inherit from tile 18, fallback palette 2
+                        # Balloon string sprites - use same palette as balloon sprite (tile 22)
+                        (13, 'inherit_from', 22, 2),  # BALLOON_STRING_1, inherit from tile 22, fallback palette 2
+                        (14, 'inherit_from', 22, 2),  # BALLOON_STRING_2, inherit from tile 22, fallback palette 2
+                        (15, 'inherit_from', 22, 2),  # BALLOON_STRING_3, inherit from tile 22, fallback palette 2
+                        # Balloon sprite - use palette 2 (from nes.c: oamProps = 0x36 means palette 2)
+                        (22, 'fixed', None, 2),  # BALLOON_SPRITE_1, use palette 2
                         # Background tile object sprites - use background palette indices (they're treated as background tiles)
                         (23, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_1, use background palette
                         (24, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_2, use background palette
