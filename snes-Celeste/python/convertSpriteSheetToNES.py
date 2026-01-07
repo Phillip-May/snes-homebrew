@@ -24,12 +24,13 @@ temp_gid_arrays_collector = []
 # Maps tile_index -> (tile_index, palette_idx, tl, tr, bl, br)
 shared_object_sprite_dict = {}
 
-# Track background palette indices for collapse tiles (they use background palettes)
-# Maps collapse_tile_index -> background_palette_index
-collapse_tile_background_palette = {}
+# Track background palette indices for background tile objects (collapse tiles, breakable walls, etc.)
+# Maps tile_index -> background_palette_index
+background_tile_object_palette = {}
 
-# Store collapse tile GID mappings separately
-collapse_tile_gid_data = []  # List of 3 tile entries for GIDs 24, 25, 26
+# Store background tile object GID mappings separately
+collapse_tile_gid_data = []  # List of 3 tile entries for GIDs 24, 25, 26 (collapse tiles)
+breakable_wall_gid_data = []  # List of 1 tile entry for GID 27 (breakable walls)
 
 """
 NES Sprite Sheet Converter
@@ -54,9 +55,14 @@ pointy_gids = [17, 27, 43, 59]
 icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
 all_background_gids = far_background_gids + solid_gids + pointy_gids + icy_gids + deco_objects_gids
 
-arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26, 28, 29, 30, 31, 45, 46, 47, 64, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26, 28, 29, 30, 31, 45, 46, 47, 70, 71, 86, 87, 96, 97, 102, 118, 119, 120]
+# Background tile objects: rendered as objects but use background palettes and appear in tilemap
 # Collapse tiles (23, 24, 25) are removed from arrMustBeObject so they use background palettes
 collapse_tile_indices = [23, 24, 25]  # COLLAPSE_TILE_SPRITE_1, COLLAPSE_TILE_SPRITE_2, COLLAPSE_TILE_SPRITE_3
+# Breakable walls (64) - can be in tilemap as background tiles
+breakable_wall_indices = [64]  # BREAKABLE_WALL_SPRITE_1
+# All background tile objects (collapse tiles, breakable walls, etc.)
+background_tile_object_indices = collapse_tile_indices + breakable_wall_indices
 
 # Sprite groups that should share the same palette
 # Each sublist contains sprite indices that must use the same palette
@@ -494,6 +500,43 @@ def reserve_collapse_tile_gids(all_sprite_data, tile_mapping):
     
     return collapse_tile_gid_data
 
+def reserve_breakable_wall_gids(all_sprite_data, tile_mapping):
+    """
+    Reserve GID 27 for breakable walls (sprite index 64).
+    Extract tile data and store separately for header generation.
+    Note: This GID is reserved but not added to the main GID array yet.
+    It will be added when we generate the shared header, ensuring it's at index 27.
+    """
+    global breakable_wall_gid_data
+    
+    breakable_wall_gid_data = []
+    breakable_wall_gid = 27
+    breakable_wall_sprite_index = 64  # BREAKABLE_WALL_SPRITE_1
+    
+    # Extract breakable wall data
+    if breakable_wall_sprite_index < len(all_sprite_data):
+        # Get optimized tile indices for this breakable wall
+        tl_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 0, 0)
+        tr_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 1, 0)
+        bl_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 2, 0)
+        br_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 3, 0)
+        
+        # Breakable walls use background palette 0 (palette_idx_encoded = 0, bit 2 = 0 for background)
+        palette_idx_encoded = 0  # Background palette 0
+        flip_flags = 0  # No flip
+        
+        tile_entry = (tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx, palette_idx_encoded, flip_flags)
+        breakable_wall_gid_data.append(tile_entry)
+        
+        print(f"Prepared breakable wall sprite {breakable_wall_sprite_index} for GID {breakable_wall_gid} (tiles: {tl_opt_idx}, {tr_opt_idx}, {bl_opt_idx}, {br_opt_idx})")
+    else:
+        # Sprite index out of range, use empty tile
+        tile_entry = (0, 0, 0, 0, 0, 0)
+        breakable_wall_gid_data.append(tile_entry)
+        print(f"WARNING: Breakable wall sprite {breakable_wall_sprite_index} not found, using empty tile for GID {breakable_wall_gid}")
+    
+    return breakable_wall_gid_data
+
 def rgb_to_nes_6bit(r, g, b):
     """
     Convert RGB (0-255) to NES 6-bit color index (0-63).
@@ -695,13 +738,13 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         bl_opt_idx = min(bl_opt_idx, 255)
         br_opt_idx = min(br_opt_idx, 255)
 
-        # Determine if this is a background tile (includes far_background, solid, pointy, icy, and collapse tiles)
-        # Collapse tiles use background palettes even though they're rendered as sprites
-        is_background = tile_index in all_background_gids or tile_index in collapse_tile_indices
+        # Determine if this is a background tile (includes far_background, solid, pointy, icy, and background tile objects)
+        # Background tile objects (collapse tiles, breakable walls) use background palettes even though they're rendered as sprites
+        is_background = tile_index in all_background_gids or tile_index in background_tile_object_indices
         
-        # Collapse tiles need to be added to object_data so the game can track them as objects
+        # Background tile objects need to be added to object_data so the game can track them as objects
         # They appear in the tilemap as background tiles but are also objects
-        if tile_index in collapse_tile_indices:
+        if tile_index in background_tile_object_indices:
             object_data.append((tile_index, map_x_tile, map_y_tile))
 
         # Normalize palette: pad to 4 colors
@@ -741,10 +784,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 print(f"ERROR: Background palette index {palette_idx_encoded} exceeds limit of 3!")
                 palette_idx_encoded = 0
             
-            # Track background palette index for collapse tiles (they're rendered as sprites but use background palettes)
-            if tile_index in collapse_tile_indices:
-                collapse_tile_background_palette[tile_index] = palette_idx
-                collapse_tiles_in_tilemap[tile_index] = palette_idx
+            # Track background palette index for background tile objects (they're rendered as sprites but use background palettes)
+            if tile_index in background_tile_object_indices:
+                background_tile_object_palette[tile_index] = palette_idx
+                if tile_index in collapse_tile_indices:
+                    collapse_tiles_in_tilemap[tile_index] = palette_idx
         else:
             # Sprite tile - use sprite palettes
             normalized_palette = list(palette)
@@ -907,7 +951,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         else:
             # Add new entry to shared mapping
             # Skip GIDs 24, 25, 26 if we haven't reached them yet
-            while next_gid in collapse_gids:
+            while next_gid in collapse_gids or next_gid == 27:  # Skip reserved GIDs for background tile objects
                 next_gid += 1
                 shared_gid_mapping_global['next_gid'] = next_gid
             
@@ -1123,10 +1167,15 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if player_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(player_tile_idx)
             
-            # Add collapse tiles found in this level's tilemap (they use background palettes)
+            # Add background tile objects found in this level's tilemap (they use background palettes)
+            # Add collapse tiles
             for collapse_tile_idx, bg_palette_idx in collapse_tiles_in_tilemap.items():
                 if collapse_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(collapse_tile_idx)
+            # Add breakable walls (if present in tilemap)
+            for tile_idx in background_tile_object_indices:
+                if tile_idx in background_tile_object_palette and tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(tile_idx)
             
             # Generate object sprite data (CHR data for each unique object)
             # Each object is a 16x16 sprite = 4 8x8 tiles = 64 bytes
@@ -1155,9 +1204,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                     if obj_tile_idx in player_sprite_tile_indices:
                         # Player frames use sprite palette 3 (mark with 3)
                         palette_idx = 3
-                    elif obj_tile_idx in collapse_tile_indices:
-                        # Collapse tiles use sprite palette 1 (which is set to background palette 0)
-                        # All collapse tiles use sprite palette 1 regardless of which background palette they use
+                    elif obj_tile_idx in background_tile_object_indices:
+                        # Background tile objects (collapse tiles, breakable walls) use sprite palette 1 (which is set to background palette 0)
+                        # All background tile objects use sprite palette 1 regardless of which background palette they use
                         palette_idx = 1
                     else:
                         # Get palette index for this object from object_palette_mapping (0-2 for object palettes)
@@ -2117,9 +2166,11 @@ def main():
         remaining_tiles = max_tiles - len(unique_chr_tiles)
         print(f"  Remaining capacity: {remaining_tiles} unique 8x8 tiles")
 
-    # Reserve GIDs 24, 25, 26 for collapse tiles before processing levels
+    # Reserve GIDs for background tile objects before processing levels
     print("\nReserving GIDs 24, 25, 26 for collapse tiles...")
     reserve_collapse_tile_gids(all_sprite_data, tile_mapping)
+    print("\nReserving GID 27 for breakable walls...")
+    reserve_breakable_wall_gids(all_sprite_data, tile_mapping)
 
     # Process map JSON and create level previews and .h files
     tilemap_filename = os.path.join(script_dir, 'baseCelesteTileMap.json')
@@ -2416,9 +2467,10 @@ def main():
                     
                     # Generate shared GID mapping header after all levels are processed
                     # Ensure it's always generated, even if empty (for compilation)
-                    # Ensure collapse tiles are at GIDs 24, 25, 26
-                    global collapse_tile_gid_data
+                    # Ensure background tile objects are at their reserved GIDs
+                    global collapse_tile_gid_data, breakable_wall_gid_data
                     collapse_gids = [24, 25, 26]
+                    breakable_wall_gid = 27
                     if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
                         # Ensure gid_map_data is large enough
                         while len(shared_gid_mapping_global['gid_map_data']) <= collapse_gids[-1]:
@@ -2439,7 +2491,8 @@ def main():
                         f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
                         f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
                         f.write("// GID 0 is reserved for empty tiles\n")
-                        f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n\n")
+                        f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n")
+                        f.write("// GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)\n\n")
                         f.write("#ifndef GID_TO_TILE_SHARED_H\n")
                         f.write("#define GID_TO_TILE_SHARED_H\n\n")
                         if len(shared_gid_mapping_global['gid_map_data']) > 0:
@@ -2534,16 +2587,52 @@ def main():
                         f.write("#endif // GID_TO_TILE_COLLAPSE_H\n")
                     print(f"Generated collapse tile header with 3 entries")
                     
+                    # Generate separate breakable wall header
+                    breakable_wall_header_filename = os.path.join(script_dir, 'gid_to_tile_breakable_wall.h')
+                    print(f"\nGenerating breakable wall header: {breakable_wall_header_filename}")
+                    with open(breakable_wall_header_filename, 'w') as f:
+                        f.write("// Breakable wall GID to tile mapping\n")
+                        f.write("// Generated from baseCelesteSpriteSheet.png\n")
+                        f.write("// GID 27 for breakable walls (sprite index 64)\n")
+                        f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
+                        f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n\n")
+                        f.write("#ifndef GID_TO_TILE_BREAKABLE_WALL_H\n")
+                        f.write("#define GID_TO_TILE_BREAKABLE_WALL_H\n\n")
+                        if breakable_wall_gid_data and len(breakable_wall_gid_data) == 1:
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                            f.write("#endif\n")
+                            f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                            tile_entry = breakable_wall_gid_data[0]
+                            tl, tr, bl, br, pal_idx, flip = tile_entry
+                            f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
+                            f.write(f"    {{ {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip} }}\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
+                        else:
+                            # Default empty entry
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                            f.write("#endif\n")
+                            f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                            f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
+                        f.write("#endif // GID_TO_TILE_BREAKABLE_WALL_H\n")
+                    print(f"Generated breakable wall header with 1 entry")
+                    
                     # Code-referenced objects: objects used dynamically in code but might not appear in level object data
                     # Format: (tile_index, palette_source, base_tile_or_none, palette_fallback)
                     # palette_source: 'inherit_from' = use palette from base_tile, 'mapping' = use object_palette_mapping, 'fixed' = use palette_fallback value, 'background' = use background palette index
                     code_referenced_objects = [
                         # Spring sprite 2 - uses same palette as spring sprite 1 (tile 18)
                         (19, 'inherit_from', 18, 2),  # SPRING_SPRITE_2, inherit from tile 18, fallback palette 2
-                        # Collapse tile sprites - use background palette indices (they're treated as background tiles)
+                        # Background tile object sprites - use background palette indices (they're treated as background tiles)
                         (23, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_1, use background palette
                         (24, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_2, use background palette
                         (25, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_3, use background palette
+                        (64, 'background', None, 0),  # BREAKABLE_WALL_SPRITE_1, use background palette
                     ]
                     
                     # Add code-referenced objects if they're missing
@@ -2563,8 +2652,8 @@ def main():
                                 else:
                                     palette_idx = palette_fallback
                             elif palette_source == 'background':
-                                # Collapse tiles use sprite palette 1 (which is set to background palette 0)
-                                # All collapse tiles use sprite palette 1 regardless of which background palette they use
+                                # Background tile objects use sprite palette 1 (which is set to background palette 0)
+                                # All background tile objects use sprite palette 1 regardless of which background palette they use
                                 palette_idx = 1
                             elif palette_source == 'mapping':
                                 # Try to get from object_palette_mapping if available
@@ -2719,8 +2808,9 @@ def main():
     # Ensure shared GID mapping header is always generated (even if no levels were processed)
     shared_gid_header_filename = os.path.join(script_dir, 'gid_to_tile_shared.h')
     if not os.path.exists(shared_gid_header_filename) or len(shared_gid_mapping_global['gid_map_data']) == 0:
-        # Ensure collapse tiles are at GIDs 24, 25, 26
+        # Ensure background tile objects are at their reserved GIDs
         collapse_gids = [24, 25, 26]
+        breakable_wall_gid = 27
         if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
             # Ensure gid_map_data is large enough
             while len(shared_gid_mapping_global['gid_map_data']) <= collapse_gids[-1]:
@@ -2740,7 +2830,8 @@ def main():
             f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
             f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
             f.write("// GID 0 is reserved for empty tiles\n")
-            f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n\n")
+            f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n")
+            f.write("// GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)\n\n")
             f.write("#ifndef GID_TO_TILE_SHARED_H\n")
             f.write("#define GID_TO_TILE_SHARED_H\n\n")
             if len(shared_gid_mapping_global['gid_map_data']) > 0:
@@ -2791,7 +2882,8 @@ def main():
             f.write("#endif // GID_TO_TILE_SHARED_H\n")
         print(f"Generated shared GID mapping with {len(shared_gid_mapping_global['gid_map_data']) if len(shared_gid_mapping_global['gid_map_data']) > 0 else 1} unique GIDs")
         
-        # Generate separate collapse tile header
+        # Generate separate background tile object headers
+        # Collapse tile header
         collapse_tile_header_filename = os.path.join(script_dir, 'gid_to_tile_collapse.h')
         print(f"\nGenerating collapse tile header: {collapse_tile_header_filename}")
         with open(collapse_tile_header_filename, 'w') as f:
@@ -2828,6 +2920,41 @@ def main():
                 f.write("#define GID_TO_TILE_COLLAPSE_COUNT 3\n\n")
             f.write("#endif // GID_TO_TILE_COLLAPSE_H\n")
         print(f"Generated collapse tile header with 3 entries")
+        
+        # Breakable wall header
+        breakable_wall_header_filename = os.path.join(script_dir, 'gid_to_tile_breakable_wall.h')
+        print(f"\nGenerating breakable wall header: {breakable_wall_header_filename}")
+        with open(breakable_wall_header_filename, 'w') as f:
+            f.write("// Breakable wall GID to tile mapping\n")
+            f.write("// Generated from baseCelesteSpriteSheet.png\n")
+            f.write("// GID 27 for breakable walls (sprite index 64)\n")
+            f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
+            f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n\n")
+            f.write("#ifndef GID_TO_TILE_BREAKABLE_WALL_H\n")
+            f.write("#define GID_TO_TILE_BREAKABLE_WALL_H\n\n")
+            if breakable_wall_gid_data and len(breakable_wall_gid_data) == 1:
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                f.write("#endif\n")
+                f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                tile_entry = breakable_wall_gid_data[0]
+                tl, tr, bl, br, pal_idx, flip = tile_entry
+                f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
+                f.write(f"    {{ {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip} }}\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
+            else:
+                # Default empty entry
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                f.write("#endif\n")
+                f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
+                f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
+            f.write("#endif // GID_TO_TILE_BREAKABLE_WALL_H\n")
+        print(f"Generated breakable wall header with 1 entry")
 
 
     print(f"\nConversion complete!")

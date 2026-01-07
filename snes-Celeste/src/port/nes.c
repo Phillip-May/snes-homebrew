@@ -11,6 +11,7 @@
 // sprite_animation_enums_nes.h is included by port.h when __NES__ is defined
 #include "../../python/gid_to_tile_shared.h"
 #include "../../python/gid_to_tile_collapse.h"
+#include "../../python/gid_to_tile_breakable_wall.h"
 #include "../../python/compression_dict_shared.h"
 #include "../../python/object_sprite_dict_shared_nes.h"
 #include "../../python/tilemap_level1_nes.h"
@@ -66,18 +67,18 @@ static uint8_t s_oamIndex = 0;
 static uint8_t s_scrollY = 0; // Vertical scroll position
 static uint8_t s_frameCounter = 0; // For screenshake pattern
 
-// Queue of pending collapse tile updates (simplified - just track indices)
-#define MAX_PENDING_COLLAPSE_TILE_UPDATES 30
-static uint8_t s_pendingCollapseTileUpdates[MAX_PENDING_COLLAPSE_TILE_UPDATES];
-static uint8_t s_pendingCollapseTileCount = 0;
+// Queue of pending background tile object updates (collapse tiles, breakable walls, etc.)
+#define MAX_PENDING_BG_TILE_UPDATES 30
+static uint8_t s_pendingBgTileUpdates[MAX_PENDING_BG_TILE_UPDATES];
+static uint8_t s_pendingBgTileCount = 0;
 
-// Pre-calculated VRAM write operations for collapse tiles (to move calculations before vblank)
-#define MAX_COLLAPSE_TILE_WRITES 30
+// Pre-calculated VRAM write operations for background tile objects (to move calculations before vblank)
+#define MAX_BG_TILE_WRITES 30
 typedef struct {
     uint16_t addr_top;
     uint16_t addr_bottom;
     const unsigned char *tile_data;  // Pointer to tile entry (TL, TR, BL, BR, palette, flip)
-} CollapseTileWrite;
+} BgTileWrite;
 
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern struct sPlayerData GLOBAL_PlayerData;
@@ -554,44 +555,65 @@ void port_buildSpring(uint8_t index) {
     render_object_sprite(spring, oamOffset);
 }
 
-// Queue a collapse tile update (called from mainBankZero.c when state changes)
+// Queue a background tile object update (called from mainBankZero.c when state changes)
+// Handles collapse tiles, breakable walls, and other background tile objects
 void port_updateCollapseTileNametable(uint8_t index) {
     // Check if already in queue (avoid duplicates)
-    for (uint8_t i = 0; i < s_pendingCollapseTileCount; i++) {
-        if (s_pendingCollapseTileUpdates[i] == index) {
+    for (uint8_t i = 0; i < s_pendingBgTileCount; i++) {
+        if (s_pendingBgTileUpdates[i] == index) {
             return; // Already queued
         }
     }
     // Add to queue if there's space
-    if (s_pendingCollapseTileCount < MAX_PENDING_COLLAPSE_TILE_UPDATES) {
-        s_pendingCollapseTileUpdates[s_pendingCollapseTileCount++] = index;
+    if (s_pendingBgTileCount < MAX_PENDING_BG_TILE_UPDATES) {
+        s_pendingBgTileUpdates[s_pendingBgTileCount++] = index;
     }
 }
 
-static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t *write_count) {
+static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
-    if (s_pendingCollapseTileCount == 0) return;
+    if (s_pendingBgTileCount == 0) return;
     
-    // Limit to 2 updates per frame
+    // Limit to 1 update per frame
     const uint8_t MAX_UPDATES_PER_FRAME = 1;
     uint8_t updates_this_frame = 0;
     uint8_t processed_count = 0;
     
-    // Process pending updates (up to 2 per frame)
-    while (processed_count < s_pendingCollapseTileCount && updates_this_frame < MAX_UPDATES_PER_FRAME) {
-        uint8_t index = s_pendingCollapseTileUpdates[processed_count];
-        OBJ_DATA *collapseTile = &GLOBAL_OBJList[index];
+    // Process pending updates (up to MAX_UPDATES_PER_FRAME per frame)
+    while (processed_count < s_pendingBgTileCount && updates_this_frame < MAX_UPDATES_PER_FRAME) {
+        uint8_t index = s_pendingBgTileUpdates[processed_count];
+        OBJ_DATA *bgTileObj = &GLOBAL_OBJList[index];
         
-        uint8_t tileX = collapseTile->pos.x / 16;
-        uint8_t tileY = (collapseTile->pos.y + 1) / 16;
+        uint8_t tileX = bgTileObj->pos.x / 16;
+        uint8_t tileY = (bgTileObj->pos.y + 1) / 16;
         const unsigned char *tile_entry = NULL;
-        if (collapseTile->data.collapseTile.state != 2 && collapseTile->oamTile >= COLLAPSE_TILE_SPRITE_1 && collapseTile->oamTile <= COLLAPSE_TILE_SPRITE_3) {
-            // gid_to_tile_collapse is in bank 5, switch to it before accessing
-            set_prg_bank(5);
-            tile_entry = gid_to_tile_collapse[collapseTile->oamTile - COLLAPSE_TILE_SPRITE_1];
-            // Switch back to bank 6 (prepare_collapse_tiles_nametable is called from bank 6 context)
-            set_prg_bank(6);
+        
+        // Handle collapse tiles
+        if (bgTileObj->eType == OBJ_COLLAPSE_TILE) {
+            if (bgTileObj->data.collapseTile.state != 2 && bgTileObj->oamTile >= COLLAPSE_TILE_SPRITE_1 && bgTileObj->oamTile <= COLLAPSE_TILE_SPRITE_3) {
+                // gid_to_tile_collapse is in bank 5, switch to it before accessing
+                set_prg_bank(5);
+                tile_entry = gid_to_tile_collapse[bgTileObj->oamTile - COLLAPSE_TILE_SPRITE_1];
+                // Switch back to bank 6
+                set_prg_bank(6);
+            }
+            // If state == 2 (HIDDEN), tile_entry remains NULL (will clear the tile)
         }
+        // Handle breakable walls
+        else if (bgTileObj->eType == OBJ_BREAKABLE_WALL) {
+            // Breakable walls: if object still exists (not destroyed), show the wall tile
+            if (bgTileObj->oamTile == BREAKABLE_WALL_SPRITE_1) {
+                // gid_to_tile_breakable_wall is in bank 5, switch to it before accessing
+                set_prg_bank(5);
+                tile_entry = gid_to_tile_breakable_wall[0];
+                // Switch back to bank 6
+                set_prg_bank(6);
+            }
+            // If oamTile doesn't match, tile_entry remains NULL (will clear the tile)
+        }
+        // If object is OBJ_UNUSED, tile_entry remains NULL (will clear the tile)
+        // This handles the case where a breakable wall was queued before being destroyed
+        
         uint8_t nes_tile_x = tileX * 2;
         uint8_t nes_tile_y_top = tileY * 2;
         uint8_t nes_tile_y_bottom = nes_tile_y_top + 1;
@@ -602,7 +624,7 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
         uint16_t addr_top = nametable_base_top + ((uint16_t)nes_tile_y_adj_top * 32) + nes_tile_x;
         uint16_t addr_bottom = nametable_base_bottom + ((uint16_t)nes_tile_y_adj_bottom * 32) + nes_tile_x;
         
-        CollapseTileWrite *write = &writes[(*write_count)++];
+        BgTileWrite *write = &writes[(*write_count)++];
         write->addr_top = addr_top;
         write->addr_bottom = addr_bottom;
         write->tile_data = tile_entry;
@@ -612,14 +634,14 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
     
     // Remove processed updates from queue (shift remaining items)
     if (processed_count > 0) {
-        for (uint8_t i = 0; i < s_pendingCollapseTileCount - processed_count; i++) {
-            s_pendingCollapseTileUpdates[i] = s_pendingCollapseTileUpdates[i + processed_count];
+        for (uint8_t i = 0; i < s_pendingBgTileCount - processed_count; i++) {
+            s_pendingBgTileUpdates[i] = s_pendingBgTileUpdates[i + processed_count];
         }
-        s_pendingCollapseTileCount -= processed_count;
+        s_pendingBgTileCount -= processed_count;
     }
 }
 
-static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *writes, uint8_t write_count) {
+static void execute_bg_tiles_nametable_writes(const BgTileWrite *writes, uint8_t write_count) {
     // Check if any writes need bank 5 data
     bool needs_bank5 = false;
     for (uint8_t i = 0; i < write_count; i++) {
@@ -635,7 +657,7 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
     }
     
     for (uint8_t i = 0; i < write_count; i++) {
-        const CollapseTileWrite *write = &writes[i];
+        const BgTileWrite *write = &writes[i];
         if (write->tile_data != NULL) {
             vram_adr(write->addr_top);
             vram_put(write->tile_data[0]);
@@ -653,7 +675,7 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
         }
     }
     
-    // Switch back to bank 6 (execute_collapse_tiles_nametable_writes is called from bank 6 context)
+    // Switch back to bank 6 (execute_bg_tiles_nametable_writes is called from bank 6 context)
     if (needs_bank5) {
         set_prg_bank(6);
     }
@@ -765,17 +787,17 @@ void port_drawText(const unsigned char *text, uint8_t x, uint8_t y) {
 
 static char (*volatile pad_poll_fn)(char) = pad_poll;
 static void update_player_hair_color(void);
-static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t *write_count);
-static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *writes, uint8_t write_count);
+static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count);
+static void execute_bg_tiles_nametable_writes(const BgTileWrite *writes, uint8_t write_count);
 
 __attribute__((noinline)) void port_vblank(void) {
     int16_t playerY = (int16_t)GLOBAL_PlayerData.objData.pos.y;
     int16_t scrollCalc = playerY - 16 - (int16_t)GLOBAL_ActiveLevel.scrollPointY;
     s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
-    CollapseTileWrite collapseTileWrites[MAX_COLLAPSE_TILE_WRITES];
-    uint8_t collapseTileWriteCount = 0;
-    set_prg_bank(6);  // Switch to bank 6 for collapse tile functions (code is in bank 6)
-    prepare_collapse_tiles_nametable(collapseTileWrites, &collapseTileWriteCount);
+    BgTileWrite bgTileWrites[MAX_BG_TILE_WRITES];
+    uint8_t bgTileWriteCount = 0;
+    set_prg_bank(6);  // Switch to bank 6 for background tile object functions (code is in bank 6)
+    prepare_bg_tiles_nametable(bgTileWrites, &bgTileWriteCount);
     ppu_wait_nmi();
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
     __asm__ __volatile__("" ::: "memory");
@@ -790,8 +812,8 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
     //oam_upload(); //This appears to trigger anyway looking in mesen
-    // execute_collapse_tiles_nametable_writes is in bank 5, bank already switched above
-    execute_collapse_tiles_nametable_writes(collapseTileWrites, collapseTileWriteCount);
+    // execute_bg_tiles_nametable_writes is in bank 6, bank already switched above
+    execute_bg_tiles_nametable_writes(bgTileWrites, bgTileWriteCount);
     set_prg_bank(0);  // Switch back to fixed bank
     update_player_hair_color();
     
@@ -992,7 +1014,7 @@ void port_LoadRoomData(uint16_t roomID) {
     set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
     uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
-    s_pendingCollapseTileCount = 0;
+    s_pendingBgTileCount = 0;
     GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = LEVEL_WIDTH;
     GLOBAL_ActiveLevel.roomSizeY = LEVEL_HEIGHT;

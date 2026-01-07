@@ -133,6 +133,8 @@ void breakableWallInit(uint8_t index) {
     wall->oamTile = BREAKABLE_WALL_SPRITE_1;
     wall->oamProps = properties;
     wall->flags |= OBJ_FLAG_DIRTY;
+    // Update nametable to show the breakable wall tile
+    port_updateCollapseTileNametable(index);
 
 }
 
@@ -161,6 +163,8 @@ void breakableWallUpdate(uint8_t index) {
         initObject(OBJ_SMOKE, thisX + 16, thisY + 16);
         initObject(OBJ_STRAWBERRY, thisX + 8, thisY + 8);
 
+        // Update nametable to clear the breakable wall tile (queue before destroying)
+        port_updateCollapseTileNametable(index);
         //Destroy the object
         wall->eType = OBJ_UNUSED;
         wall->flags |= OBJ_FLAG_DIRTY;
