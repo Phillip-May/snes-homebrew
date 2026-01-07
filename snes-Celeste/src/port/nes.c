@@ -379,11 +379,11 @@ static void decompress_tilemap(const unsigned char *compressed_data, uint8_t *ou
             uint8_t dict_idx = byte & 0x3F;
             if (dict_idx < COMPRESSION_DICT_SHARED_COUNT) {
                 // compression_dict_shared is in bank 5, switch to it to access
-                prg_bank_switch(5);
+                set_prg_bank(5);
                 output[out_idx++] = compression_dict_shared[dict_idx][0];
                 if (out_idx < LEVEL_TILE_COUNT) output[out_idx++] = compression_dict_shared[dict_idx][1];
                 // Switch back to level data bank to continue reading compressed_data
-                prg_bank_switch(data_bank);
+                set_prg_bank(data_bank);
             }
             comp_idx++;
         }
@@ -408,7 +408,7 @@ static const unsigned char* get_object_sprite_data(uint8_t tile_index) {
     if (tile_index >= OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE) return NULL;
     uint8_t compact_idx = object_sprite_lookup_table[tile_index];
     if (compact_idx == 0xFF || compact_idx >= OBJECT_SPRITE_DICT_COMPACT_COUNT) {
-        prg_bank_switch(0);  // Switch back to fixed bank on error
+        set_prg_bank(0);  // Switch back to fixed bank on error
         return NULL;
     }
     return &object_sprite_dict_compact[compact_idx][0];
@@ -480,13 +480,13 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     uint8_t tile_index = playerData->oamTile;
     const unsigned char *player_sprite = get_object_sprite_data(tile_index);
     if (player_sprite == NULL) {
-        prg_bank_switch(0);  // get_object_sprite_data may have switched to bank 5, switch back
+        set_prg_bank(0);  // get_object_sprite_data may have switched to bank 5, switch back
         hide_sprites(0);
         return;
     }
     
     render_16x16_sprite(player_sprite, baseX, baseY, playerData->oamProps, 0);
-    prg_bank_switch(0);  // get_object_sprite_data switched to bank 5, switch back to fixed bank
+    set_prg_bank(0);  // get_object_sprite_data switched to bank 5, switch back to fixed bank
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -587,10 +587,10 @@ static void prepare_collapse_tiles_nametable(CollapseTileWrite *writes, uint8_t 
         const unsigned char *tile_entry = NULL;
         if (collapseTile->data.collapseTile.state != 2 && collapseTile->oamTile >= COLLAPSE_TILE_SPRITE_1 && collapseTile->oamTile <= COLLAPSE_TILE_SPRITE_3) {
             // gid_to_tile_collapse is in bank 5, switch to it before accessing
-            prg_bank_switch(5);
+            set_prg_bank(5);
             tile_entry = gid_to_tile_collapse[collapseTile->oamTile - COLLAPSE_TILE_SPRITE_1];
             // Switch back to bank 6 (prepare_collapse_tiles_nametable is called from bank 6 context)
-            prg_bank_switch(6);
+            set_prg_bank(6);
         }
         uint8_t nes_tile_x = tileX * 2;
         uint8_t nes_tile_y_top = tileY * 2;
@@ -631,7 +631,7 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
     
     // Switch to bank 5 if needed (tile_data pointers point to data in bank 5)
     if (needs_bank5) {
-        prg_bank_switch(5);
+        set_prg_bank(5);
     }
     
     for (uint8_t i = 0; i < write_count; i++) {
@@ -655,7 +655,7 @@ static void execute_collapse_tiles_nametable_writes(const CollapseTileWrite *wri
     
     // Switch back to bank 6 (execute_collapse_tiles_nametable_writes is called from bank 6 context)
     if (needs_bank5) {
-        prg_bank_switch(6);
+        set_prg_bank(6);
     }
     if (write_count > 0) {
         (void)PPU_STATUS;
@@ -774,7 +774,7 @@ __attribute__((noinline)) void port_vblank(void) {
     s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
     CollapseTileWrite collapseTileWrites[MAX_COLLAPSE_TILE_WRITES];
     uint8_t collapseTileWriteCount = 0;
-    prg_bank_switch(6);  // Switch to bank 6 for collapse tile functions (code is in bank 6)
+    set_prg_bank(6);  // Switch to bank 6 for collapse tile functions (code is in bank 6)
     prepare_collapse_tiles_nametable(collapseTileWrites, &collapseTileWriteCount);
     ppu_wait_nmi();
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
@@ -792,7 +792,7 @@ __attribute__((noinline)) void port_vblank(void) {
     //oam_upload(); //This appears to trigger anyway looking in mesen
     // execute_collapse_tiles_nametable_writes is in bank 5, bank already switched above
     execute_collapse_tiles_nametable_writes(collapseTileWrites, collapseTileWriteCount);
-    prg_bank_switch(0);  // Switch back to fixed bank
+    set_prg_bank(0);  // Switch back to fixed bank
     update_player_hair_color();
     
     // Apply screenshake to scroll if active
@@ -830,7 +830,7 @@ static void load_background_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
+    set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
     uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
@@ -839,7 +839,7 @@ static void load_background_palettes(void) {
         }
     }
     pal_bg(palette_ram);
-    prg_bank_switch(6);  // Switch back to bank 6 before returning (load_background_palettes is in bank 6)
+    set_prg_bank(6);  // Switch back to bank 6 before returning (load_background_palettes is in bank 6)
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -847,7 +847,7 @@ static void load_sprite_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[16 + i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
+    set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
     uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
@@ -856,7 +856,7 @@ static void load_sprite_palettes(void) {
         }
     }
     pal_spr(&palette_ram[16]);
-    prg_bank_switch(6);  // Switch back to bank 6 before returning (load_sprite_palettes is in bank 6)
+    set_prg_bank(6);  // Switch back to bank 6 before returning (load_sprite_palettes is in bank 6)
 }
 
 static void update_player_hair_color(void) {
@@ -879,7 +879,7 @@ __attribute__((section(".prg_rom_6")))
 static void write_nametable(void) {
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
+    set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
     uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     // decompress_tilemap is in fixed bank, so it can be called from any bank
@@ -887,7 +887,7 @@ static void write_nametable(void) {
     uint8_t *decompressed_tilemap = (uint8_t *)GLOBAL_OBJList;
     decompress_tilemap(level->tilemap_compressed, decompressed_tilemap, level_bank);
     // Switch to bank 5 to access gid_to_tile_shared (which is in bank 5)
-    prg_bank_switch(5);
+    set_prg_bank(5);
     const unsigned char *tilemap_gids = decompressed_tilemap;
     const unsigned char (*gid_to_tile_map)[6] = GID_TO_TILE_MAP;
     uint16_t gid_map_count = GID_TO_TILE_MAP_COUNT;
@@ -959,7 +959,7 @@ static void write_nametable(void) {
             vram_put(tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6));
         }
     }
-    prg_bank_switch(6);  // Switch back to bank 6 before returning (write_nametable is in bank 6)
+    set_prg_bank(6);  // Switch back to bank 6 before returning (write_nametable is in bank 6)
 }
 
 static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
@@ -989,7 +989,7 @@ void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    prg_bank_switch(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
+    set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
     uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     s_pendingCollapseTileCount = 0;
@@ -1001,7 +1001,7 @@ void port_LoadRoomData(uint16_t roomID) {
     uint8_t *decompressed_tilemap = (uint8_t *)GLOBAL_OBJList;
     decompress_tilemap(level->tilemap_compressed, decompressed_tilemap, level_bank);
     // Switch to bank 5 to access gid_to_collision (which is in bank 5)
-    prg_bank_switch(5);
+    set_prg_bank(5);
     for (uint16_t i = 0; i < LEVEL_TILE_COUNT && i < 256; i++) {
         uint8_t gid = decompressed_tilemap[i];
         uint8_t collision_flag = (gid < GID_TO_COLLISION_COUNT) ? gid_to_collision[gid] : 0;
@@ -1009,7 +1009,7 @@ void port_LoadRoomData(uint16_t roomID) {
         GLOBAL_ActiveLevel.collisionFlagsArr[i] = collision_flag;
     }
     // Switch back to bank 1 to access level_data array (all levels are in bank 1)
-    prg_bank_switch(1);
+    set_prg_bank(1);
     const LevelData *level_for_struct = &level_data[level_idx];  // Re-get pointer while in bank 1
     GLOBAL_ActiveLevel.playerSpawnX = level_for_struct->spawn_x;
     GLOBAL_ActiveLevel.playerSpawnY = level_for_struct->spawn_y;
@@ -1026,6 +1026,6 @@ void port_LoadRoomData(uint16_t roomID) {
     ppu_wait_nmi();
     ppu_wait_nmi();
     ppu_on_all();
-    prg_bank_switch(6);  // Switch back to bank 6 before returning (port_LoadRoomData is in bank 6)
+    set_prg_bank(6);  // Switch back to bank 6 before returning (port_LoadRoomData is in bank 6)
 }
 

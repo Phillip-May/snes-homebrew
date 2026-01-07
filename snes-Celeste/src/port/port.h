@@ -221,7 +221,6 @@ void port_LoadRoomData(uint16_t roomID);
 #ifdef __NES_UNROM_512__
 // PRG-ROM bank switching for UNROM-512 (non-LLVM-MOS compilers)
 #include <mapper.h>
-void prg_bank_switch(uint8_t bank);
 #endif
 
 // Macros for function section attributes (bank placement)
@@ -246,7 +245,7 @@ void prg_bank_switch(uint8_t bank);
 // Wrapper function for bank switching (portable interface)
 static inline void port_prg_bank_switch(uint8_t bank) {
 #ifdef __NES_UNROM_512__
-    prg_bank_switch(bank);
+    set_prg_bank(bank);
 #endif
 }
 
