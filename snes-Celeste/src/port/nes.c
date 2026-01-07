@@ -620,7 +620,12 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
         
         BgTileWrite *write = &writes[(*write_count)++];
         
-        if (bgTileObj->eType == OBJ_BREAKABLE_WALL) {
+        // Check if this is a breakable wall (either active or destroyed)
+        // Destroyed breakable walls become OBJ_UNUSED but may still have BREAKABLE_WALL_SPRITE_1 in oamTile
+        bool is_breakable_wall = (bgTileObj->eType == OBJ_BREAKABLE_WALL) || 
+                                  (bgTileObj->eType == OBJ_UNUSED && bgTileObj->oamTile == BREAKABLE_WALL_SPRITE_1);
+        
+        if (is_breakable_wall) {
             // 4x4 grid for breakable walls
             uint8_t nes_tile_x = tileX * 2;
             uint8_t nes_tile_y_row1 = tileY * 2;
