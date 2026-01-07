@@ -77,7 +77,11 @@ static uint8_t s_pendingBgTileCount = 0;
 typedef struct {
     uint16_t addr_top;
     uint16_t addr_bottom;
-    const unsigned char *tile_data;  // Pointer to tile entry (TL, TR, BL, BR, palette, flip)
+    uint16_t addr_row2;  // For 4x4 breakable walls
+    uint16_t addr_row3;  // For 4x4 breakable walls
+    uint16_t addr_row4;  // For 4x4 breakable walls
+    const unsigned char *tile_data;  // Pointer to tile entry (2x2: TL, TR, BL, BR, palette, flip) or (4x4: 16 tiles, palette, flip)
+    uint8_t is_4x4;  // 1 for 4x4 breakable walls, 0 for 2x2 collapse tiles
 } BgTileWrite;
 
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
@@ -614,19 +618,49 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
         // If object is OBJ_UNUSED, tile_entry remains NULL (will clear the tile)
         // This handles the case where a breakable wall was queued before being destroyed
         
-        uint8_t nes_tile_x = tileX * 2;
-        uint8_t nes_tile_y_top = tileY * 2;
-        uint8_t nes_tile_y_bottom = nes_tile_y_top + 1;
-        uint16_t nametable_base_top = (nes_tile_y_top < 30) ? 0x2000 : 0x2800;
-        uint16_t nametable_base_bottom = (nes_tile_y_bottom < 30) ? 0x2000 : 0x2800;
-        uint8_t nes_tile_y_adj_top = (nes_tile_y_top < 30) ? nes_tile_y_top : (nes_tile_y_top - 30);
-        uint8_t nes_tile_y_adj_bottom = (nes_tile_y_bottom < 30) ? nes_tile_y_bottom : (nes_tile_y_bottom - 30);
-        uint16_t addr_top = nametable_base_top + ((uint16_t)nes_tile_y_adj_top * 32) + nes_tile_x;
-        uint16_t addr_bottom = nametable_base_bottom + ((uint16_t)nes_tile_y_adj_bottom * 32) + nes_tile_x;
-        
         BgTileWrite *write = &writes[(*write_count)++];
-        write->addr_top = addr_top;
-        write->addr_bottom = addr_bottom;
+        
+        if (bgTileObj->eType == OBJ_BREAKABLE_WALL) {
+            // 4x4 grid for breakable walls
+            uint8_t nes_tile_x = tileX * 2;
+            uint8_t nes_tile_y_row1 = tileY * 2;
+            uint8_t nes_tile_y_row2 = nes_tile_y_row1 + 1;
+            uint8_t nes_tile_y_row3 = nes_tile_y_row1 + 2;
+            uint8_t nes_tile_y_row4 = nes_tile_y_row1 + 3;
+            
+            uint16_t nametable_base_row1 = (nes_tile_y_row1 < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_row2 = (nes_tile_y_row2 < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_row3 = (nes_tile_y_row3 < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_row4 = (nes_tile_y_row4 < 30) ? 0x2000 : 0x2800;
+            
+            uint8_t nes_tile_y_adj_row1 = (nes_tile_y_row1 < 30) ? nes_tile_y_row1 : (nes_tile_y_row1 - 30);
+            uint8_t nes_tile_y_adj_row2 = (nes_tile_y_row2 < 30) ? nes_tile_y_row2 : (nes_tile_y_row2 - 30);
+            uint8_t nes_tile_y_adj_row3 = (nes_tile_y_row3 < 30) ? nes_tile_y_row3 : (nes_tile_y_row3 - 30);
+            uint8_t nes_tile_y_adj_row4 = (nes_tile_y_row4 < 30) ? nes_tile_y_row4 : (nes_tile_y_row4 - 30);
+            
+            write->addr_top = nametable_base_row1 + ((uint16_t)nes_tile_y_adj_row1 * 32) + nes_tile_x;
+            write->addr_bottom = nametable_base_row2 + ((uint16_t)nes_tile_y_adj_row2 * 32) + nes_tile_x;
+            write->addr_row2 = nametable_base_row3 + ((uint16_t)nes_tile_y_adj_row3 * 32) + nes_tile_x;
+            write->addr_row3 = nametable_base_row4 + ((uint16_t)nes_tile_y_adj_row4 * 32) + nes_tile_x;
+            write->addr_row4 = 0;  // Not used, but initialize for consistency
+            write->is_4x4 = 1;
+        } else {
+            // 2x2 grid for collapse tiles
+            uint8_t nes_tile_x = tileX * 2;
+            uint8_t nes_tile_y_top = tileY * 2;
+            uint8_t nes_tile_y_bottom = nes_tile_y_top + 1;
+            uint16_t nametable_base_top = (nes_tile_y_top < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_bottom = (nes_tile_y_bottom < 30) ? 0x2000 : 0x2800;
+            uint8_t nes_tile_y_adj_top = (nes_tile_y_top < 30) ? nes_tile_y_top : (nes_tile_y_top - 30);
+            uint8_t nes_tile_y_adj_bottom = (nes_tile_y_bottom < 30) ? nes_tile_y_bottom : (nes_tile_y_bottom - 30);
+            write->addr_top = nametable_base_top + ((uint16_t)nes_tile_y_adj_top * 32) + nes_tile_x;
+            write->addr_bottom = nametable_base_bottom + ((uint16_t)nes_tile_y_adj_bottom * 32) + nes_tile_x;
+            write->addr_row2 = 0;
+            write->addr_row3 = 0;
+            write->addr_row4 = 0;
+            write->is_4x4 = 0;
+        }
+        
         write->tile_data = tile_entry;
         updates_this_frame++;
         processed_count++;
@@ -659,19 +693,69 @@ static void execute_bg_tiles_nametable_writes(const BgTileWrite *writes, uint8_t
     for (uint8_t i = 0; i < write_count; i++) {
         const BgTileWrite *write = &writes[i];
         if (write->tile_data != NULL) {
-            vram_adr(write->addr_top);
-            vram_put(write->tile_data[0]);
-            vram_put(write->tile_data[1]);
-            vram_adr(write->addr_bottom);
-            vram_put(write->tile_data[2]);
-            vram_put(write->tile_data[3]);
+            if (write->is_4x4) {
+                // 4x4 grid for breakable walls (16 tiles in row-major order)
+                vram_adr(write->addr_top);
+                vram_put(write->tile_data[0]);
+                vram_put(write->tile_data[1]);
+                vram_put(write->tile_data[2]);
+                vram_put(write->tile_data[3]);
+                vram_adr(write->addr_bottom);
+                vram_put(write->tile_data[4]);
+                vram_put(write->tile_data[5]);
+                vram_put(write->tile_data[6]);
+                vram_put(write->tile_data[7]);
+                vram_adr(write->addr_row2);
+                vram_put(write->tile_data[8]);
+                vram_put(write->tile_data[9]);
+                vram_put(write->tile_data[10]);
+                vram_put(write->tile_data[11]);
+                vram_adr(write->addr_row3);
+                vram_put(write->tile_data[12]);
+                vram_put(write->tile_data[13]);
+                vram_put(write->tile_data[14]);
+                vram_put(write->tile_data[15]);
+            } else {
+                // 2x2 grid for collapse tiles
+                vram_adr(write->addr_top);
+                vram_put(write->tile_data[0]);
+                vram_put(write->tile_data[1]);
+                vram_adr(write->addr_bottom);
+                vram_put(write->tile_data[2]);
+                vram_put(write->tile_data[3]);
+            }
         } else {
-            vram_adr(write->addr_top);
-            vram_put(0);
-            vram_put(0);
-            vram_adr(write->addr_bottom);
-            vram_put(0);
-            vram_put(0);
+            if (write->is_4x4) {
+                // Clear 4x4 grid
+                vram_adr(write->addr_top);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_adr(write->addr_bottom);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_adr(write->addr_row2);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_adr(write->addr_row3);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+                vram_put(0);
+            } else {
+                // Clear 2x2 grid
+                vram_adr(write->addr_top);
+                vram_put(0);
+                vram_put(0);
+                vram_adr(write->addr_bottom);
+                vram_put(0);
+                vram_put(0);
+            }
         }
     }
     
