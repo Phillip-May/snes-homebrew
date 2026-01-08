@@ -1046,7 +1046,11 @@ static void update_player_hair_color(void) {
     uint8_t hair_color = (dashes_left == 0) ? 0x12 : ((dashes_left == 1) ? 0x15 : 0x1A);
     if (palette_ram[hair_color_index] != hair_color) {
         palette_ram[hair_color_index] = hair_color;
-        pal_spr(&palette_ram[16]);
+        // Only update the specific palette entry instead of all sprite palettes
+        // PPU sprite palette address: $3F10 + (hair_color_index - 16) = $3F10 + 13 = $3F1D
+        PPU_ADDR = 0x3F;
+        PPU_ADDR = (uint8_t)(0x10 + (hair_color_index - 16));
+        PPU_DATA = hair_color;
     }
 }
 
