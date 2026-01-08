@@ -85,6 +85,8 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level31
     7, 3, 19, 20, 21, 22,
     9, 0, 27, 28, 29, 26,
     10, 0, 0, 26, 0, 26,
+    11, 0, 30, 31, 0, 0,
+    12, 0, 32, 33, 0, 0,
     13, 2, 34, 35, 36, 37,
     14, 2, 0, 38, 39, 0,
     15, 2, 39, 0, 0, 38,
@@ -93,7 +95,7 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level31
     118, 0, 268, 246, 269, 0,
 };
 
-#define OBJECT_SPRITE_LEVEL31_COUNT 15
+#define OBJECT_SPRITE_LEVEL31_COUNT 17
 
 // Object palette data for layer 'level31' (NES 6-bit format)
 // 3 object palettes, each with 4 colors: [color0, color1, color2, color3]

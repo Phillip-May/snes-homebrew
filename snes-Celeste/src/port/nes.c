@@ -407,6 +407,7 @@ static void oam_upload(void) {
 static const unsigned char* get_object_sprite_data(uint8_t tile_index);
 static void hide_sprites(uint16_t oamOffset);
 static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset);
+static void render_16x8_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset);
 static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset);
 
 // get_object_sprite_data must stay in fixed bank - used by port_updatePlayerSprite (fixed bank)
@@ -430,6 +431,11 @@ static void hide_sprites(uint16_t oamOffset) {
     OAM_BUF[oamOffset + 12] = 240;
 }
 
+static void hide_2_sprites(uint16_t oamOffset) {
+    OAM_BUF[oamOffset + 0] = 240;
+    OAM_BUF[oamOffset + 4] = 240;
+}
+
 // Calculate OAM offset for an object at the given index
 // Accounts for objects that use extra slots (e.g., balloon uses 8 slots instead of 4)
 // Returns offset in bytes (each sprite slot is 4 bytes)
@@ -437,13 +443,16 @@ __attribute__((section(".prg_rom_6")))
 static uint16_t calculate_oam_offset(uint8_t index) {
     // Player uses index 0, objects start at index 1
     // Each 16x16 sprite uses 4 OAM slots (4 bytes each = 16 bytes total)
-    // Balloon uses 8 slots (2 sprites = 32 bytes total)
+    // Balloon uses 8 slots (2 16x16 sprites = 32 bytes total)
+    // Moving platforms use 4 slots (2 16x8 sprites = 16 bytes total)
     uint16_t offset = 16; // Player sprite at index 0 uses first 16 bytes (4 slots)
     
     // Count slots used by all objects before this one
     for (uint8_t i = 1; i < index && i < GLBOAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_BALLOON) {
             offset += 32; // Balloon uses 8 slots (32 bytes)
+        } else if (GLOBAL_OBJList[i].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[i].eType == OBJ_PLATMOV_R) {
+            offset += 16; // Moving platforms use 4 slots (16 bytes: 2 sprites × 8 bytes each)
         } else {
             offset += 16; // Normal objects use 4 slots (16 bytes)
         }
@@ -637,6 +646,24 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
         OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tr_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
         OAM_BUF[oamOffset + 8] = baseY + 8; OAM_BUF[oamOffset + 9] = bl_tile; OAM_BUF[oamOffset + 10] = baseProps; OAM_BUF[oamOffset + 11] = baseX;
         OAM_BUF[oamOffset + 12] = baseY + 8; OAM_BUF[oamOffset + 13] = br_tile; OAM_BUF[oamOffset + 14] = baseProps; OAM_BUF[oamOffset + 15] = baseX + 8;
+    }
+}
+
+// Render a 16x8 sprite (2 sprites: left and right, top row only)
+static void render_16x8_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset) {
+    if (sprite_data == NULL) return;
+    uint8_t palette_idx = sprite_data[0];
+    uint8_t tl_tile = sprite_data[1], tr_tile = sprite_data[2];
+    uint8_t baseProps = (palette_idx & 0x03) & ~0x20;
+    bool flip_horizontal = (oamProps & 0x40) != 0;
+    if (flip_horizontal) baseProps |= 0x40;
+    
+    if (flip_horizontal) {
+        OAM_BUF[oamOffset + 0] = baseY; OAM_BUF[oamOffset + 1] = tr_tile; OAM_BUF[oamOffset + 2] = baseProps; OAM_BUF[oamOffset + 3] = baseX;
+        OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tl_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
+    } else {
+        OAM_BUF[oamOffset + 0] = baseY; OAM_BUF[oamOffset + 1] = tl_tile; OAM_BUF[oamOffset + 2] = baseProps; OAM_BUF[oamOffset + 3] = baseX;
+        OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tr_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
     }
 }
 
@@ -885,6 +912,43 @@ void port_buildStrawberry(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildPlatMov(uint8_t index) {
+    OBJ_DATA *platMov = &GLOBAL_OBJList[index];
+    uint16_t oamOffset = calculate_oam_offset(index);
+    if (platMov->eType == OBJ_UNUSED) {
+        // Hide both left and right sprites
+        hide_2_sprites(oamOffset);
+        hide_2_sprites(oamOffset + 8);
+        return;
+    }
+    
+    uint8_t baseX = (uint8_t)platMov->pos.x;
+    uint8_t spriteY = (uint8_t)platMov->pos.y;
+    uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
+    uint8_t oamProps = platMov->oamProps;
+    
+    // Render left side (PLATMOV_SPRITE_1 = 11)
+    const unsigned char *left_sprite_data = get_object_sprite_data(PLATMOV_SPRITE_1);
+    if (left_sprite_data == NULL) {
+        // Hide both left and right sprites on error
+        hide_2_sprites(oamOffset);
+        hide_2_sprites(oamOffset + 8);
+        set_prg_bank(6);
+        return;
+    }
+    render_16x8_sprite(left_sprite_data, baseX, baseY, oamProps, oamOffset);
+    
+    // Render right side (PLATMOV_SPRITE_2 = 12) at baseX + 16
+    const unsigned char *right_sprite_data = get_object_sprite_data(PLATMOV_SPRITE_2);
+    if (right_sprite_data == NULL) {
+        // Hide right sprite on error (left already rendered)
+        hide_2_sprites(oamOffset + 8);
+        set_prg_bank(6);
+        return;
+    }
+    render_16x8_sprite(right_sprite_data, baseX + 16, baseY, oamProps, oamOffset + 8);
+    
+    // get_object_sprite_data switches to bank 5, switch back to bank 6
+    set_prg_bank(6);
 }
 
 __attribute__((section(".prg_rom_6")))

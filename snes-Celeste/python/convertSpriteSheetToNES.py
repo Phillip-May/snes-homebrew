@@ -1182,6 +1182,14 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if balloon_string_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(balloon_string_tile_idx)
             
+            # Add moving platform objects (tiles 11 and 12) to object sprite data
+            # These must always be included even if not present in this level's object_data
+            # PLATMOV_SPRITE_1 = 11 (left side), PLATMOV_SPRITE_2 = 12 (right side)
+            platmov_tile_indices = [11, 12]  # Moving platform tile indices
+            for platmov_tile_idx in platmov_tile_indices:
+                if platmov_tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(platmov_tile_idx)
+            
             # Add background tile objects found in this level's tilemap (they use background palettes)
             # Add collapse tiles
             for collapse_tile_idx, bg_palette_idx in collapse_tiles_in_tilemap.items():
