@@ -633,6 +633,7 @@ void keyUpdate(uint8_t index) {
         chest->data.chest.keyIsCollected = true;
         this->eType = OBJ_UNUSED;
         this->flags |= OBJ_FLAG_DIRTY;
+        port_buildKey(index);
         playSoundEffect(SOUND_EFFECT_KEY_COLLECT);
         return;
     }

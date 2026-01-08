@@ -496,8 +496,6 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildUnused(uint8_t index) {
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
-    hide_sprites(oamOffset);
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -589,7 +587,6 @@ void port_buildKey(uint8_t index) {
         hide_sprites(oamOffset);
         return;
     }
-    // Render the key sprite using the current oamTile (which is updated by keyUpdate to cycle through frames)
     render_object_sprite(key, oamOffset);
     // render_object_sprite calls get_object_sprite_data which switches to bank 5
     // We need to switch back to bank 6 since this function is in bank 6
@@ -1046,15 +1043,7 @@ static void update_player_hair_color(void) {
     uint8_t hair_color = (dashes_left == 0) ? 0x12 : ((dashes_left == 1) ? 0x15 : 0x1A);
     if (palette_ram[hair_color_index] != hair_color) {
         palette_ram[hair_color_index] = hair_color;
-        // Only update the specific palette entry instead of all sprite palettes
-        // PPU sprite palette address: $3F10 + (hair_color_index - 16) = $3F10 + 13 = $3F1D
-        PPU_ADDR = 0x3F;
-        PPU_ADDR = (uint8_t)(0x10 + (hair_color_index - 16));
-        PPU_DATA = hair_color;
-        // Reset PPU address register after palette write to prevent corruption
-        (void)PPU_STATUS;
-        PPU_ADDR = 0;
-        PPU_ADDR = 0;
+        pal_spr(&palette_ram[16]);
     }
 }
 
