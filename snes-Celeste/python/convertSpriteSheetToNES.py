@@ -1174,6 +1174,14 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if key_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(key_tile_idx)
             
+            # Add balloon string objects (tiles 13, 14, 15) to object sprite data
+            # These must always be included even if not present in this level's object_data
+            # Similar to how key sprites are handled - these are extra animation frames
+            balloon_string_tile_indices = [13, 14, 15]  # Balloon string tile indices
+            for balloon_string_tile_idx in balloon_string_tile_indices:
+                if balloon_string_tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(balloon_string_tile_idx)
+            
             # Add background tile objects found in this level's tilemap (they use background palettes)
             # Add collapse tiles
             for collapse_tile_idx, bg_palette_idx in collapse_tiles_in_tilemap.items():

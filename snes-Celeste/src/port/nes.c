@@ -545,8 +545,8 @@ void port_buildBalloon(uint8_t index) {
         hide_sprites(oamOffset + 16);
         return;
     }
-    // String sprite is positioned 16 pixels below the balloon
-    uint8_t stringY = balloonY + 16;
+    // String sprite is positioned 14 pixels below the balloon (moved up 2 pixels)
+    uint8_t stringY = balloonY + 14;
     // Use same palette as balloon
     render_16x16_sprite(string_sprite_data, baseX, stringY, balloon->oamProps, oamOffset + 16);
 }

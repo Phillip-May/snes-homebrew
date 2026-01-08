@@ -88,12 +88,15 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level20
     7, 3, 19, 20, 21, 22,
     9, 0, 27, 28, 29, 26,
     10, 0, 0, 26, 0, 26,
+    13, 2, 34, 35, 36, 37,
+    14, 2, 0, 38, 39, 0,
+    15, 2, 39, 0, 0, 38,
     22, 0, 56, 57, 58, 59,
     23, 1, 60, 61, 62, 63,
     64, 1, 97, 167, 168, 100,
 };
 
-#define OBJECT_SPRITE_LEVEL20_COUNT 12
+#define OBJECT_SPRITE_LEVEL20_COUNT 15
 
 // Object palette data for layer 'level20' (NES 6-bit format)
 // 3 object palettes, each with 4 colors: [color0, color1, color2, color3]
