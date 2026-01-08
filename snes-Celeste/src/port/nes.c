@@ -1051,6 +1051,10 @@ static void update_player_hair_color(void) {
         PPU_ADDR = 0x3F;
         PPU_ADDR = (uint8_t)(0x10 + (hair_color_index - 16));
         PPU_DATA = hair_color;
+        // Reset PPU address register after palette write to prevent corruption
+        (void)PPU_STATUS;
+        PPU_ADDR = 0;
+        PPU_ADDR = 0;
     }
 }
 
