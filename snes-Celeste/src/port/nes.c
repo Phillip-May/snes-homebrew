@@ -496,6 +496,8 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildUnused(uint8_t index) {
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    hide_sprites(oamOffset);
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -581,6 +583,17 @@ void port_buildBigChest(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildKey(uint8_t index) {
+    OBJ_DATA *key = &GLOBAL_OBJList[index];
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    if (key->eType == OBJ_UNUSED) {
+        hide_sprites(oamOffset);
+        return;
+    }
+    // Render the key sprite using the current oamTile (which is updated by keyUpdate to cycle through frames)
+    render_object_sprite(key, oamOffset);
+    // render_object_sprite calls get_object_sprite_data which switches to bank 5
+    // We need to switch back to bank 6 since this function is in bank 6
+    set_prg_bank(6);
 }
 
 static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset) {

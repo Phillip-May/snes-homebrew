@@ -1167,6 +1167,13 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if player_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(player_tile_idx)
             
+            # Add key objects (gid 9 and 10) to object sprite data
+            # These must always be included even if not present in this level's object_data
+            key_object_tile_indices = [9, 10]  # Key object tile indices
+            for key_tile_idx in key_object_tile_indices:
+                if key_tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(key_tile_idx)
+            
             # Add background tile objects found in this level's tilemap (they use background palettes)
             # Add collapse tiles
             for collapse_tile_idx, bg_palette_idx in collapse_tiles_in_tilemap.items():
