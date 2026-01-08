@@ -50,7 +50,7 @@ void playSoundEffect(enum eSoundEffect soundEffect){
 
 uint8_t GLOBAL_InputState = 0;
 
-#define GLBOAL_OBJ_LIST_SIZE 30
+#define GLBOAL_OBJ_LIST_SIZE 29
 OBJ_DATA GLOBAL_OBJList[GLBOAL_OBJ_LIST_SIZE] = {0};
 
 uint16_t GLOBAL_FrameCountVBLANK = 0;

@@ -88,6 +88,9 @@ extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern struct sPlayerData GLOBAL_PlayerData;
 extern OBJ_DATA GLOBAL_OBJList[];
 
+// Object list size (must match definition in mainBankZero.c)
+#define GLBOAL_OBJ_LIST_SIZE 29
+
 // Fixed level dimensions (all levels are 16x16 = 256 tiles)
 #define LEVEL_WIDTH 16
 #define LEVEL_HEIGHT 16
@@ -427,6 +430,28 @@ static void hide_sprites(uint16_t oamOffset) {
     OAM_BUF[oamOffset + 12] = 240;
 }
 
+// Calculate OAM offset for an object at the given index
+// Accounts for objects that use extra slots (e.g., balloon uses 8 slots instead of 4)
+// Returns offset in bytes (each sprite slot is 4 bytes)
+__attribute__((section(".prg_rom_6")))
+static uint16_t calculate_oam_offset(uint8_t index) {
+    // Player uses index 0, objects start at index 1
+    // Each 16x16 sprite uses 4 OAM slots (4 bytes each = 16 bytes total)
+    // Balloon uses 8 slots (2 sprites = 32 bytes total)
+    uint16_t offset = 16; // Player sprite at index 0 uses first 16 bytes (4 slots)
+    
+    // Count slots used by all objects before this one
+    for (uint8_t i = 1; i < index && i < GLBOAL_OBJ_LIST_SIZE; i++) {
+        if (GLOBAL_OBJList[i].eType == OBJ_BALLOON) {
+            offset += 32; // Balloon uses 8 slots (32 bytes)
+        } else {
+            offset += 16; // Normal objects use 4 slots (16 bytes)
+        }
+    }
+    
+    return offset;
+}
+
 __attribute__((section(".prg_rom_6")))
 static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset) {
     if (obj->eType == OBJ_UNUSED) {
@@ -509,7 +534,7 @@ void port_buildBreakableWall(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildBalloon(uint8_t index) {
     OBJ_DATA *balloon = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    uint16_t oamOffset = calculate_oam_offset(index);
     
     // Check if balloon should be hidden (unused, popped, or hidden)
     // BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1
@@ -558,7 +583,7 @@ void port_buildMonument(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildChest(uint8_t index) {
     OBJ_DATA *chest = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    uint16_t oamOffset = calculate_oam_offset(index);
     if (chest->eType == OBJ_UNUSED) {
         hide_sprites(oamOffset);
         return;
@@ -582,7 +607,7 @@ void port_buildBigChest(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildKey(uint8_t index) {
     OBJ_DATA *key = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    uint16_t oamOffset = calculate_oam_offset(index);
     if (key->eType == OBJ_UNUSED) {
         hide_sprites(oamOffset);
         return;
@@ -618,7 +643,7 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
 __attribute__((section(".prg_rom_6")))
 void port_buildSpring(uint8_t index) {
     OBJ_DATA *spring = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    uint16_t oamOffset = calculate_oam_offset(index);
     if (spring->eType == OBJ_UNUSED || spring->data.spring.isDisabled) {
         hide_sprites(oamOffset);
         return;
@@ -849,7 +874,7 @@ void port_buildCollapseTile(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildStrawberry(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    uint16_t oamOffset = calculate_oam_offset(index);
     if (strawberry->eType == OBJ_UNUSED || 
         (strawberry->data.strawberry.isCollected && strawberry->data.strawberry.frameCount > 60)) {
         hide_sprites(oamOffset);
@@ -865,7 +890,7 @@ void port_buildPlatMov(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildFlyingBerry(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    uint16_t oamOffset = calculate_oam_offset(index);
     if (berry->eType == OBJ_UNUSED || 
         (berry->data.strawberry.isCollected && berry->data.strawberry.frameCount > 60)) {
         hide_sprites(oamOffset);
