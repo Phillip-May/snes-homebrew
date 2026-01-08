@@ -66,7 +66,7 @@ enum eKeySprite {
 };
 
 enum eChestSprite {
-    CHEST_SPRITE_1 = 0x42
+    CHEST_SPRITE_1 = 20
 };
 
 enum eMonumentSprite {

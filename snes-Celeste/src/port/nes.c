@@ -557,6 +557,22 @@ void port_buildMonument(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildChest(uint8_t index) {
+    OBJ_DATA *chest = &GLOBAL_OBJList[index];
+    uint16_t oamOffset = ((uint16_t)index * 4 + 4) * 4;
+    if (chest->eType == OBJ_UNUSED) {
+        hide_sprites(oamOffset);
+        return;
+    }
+    // Hide chest when it's in the OPEN state (state == 2)
+    // CHEST_STATE_OPEN = 2
+    if (chest->data.chest.state == 2) {
+        hide_sprites(oamOffset);
+        return;
+    }
+    render_object_sprite(chest, oamOffset);
+    // render_object_sprite calls get_object_sprite_data which switches to bank 5
+    // We need to switch back to bank 6 since this function is in bank 6
+    set_prg_bank(6);
 }
 
 __attribute__((section(".prg_rom_6")))
