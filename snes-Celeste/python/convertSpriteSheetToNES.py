@@ -1190,6 +1190,22 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if platmov_tile_idx < len(all_sprite_data):
                     unique_object_tiles.add(platmov_tile_idx)
             
+            # Add flying berry wing objects (tiles 29, 30, 31) to object sprite data
+            # These must always be included even if not present in this level's object_data
+            # Similar to how key sprites are handled - these are extra animation frames for wings
+            flying_berry_wing_tile_indices = [29, 30, 31]  # Flying berry wing tile indices (UP, MID, DOWN)
+            for wing_tile_idx in flying_berry_wing_tile_indices:
+                if wing_tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(wing_tile_idx)
+            
+            # Add flying berry wing objects (tiles 45, 46, 47) to object sprite data
+            # These must always be included even if not present in this level's object_data
+            # Similar to how key sprites are handled - these are extra animation frames for wings
+            flying_berry_wing_tile_indices_2 = [45, 46, 47]  # Flying berry wing tile indices (alternative set)
+            for wing_tile_idx in flying_berry_wing_tile_indices_2:
+                if wing_tile_idx < len(all_sprite_data):
+                    unique_object_tiles.add(wing_tile_idx)
+            
             # Add background tile objects found in this level's tilemap (they use background palettes)
             # Add collapse tiles
             for collapse_tile_idx, bg_palette_idx in collapse_tiles_in_tilemap.items():
@@ -2657,6 +2673,10 @@ def main():
                         (15, 'inherit_from', 22, 2),  # BALLOON_STRING_3, inherit from tile 22, fallback palette 2
                         # Balloon sprite - use palette 2 (from nes.c: oamProps = 0x36 means palette 2)
                         (22, 'fixed', None, 2),  # BALLOON_SPRITE_1, use palette 2
+                        # Flying berry wing sprites (tiles 45, 46, 47) - use same palette as flying berry (tile 28)
+                        (45, 'inherit_from', 28, 0),  # FLYING_BERRY_WING_1, inherit from tile 28, fallback palette 0
+                        (46, 'inherit_from', 28, 0),  # FLYING_BERRY_WING_2, inherit from tile 28, fallback palette 0
+                        (47, 'inherit_from', 28, 0),  # FLYING_BERRY_WING_3, inherit from tile 28, fallback palette 0
                         # Background tile object sprites - use background palette indices (they're treated as background tiles)
                         (23, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_1, use background palette
                         (24, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_2, use background palette
@@ -2743,9 +2763,10 @@ def main():
     # NES format: sparse array indexed by tile_idx, format [pal_idx, tl, tr, bl, br]
     # SNES format: array with tile_idx field, format [tile_idx, pal_idx, tl, tr, bl, br]
     
-    # NES only uses tile indices 0-26 (based on sprite_animation_enums.h)
-    # The highest used index is 26 (STRAWBERRY_SPRITE_1), so we need 27 entries (0-26)
-    nes_max_tile_idx = 32  # Fixed at 26 for NES - this matches sprite_animation_enums.h
+    # NES uses tile indices up to 47 (flying berry wings: tiles 45, 46, 47)
+    # Keep lookup table small - only include tiles we actually use in code
+    # The lookup table is in bank 5, but we want to minimize its size
+    nes_max_tile_idx = 47  # Flying berry wings are the highest tile indices we need
     
     # Generate NES format header (compact format with lookup table)
     object_sprite_dict_nes_filename = os.path.join(script_dir, 'object_sprite_dict_shared_nes.h')

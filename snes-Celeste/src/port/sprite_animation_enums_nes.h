@@ -35,7 +35,10 @@ enum eStrawberrySprite {
 
 // Flying berry sprite state - value maps to tile index (28)
 enum eFlyingBerrySprite {
-    FLYING_BERRY_SPRITE_1 = 28
+    FLYING_BERRY_SPRITE_1 = 28,
+    FLYING_BERRY_WING_UP = 45,
+    FLYING_BERRY_WING_MID = 46,
+    FLYING_BERRY_WING_DOWN = 47
 };
 
 // Platform-independent sprite enums (shared with SNES)

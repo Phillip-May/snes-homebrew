@@ -97,6 +97,12 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level12
     15, 2, 39, 0, 0, 38,
     23, 1, 60, 61, 62, 63,
     28, 0, 77, 78, 79, 80,
+    29, 0, 81, 82, 83, 84,
+    30, 0, 85, 86, 87, 88,
+    31, 0, 89, 90, 91, 92,
+    45, 0, 121, 122, 123, 124,
+    46, 0, 0, 0, 123, 125,
+    47, 0, 0, 0, 126, 16,
     64, 1, 97, 167, 168, 100,
     70, 2, 0, 0, 184, 185,
     71, 2, 0, 0, 186, 187,
@@ -104,7 +110,7 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level12
     87, 2, 212, 213, 214, 215,
 };
 
-#define OBJECT_SPRITE_LEVEL12_COUNT 21
+#define OBJECT_SPRITE_LEVEL12_COUNT 27
 
 // Object palette data for layer 'level12' (NES 6-bit format)
 // 3 object palettes, each with 4 colors: [color0, color1, color2, color3]

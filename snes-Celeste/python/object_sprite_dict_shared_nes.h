@@ -7,7 +7,7 @@
 #define OBJECT_SPRITE_DICT_SHARED_NES_H
 
 // Lookup table: maps tile_idx -> compact_index (0xFF = not found)
-const unsigned char object_sprite_lookup_table[33] = {
+const unsigned char object_sprite_lookup_table[48] = {
     /* tile 0 */  255,
     /* tile 1 */  0,
     /* tile 2 */  1,
@@ -37,15 +37,30 @@ const unsigned char object_sprite_lookup_table[33] = {
     /* tile 26 */  22,
     /* tile 27 */  255,
     /* tile 28 */  23,
-    /* tile 29 */  255,
-    /* tile 30 */  255,
-    /* tile 31 */  255,
-    /* tile 32 */  255
+    /* tile 29 */  24,
+    /* tile 30 */  25,
+    /* tile 31 */  26,
+    /* tile 32 */  255,
+    /* tile 33 */  255,
+    /* tile 34 */  255,
+    /* tile 35 */  255,
+    /* tile 36 */  255,
+    /* tile 37 */  255,
+    /* tile 38 */  255,
+    /* tile 39 */  255,
+    /* tile 40 */  255,
+    /* tile 41 */  255,
+    /* tile 42 */  255,
+    /* tile 43 */  255,
+    /* tile 44 */  255,
+    /* tile 45 */  27,
+    /* tile 46 */  28,
+    /* tile 47 */  29
 };
 
 // Compact sprite data array (only used entries)
 // Format: [pal_idx, tl, tr, bl, br]
-const unsigned char object_sprite_dict_compact[24][5] = {
+const unsigned char object_sprite_dict_compact[30][5] = {
     /* compact_idx 0: tile 1 */  { 3, 1, 2, 3, 4 },
     /* compact_idx 1: tile 2 */  { 3, 1, 2, 3, 5 },
     /* compact_idx 2: tile 3 */  { 3, 6, 7, 8, 9 },
@@ -69,10 +84,16 @@ const unsigned char object_sprite_dict_compact[24][5] = {
     /* compact_idx 20: tile 24 */  { 1, 64, 65, 66, 67 },
     /* compact_idx 21: tile 25 */  { 1, 68, 69, 70, 71 },
     /* compact_idx 22: tile 26 */  { 0, 72, 55, 73, 74 },
-    /* compact_idx 23: tile 28 */  { 0, 77, 78, 79, 80 }
+    /* compact_idx 23: tile 28 */  { 0, 77, 78, 79, 80 },
+    /* compact_idx 24: tile 29 */  { 0, 81, 82, 83, 84 },
+    /* compact_idx 25: tile 30 */  { 0, 85, 86, 87, 88 },
+    /* compact_idx 26: tile 31 */  { 0, 89, 90, 91, 92 },
+    /* compact_idx 27: tile 45 */  { 0, 121, 122, 123, 124 },
+    /* compact_idx 28: tile 46 */  { 0, 0, 0, 123, 125 },
+    /* compact_idx 29: tile 47 */  { 0, 0, 0, 126, 16 }
 };
 
-#define OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE 33
-#define OBJECT_SPRITE_DICT_COMPACT_COUNT 24
+#define OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE 48
+#define OBJECT_SPRITE_DICT_COMPACT_COUNT 30
 
 #endif // OBJECT_SPRITE_DICT_SHARED_NES_H

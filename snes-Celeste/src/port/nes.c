@@ -445,6 +445,7 @@ static uint16_t calculate_oam_offset(uint8_t index) {
     // Each 16x16 sprite uses 4 OAM slots (4 bytes each = 16 bytes total)
     // Balloon uses 8 slots (2 16x16 sprites = 32 bytes total)
     // Moving platforms use 4 slots (2 16x8 sprites = 16 bytes total)
+    // Flying berry uses 12 slots (1 16x16 sprite + 2 wing sprites = 48 bytes total)
     uint16_t offset = 16; // Player sprite at index 0 uses first 16 bytes (4 slots)
     
     // Count slots used by all objects before this one
@@ -453,6 +454,8 @@ static uint16_t calculate_oam_offset(uint8_t index) {
             offset += 32; // Balloon uses 8 slots (32 bytes)
         } else if (GLOBAL_OBJList[i].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[i].eType == OBJ_PLATMOV_R) {
             offset += 16; // Moving platforms use 4 slots (16 bytes: 2 sprites × 8 bytes each)
+        } else if (GLOBAL_OBJList[i].eType == OBJ_FLYING_BERRY) {
+            offset += 48; // Flying berry uses 12 slots (48 bytes: 1 16x16 sprite + 2 wing sprites)
         } else {
             offset += 16; // Normal objects use 4 slots (16 bytes)
         }
@@ -955,12 +958,60 @@ __attribute__((section(".prg_rom_6")))
 void port_buildFlyingBerry(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
     uint16_t oamOffset = calculate_oam_offset(index);
-    if (berry->eType == OBJ_UNUSED || 
-        (berry->data.strawberry.isCollected && berry->data.strawberry.frameCount > 60)) {
+    bool isHidden = (berry->eType == OBJ_UNUSED || 
+                     (berry->data.strawberry.isCollected && berry->data.strawberry.frameCount > 60));
+    
+    if (isHidden) {
+        // Hide main berry sprite and both wings
         hide_sprites(oamOffset);
+        hide_sprites(oamOffset + 16);  // Left wing (16x16 = 4 slots)
+        hide_sprites(oamOffset + 32);  // Right wing (16x16 = 4 slots)
         return;
     }
+    
+    // Render main berry sprite
     render_object_sprite(berry, oamOffset);
+    
+    // Calculate wing position and animation
+    uint8_t baseX = (uint8_t)berry->pos.x;
+    uint8_t spriteY = (uint8_t)berry->pos.y;
+    uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
+    uint8_t oamProps = berry->oamProps;
+    
+    // Determine wing tile based on vertical movement (comparing current Y to startY)
+    int16_t deltaY = (int16_t)berry->pos.y - (int16_t)berry->data.strawberry.startY;
+    uint8_t wingTile;
+    if (deltaY < 0) {
+        wingTile = FLYING_BERRY_WING_UP;  // Moving up
+    } else if (deltaY > 0) {
+        wingTile = FLYING_BERRY_WING_DOWN;  // Moving down
+    } else {
+        wingTile = FLYING_BERRY_WING_MID;  // At rest
+    }
+    
+    // Get wing sprite data
+    const unsigned char *wing_sprite_data = get_object_sprite_data(wingTile);
+    if (wing_sprite_data == NULL) {
+        hide_sprites(oamOffset + 16);
+        hide_sprites(oamOffset + 32);
+        set_prg_bank(6);
+        return;
+    }
+    
+    // Render left wing (at baseX - 14, baseY - 2)
+    // Left wing uses flipped properties (0x74 = priority 3, palette 2, flip horizontal)
+    uint8_t leftWingX = (baseX >= 14) ? (baseX - 14) : 0;
+    uint8_t leftWingY = (baseY >= 2) ? (baseY - 2) : 0;
+    render_16x16_sprite(wing_sprite_data, leftWingX, leftWingY, 0x74, oamOffset + 16);
+    
+    // Render right wing (at baseX + 14, baseY - 2)
+    // Right wing uses normal properties (0x34 = priority 3, palette 2)
+    uint8_t rightWingX = baseX + 14;
+    uint8_t rightWingY = (baseY >= 2) ? (baseY - 2) : 0;
+    render_16x16_sprite(wing_sprite_data, rightWingX, rightWingY, 0x34, oamOffset + 32);
+    
+    // get_object_sprite_data switches to bank 5, switch back to bank 6
+    set_prg_bank(6);
 }
 
 __attribute__((section(".prg_rom_6")))

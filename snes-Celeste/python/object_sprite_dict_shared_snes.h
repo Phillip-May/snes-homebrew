@@ -6,7 +6,7 @@
 #ifndef OBJECT_SPRITE_DICT_SHARED_SNES_H
 #define OBJECT_SPRITE_DICT_SHARED_SNES_H
 
-const unsigned char object_sprite_dict_shared[32][6] = {
+const unsigned char object_sprite_dict_shared[38][6] = {
     // Entry 0
     { 1, 3, 1, 2, 3, 4 },
     // Entry 1
@@ -56,23 +56,35 @@ const unsigned char object_sprite_dict_shared[32][6] = {
     // Entry 23
     { 28, 0, 77, 78, 79, 80 },
     // Entry 24
-    { 64, 1, 97, 167, 168, 100 },
+    { 29, 0, 81, 82, 83, 84 },
     // Entry 25
-    { 70, 2, 0, 0, 184, 185 },
+    { 30, 0, 85, 86, 87, 88 },
     // Entry 26
-    { 71, 2, 0, 0, 186, 187 },
+    { 31, 0, 89, 90, 91, 92 },
     // Entry 27
-    { 86, 2, 208, 209, 210, 211 },
+    { 45, 0, 121, 122, 123, 124 },
     // Entry 28
-    { 87, 2, 212, 213, 214, 215 },
+    { 46, 0, 0, 0, 123, 125 },
     // Entry 29
-    { 96, 0, 229, 230, 103, 103 },
+    { 47, 0, 0, 0, 126, 16 },
     // Entry 30
-    { 97, 0, 230, 231, 103, 103 },
+    { 64, 1, 97, 167, 168, 100 },
     // Entry 31
+    { 70, 2, 0, 0, 184, 185 },
+    // Entry 32
+    { 71, 2, 0, 0, 186, 187 },
+    // Entry 33
+    { 86, 2, 208, 209, 210, 211 },
+    // Entry 34
+    { 87, 2, 212, 213, 214, 215 },
+    // Entry 35
+    { 96, 0, 229, 230, 103, 103 },
+    // Entry 36
+    { 97, 0, 230, 231, 103, 103 },
+    // Entry 37
     { 118, 0, 268, 246, 269, 0 }
 };
 
-#define OBJECT_SPRITE_DICT_SHARED_COUNT 32
+#define OBJECT_SPRITE_DICT_SHARED_COUNT 38
 
 #endif // OBJECT_SPRITE_DICT_SHARED_SNES_H
