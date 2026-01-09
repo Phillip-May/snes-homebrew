@@ -514,6 +514,7 @@ def reserve_breakable_wall_gids(all_sprite_data, tile_mapping):
     Extract tile data and store separately for header generation.
     Note: This GID is reserved but not added to the main GID array yet.
     It will be added when we generate the shared header, ensuring it's at index 27.
+    Breakable walls are 32x32 sprites (4x4 tiles = 16 tiles total).
     """
     global breakable_wall_gid_data
     
@@ -521,27 +522,71 @@ def reserve_breakable_wall_gids(all_sprite_data, tile_mapping):
     breakable_wall_gid = 27
     breakable_wall_sprite_index = 64  # BREAKABLE_WALL_SPRITE_1
     
-    # Extract breakable wall data using same logic as collapse tiles
-    if breakable_wall_sprite_index < len(all_sprite_data):
-        # Get optimized tile indices for this breakable wall
-        tl_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 0, 0)
-        tr_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 1, 0)
-        bl_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 2, 0)
-        br_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 3, 0)
+    # Breakable walls are 32x32 (4x4 tiles), so we need to extract all 16 tiles
+    # The sprite sheet has 16x16 sprites, so a 32x32 breakable wall spans 4 sprites
+    # Arranged as:
+    #   [Sprite 64] [Sprite 65]
+    #   [Sprite 80] [Sprite 81]
+    # Each sprite has 4 tiles: TL, TR, BL, BR
+    # For a 4x4 tile grid in row-major order, we need:
+    # Row 1: Sprite 64 (TL, TR) + Sprite 65 (TL, TR)
+    # Row 2: Sprite 64 (BL, BR) + Sprite 65 (BL, BR)
+    # Row 3: Sprite 80 (TL, TR) + Sprite 81 (TL, TR)
+    # Row 4: Sprite 80 (BL, BR) + Sprite 81 (BL, BR)
+    
+    # Extract all 16 tiles for the 4x4 grid
+    tiles_4x4 = []
+    base_sprite_idx = breakable_wall_sprite_index
+    
+    # Sprites are: 64 (top-left), 65 (top-right), 80 (bottom-left), 81 (bottom-right)
+    sprite_tl = base_sprite_idx      # Top-left 16x16 (64)
+    sprite_tr = base_sprite_idx + 1  # Top-right 16x16 (65)
+    sprite_bl = 80                   # Bottom-left 16x16 (80)
+    sprite_br = 81                   # Bottom-right 16x16 (81)
+    
+    # Check if we have all 4 sprites (64, 65, 80, 81)
+    if sprite_tr < len(all_sprite_data) and sprite_bl < len(all_sprite_data) and sprite_br < len(all_sprite_data):
+        # Extract tiles in row-major order for the 4x4 grid
+        # Row 1: TL of sprite 64, TR of sprite 64, TL of sprite 65, TR of sprite 65
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 0, 0))  # Sprite 64, TL
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 1, 0))  # Sprite 64, TR
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 0, 0))  # Sprite 65, TL
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 1, 0))  # Sprite 65, TR
+        
+        # Row 2: BL of sprite 64, BR of sprite 64, BL of sprite 65, BR of sprite 65
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 2, 0))  # Sprite 64, BL
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 3, 0))  # Sprite 64, BR
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 2, 0))  # Sprite 65, BL
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 3, 0))  # Sprite 65, BR
+        
+        # Row 3: TL of sprite 80, TR of sprite 80, TL of sprite 81, TR of sprite 81
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 0, 0))  # Sprite 80, TL
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 1, 0))  # Sprite 80, TR
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 0, 0))  # Sprite 81, TL
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 1, 0))  # Sprite 81, TR
+        
+        # Row 4: BL of sprite 80, BR of sprite 80, BL of sprite 81, BR of sprite 81
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 2, 0))  # Sprite 80, BL
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 3, 0))  # Sprite 80, BR
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 2, 0))  # Sprite 81, BL
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 3, 0))  # Sprite 81, BR
         
         # Breakable walls use background palette 0 (palette_idx_encoded = 0, bit 2 = 0 for background)
         palette_idx_encoded = 0  # Background palette 0
         flip_flags = 0  # No flip
         
-        tile_entry = (tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx, palette_idx_encoded, flip_flags)
+        # Store as tuple: (16 tiles, palette, flip)
+        tile_entry = (tuple(tiles_4x4), palette_idx_encoded, flip_flags)
         breakable_wall_gid_data.append(tile_entry)
         
-        print(f"Prepared breakable wall sprite {breakable_wall_sprite_index} for GID {breakable_wall_gid} (tiles: {tl_opt_idx}, {tr_opt_idx}, {bl_opt_idx}, {br_opt_idx})")
+        tiles_str = ", ".join(map(str, tiles_4x4))
+        print(f"Prepared breakable wall sprite {breakable_wall_sprite_index} for GID {breakable_wall_gid} (16 tiles: {tiles_str})")
     else:
-        # Sprite index out of range, use empty tile
-        tile_entry = (0, 0, 0, 0, 0, 0)
+        # Not enough sprites, use empty tiles
+        tiles_4x4 = [0] * 16
+        tile_entry = (tuple(tiles_4x4), 0, 0)
         breakable_wall_gid_data.append(tile_entry)
-        print(f"WARNING: Breakable wall sprite {breakable_wall_sprite_index} not found, using empty tile for GID {breakable_wall_gid}")
+        print(f"WARNING: Breakable wall sprite {breakable_wall_sprite_index} needs 4 sprites but not enough found, using empty tiles for GID {breakable_wall_gid}")
     
     return breakable_wall_gid_data
 
@@ -2672,19 +2717,28 @@ def main():
                         f.write("// Breakable wall GID to tile mapping\n")
                         f.write("// Generated from baseCelesteSpriteSheet.png\n")
                         f.write("// GID 27 for breakable walls (sprite index 64)\n")
-                        f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
-                        f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n\n")
+                        f.write("// Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags\n")
+                        f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+                        f.write("// Breakable walls are 32x32 sprites (4x4 tiles) extracted from sprite sheet\n\n")
                         f.write("#ifndef GID_TO_TILE_BREAKABLE_WALL_H\n")
                         f.write("#define GID_TO_TILE_BREAKABLE_WALL_H\n\n")
                         if breakable_wall_gid_data and len(breakable_wall_gid_data) == 1:
                             f.write("#ifdef __NES_UNROM_512__\n")
                             f.write("__attribute__((section(\".prg_rom_5\")))\n")
                             f.write("#endif\n")
-                            f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                            f.write("const unsigned char gid_to_tile_breakable_wall[1][18] = {\n")
                             tile_entry = breakable_wall_gid_data[0]
-                            tl, tr, bl, br, pal_idx, flip = tile_entry
+                            tiles_4x4, pal_idx, flip = tile_entry
+                            # tiles_4x4 is already a tuple of 16 tiles in row-major order
+                            tiles_4x4_list = list(tiles_4x4)
+                            row1_str = ", ".join(map(str, tiles_4x4_list[0:4]))
+                            row2_str = ", ".join(map(str, tiles_4x4_list[4:8]))
+                            row3_str = ", ".join(map(str, tiles_4x4_list[8:12]))
+                            row4_str = ", ".join(map(str, tiles_4x4_list[12:16]))
                             f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
-                            f.write(f"    {{ {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip} }}\n")
+                            f.write(f"    // 4x4 grid: Row 1: {row1_str} | Row 2: {row2_str} | Row 3: {row3_str} | Row 4: {row4_str}\n")
+                            tiles_str = ", ".join(map(str, tiles_4x4_list))
+                            f.write(f"    {{ {tiles_str}, {pal_idx}, {flip} }}\n")
                             f.write("};\n\n")
                             f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
                         else:
@@ -2692,9 +2746,10 @@ def main():
                             f.write("#ifdef __NES_UNROM_512__\n")
                             f.write("__attribute__((section(\".prg_rom_5\")))\n")
                             f.write("#endif\n")
-                            f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                            f.write("const unsigned char gid_to_tile_breakable_wall[1][18] = {\n")
                             f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
-                            f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+                            f.write("    // 4x4 grid: Row 1: 0,0,0,0 | Row 2: 0,0,0,0 | Row 3: 0,0,0,0 | Row 4: 0,0,0,0\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }\n")
                             f.write("};\n\n")
                             f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
                         f.write("#endif // GID_TO_TILE_BREAKABLE_WALL_H\n")
@@ -3017,19 +3072,28 @@ def main():
             f.write("// Breakable wall GID to tile mapping\n")
             f.write("// Generated from baseCelesteSpriteSheet.png\n")
             f.write("// GID 27 for breakable walls (sprite index 64)\n")
-            f.write("// Each entry: TL_tile, TR_tile, BL_tile, BR_tile, palette_idx, flip_flags\n")
-            f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n\n")
+            f.write("// Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags\n")
+            f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+            f.write("// Breakable walls are 32x32 sprites (4x4 tiles) extracted from sprite sheet\n\n")
             f.write("#ifndef GID_TO_TILE_BREAKABLE_WALL_H\n")
             f.write("#define GID_TO_TILE_BREAKABLE_WALL_H\n\n")
             if breakable_wall_gid_data and len(breakable_wall_gid_data) == 1:
                 f.write("#ifdef __NES_UNROM_512__\n")
                 f.write("__attribute__((section(\".prg_rom_5\")))\n")
                 f.write("#endif\n")
-                f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                f.write("const unsigned char gid_to_tile_breakable_wall[1][18] = {\n")
                 tile_entry = breakable_wall_gid_data[0]
-                tl, tr, bl, br, pal_idx, flip = tile_entry
+                tiles_4x4, pal_idx, flip = tile_entry
+                # tiles_4x4 is already a tuple of 16 tiles in row-major order
+                tiles_4x4_list = list(tiles_4x4)
+                row1_str = ", ".join(map(str, tiles_4x4_list[0:4]))
+                row2_str = ", ".join(map(str, tiles_4x4_list[4:8]))
+                row3_str = ", ".join(map(str, tiles_4x4_list[8:12]))
+                row4_str = ", ".join(map(str, tiles_4x4_list[12:16]))
                 f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
-                f.write(f"    {{ {tl}, {tr}, {bl}, {br}, {pal_idx}, {flip} }}\n")
+                f.write(f"    // 4x4 grid: Row 1: {row1_str} | Row 2: {row2_str} | Row 3: {row3_str} | Row 4: {row4_str}\n")
+                tiles_str = ", ".join(map(str, tiles_4x4_list))
+                f.write(f"    {{ {tiles_str}, {pal_idx}, {flip} }}\n")
                 f.write("};\n\n")
                 f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
             else:
@@ -3037,9 +3101,10 @@ def main():
                 f.write("#ifdef __NES_UNROM_512__\n")
                 f.write("__attribute__((section(\".prg_rom_5\")))\n")
                 f.write("#endif\n")
-                f.write("const unsigned char gid_to_tile_breakable_wall[1][6] = {\n")
+                f.write("const unsigned char gid_to_tile_breakable_wall[1][18] = {\n")
                 f.write("    // GID 27 - BREAKABLE_WALL_SPRITE_1\n")
-                f.write("    { 0, 0, 0, 0, 0, 0 }\n")
+                f.write("    // 4x4 grid: Row 1: 0,0,0,0 | Row 2: 0,0,0,0 | Row 3: 0,0,0,0 | Row 4: 0,0,0,0\n")
+                f.write("    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }\n")
                 f.write("};\n\n")
                 f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
             f.write("#endif // GID_TO_TILE_BREAKABLE_WALL_H\n")
