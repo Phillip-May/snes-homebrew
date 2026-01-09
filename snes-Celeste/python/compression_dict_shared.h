@@ -111,33 +111,33 @@ const unsigned char compression_dict_shared[64][2] = {
     // Entry 49
     { 6, 0 },
     // Entry 50
-    { 9, 28 },
+    { 62, 62 },
     // Entry 51
-    { 36, 9 },
+    { 9, 28 },
     // Entry 52
-    { 0, 12 },
+    { 36, 9 },
     // Entry 53
-    { 0, 7 },
+    { 0, 12 },
     // Entry 54
-    { 1, 9 },
+    { 0, 7 },
     // Entry 55
-    { 24, 0 },
+    { 1, 9 },
     // Entry 56
-    { 42, 33 },
+    { 24, 0 },
     // Entry 57
-    { 2, 3 },
+    { 42, 33 },
     // Entry 58
-    { 3, 21 },
+    { 2, 3 },
     // Entry 59
-    { 0, 3 },
+    { 3, 21 },
     // Entry 60
-    { 12, 0 },
+    { 0, 3 },
     // Entry 61
-    { 2, 6 },
+    { 12, 0 },
     // Entry 62
-    { 7, 4 },
+    { 2, 6 },
     // Entry 63
-    { 0, 24 }
+    { 7, 4 }
 };
 
 #define COMPRESSION_DICT_SHARED_COUNT 64

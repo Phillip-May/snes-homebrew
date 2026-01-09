@@ -64,6 +64,14 @@ breakable_wall_indices = [64]  # BREAKABLE_WALL_SPRITE_1
 # All background tile objects (collapse tiles, breakable walls, etc.)
 background_tile_object_indices = collapse_tile_indices + breakable_wall_indices
 
+# Tile GIDs to manually exclude from CHR banks
+# Add tile indices here to prevent them from being included in CHR bank data
+exclude_tile_gids_from_chr = [ 73, 74, 75, 76, 77, 78, 79,
+                               89, 90, 91, 92, 93, 94, 95,
+                               105, 106, 107, 108, 109, 110, 111,
+                               121, 122, 123, 124, 125, 126, 127
+                               ]
+
 # Sprite groups that should share the same palette
 # Each sublist contains sprite indices that must use the same palette
 sprite_palette_groups = [
@@ -2030,6 +2038,9 @@ def main():
             print(f"  Sprite group {group}: assigned object palette {best_palette_idx}")
     
     # Second pass: Process all tiles
+    # Track mapping from tile_index to position in all_chr_tiles (accounts for excluded tiles)
+    tile_index_to_chr_position = {}  # Maps tile_index -> starting position in all_chr_tiles
+    
     for y in range(num_rows):
         for x in range(tiles_per_row):
             box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
@@ -2069,19 +2080,47 @@ def main():
             all_sprite_data.append((sprite_4tiles, palette))
             all_palettes.append(palette)
 
-            # Add all 4 tiles to the flat CHR list
-            all_chr_tiles.extend(sprite_4tiles)
+            # Exclude manually specified tile GIDs from CHR banks
+            if tile_index not in exclude_tile_gids_from_chr:
+                # Record the starting position in all_chr_tiles for this tile_index
+                tile_index_to_chr_position[tile_index] = len(all_chr_tiles)
+                # Add all 4 tiles to the flat CHR list
+                all_chr_tiles.extend(sprite_4tiles)
+            else:
+                print(f"Excluded tile GID {tile_index} from CHR banks")
 
     print(f"\nProcessed {len(all_sprite_data)} original 8x8 tiles")
     print(f"Generated {len(all_chr_tiles)} 8x8 tiles for CHR output (4 tiles per sprite)")
 
     # Deduplicate tiles to optimize CHR usage
     print("\nDeduplicating tiles...")
-    unique_chr_tiles, tile_mapping = deduplicate_tiles(all_chr_tiles)
+    unique_chr_tiles, chr_position_mapping = deduplicate_tiles(all_chr_tiles)
     print(f"  Original tiles: {len(all_chr_tiles)}")
     print(f"  Unique tiles: {len(unique_chr_tiles)}")
     print(f"  Duplicates removed: {len(all_chr_tiles) - len(unique_chr_tiles)}")
     print(f"  Space saved: {((len(all_chr_tiles) - len(unique_chr_tiles)) * 16)} bytes")
+    
+    # Remap tile_mapping to account for excluded tiles
+    # chr_position_mapping maps: position_in_all_chr_tiles -> optimized_index
+    # tile_index_to_chr_position maps: tile_index -> starting_position_in_all_chr_tiles
+    # We need: tile_mapping maps: tile_index * 4 + tile_offset -> optimized_index
+    tile_mapping = {}
+    for tile_index in range(len(all_sprite_data)):
+        if tile_index in tile_index_to_chr_position:
+            # This tile was included in CHR banks
+            chr_start_pos = tile_index_to_chr_position[tile_index]
+            # Map the 4 tiles (tl, tr, bl, br) to optimized indices
+            for tile_offset in range(4):
+                chr_pos = chr_start_pos + tile_offset
+                if chr_pos in chr_position_mapping:
+                    tile_mapping[tile_index * 4 + tile_offset] = chr_position_mapping[chr_pos]
+                else:
+                    # Fallback to 0 if mapping not found
+                    tile_mapping[tile_index * 4 + tile_offset] = 0
+        else:
+            # This tile was excluded from CHR banks - use 0 as fallback
+            for tile_offset in range(4):
+                tile_mapping[tile_index * 4 + tile_offset] = 0
 
     # Split into CHR banks using optimized unique tiles
     # Bank 0: 4096 bytes = 256 tiles
