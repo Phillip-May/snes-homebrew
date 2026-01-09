@@ -521,7 +521,7 @@ def reserve_breakable_wall_gids(all_sprite_data, tile_mapping):
     breakable_wall_gid = 27
     breakable_wall_sprite_index = 64  # BREAKABLE_WALL_SPRITE_1
     
-    # Extract breakable wall data
+    # Extract breakable wall data using same logic as collapse tiles
     if breakable_wall_sprite_index < len(all_sprite_data):
         # Get optimized tile indices for this breakable wall
         tl_opt_idx = tile_mapping.get(breakable_wall_sprite_index * 4 + 0, 0)

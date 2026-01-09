@@ -3,7 +3,7 @@
 // GID 27 for breakable walls (sprite index 64)
 // Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags
 // flip_flags: bit 0=H, bit 1=V, bit 2=D
-// Pattern repeats the 2x2 block (97,167,168,100) 4 times to make 4x4
+// Pattern repeats the 2x2 block (TL,TR,BL,BR) 4 times to make 4x4
 
 #ifndef GID_TO_TILE_BREAKABLE_WALL_H
 #define GID_TO_TILE_BREAKABLE_WALL_H

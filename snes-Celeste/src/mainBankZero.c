@@ -1246,6 +1246,7 @@ void updateAllObjects(void) {
 }
 
 
+PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this);
 
 PORT_FUNC_BANK6
@@ -1265,8 +1266,9 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.textFlashActive = false;
     port_prg_bank_switch(6);  // Switch to bank 6 for port_LoadRoomData (code is in bank 6)
     port_LoadRoomData(roomID);
-    port_prg_bank_switch(0);  // Switch back to fixed bank for playerInit
+    // playerInit is now in bank 6, so keep bank 6 active
     playerInit(&GLOBAL_PlayerData);
+    port_prg_bank_switch(0);  // Switch back to fixed bank for port_updatePlayerSprite
     port_updatePlayerSprite(&GLOBAL_PlayerData);
     port_beginSpriteBuild(&GLOBAL_PlayerData);
     port_prg_bank_switch(6);  // Switch to bank 6 for processObject (code is in bank 6)
@@ -1321,6 +1323,7 @@ fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     return target;
 }
 
+PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;
@@ -1366,7 +1369,7 @@ void playerInit(struct sPlayerData* this){
     }
 
     port_resetSprites();
-    port_prg_bank_switch(6);  // Switch to bank 6 for initObject (code is in bank 6)
+    // playerInit is now in bank 6, and initObject is also in bank 6, so we're already in the correct bank
     for (i = 0; i < (GLOBAL_ActiveLevel.objectCount*3); i+=3) {
         if (GLOBAL_ActiveLevel.objectData[i] != 0) {
             //Player spawn, remove from generated code in future
@@ -1376,7 +1379,7 @@ void playerInit(struct sPlayerData* this){
             initObject(GLOBAL_ActiveLevel.objectData[i], GLOBAL_ActiveLevel.objectData[i+1]*16, GLOBAL_ActiveLevel.objectData[i+2]*16-1);
         }
     }
-    port_prg_bank_switch(0);  // Switch back to fixed bank
+    // Don't switch banks here - let the caller handle it. Switching banks while executing from bank 6 causes a crash.
 
 }
 
@@ -1890,10 +1893,13 @@ void playerUpdate(struct sPlayerData* this) {
 
     // next level
     if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
-        port_prg_bank_switch(6);  // Switch to bank 6 for LoadNextRoom and playerInit (code is in bank 6)
+        // LoadNextRoom and LoadRoomData are in fixed bank, and LoadRoomData already calls playerInit
+        port_prg_bank_switch(0);  // Switch to fixed bank for LoadNextRoom
         LoadNextRoom();
-        playerInit(this);
-        port_prg_bank_switch(0);  // Switch back to fixed bank
+        // LoadRoomData already called playerInit, and we've loaded a new room, so return early
+        // But we need to switch back to bank 6 since onVblank (our caller) is in bank 6
+        port_prg_bank_switch(6);  // Switch back to bank 6 for onVblank
+        return;
      }
 
     //Animation
