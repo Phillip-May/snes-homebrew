@@ -73,19 +73,19 @@ enum eChestSprite {
 };
 
 enum eMonumentSprite {
-    MONUMENT_SPRITE_1 = 0x84,
-    MONUMENT_SPRITE_2 = 0x86,
-    MONUMENT_SPRITE_3 = 0x88,
-    MONUMENT_SPRITE_4 = 0x8A
+    MONUMENT_SPRITE_1 = 70,
+    MONUMENT_SPRITE_2 = 71,
+    MONUMENT_SPRITE_3 = 86,
+    MONUMENT_SPRITE_4 = 87
 };
 
 enum eBigChestSprite {
-    BIG_CHEST_SPRITE_1 = 0x8C,
-    BIG_CHEST_SPRITE_2 = 0x8E
+    BIG_CHEST_SPRITE_1 = 96,
+    BIG_CHEST_SPRITE_2 = 97
 };
 
 enum eDoubleJumpOrbSprite {
-    DOUBLE_JUMP_ORB_SPRITE_1 = 0xA0
+    DOUBLE_JUMP_ORB_SPRITE_1 = 102
 };
 
 enum eDecoTreeSprite {
@@ -93,9 +93,9 @@ enum eDecoTreeSprite {
 };
 
 enum smokeStates {
-    SMOKE_SPRITE_1 = 0x62,
-    SMOKE_SPRITE_2 = 0x64,
-    SMOKE_SPRITE_3 = 0x66
+    SMOKE_SPRITE_1 = 29,
+    SMOKE_SPRITE_2 = 30,
+    SMOKE_SPRITE_3 = 31
 };
 
 #endif // SPRITE_ANIMATION_ENUMS_NES_H

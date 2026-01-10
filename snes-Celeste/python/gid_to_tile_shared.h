@@ -5,6 +5,7 @@
 // GID 0 is reserved for empty tiles
 // GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)
 // GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)
+// GIDs 70, 71, 86, 87 are reserved for monuments (see gid_to_tile_monument.h)
 
 #ifndef GID_TO_TILE_SHARED_H
 #define GID_TO_TILE_SHARED_H

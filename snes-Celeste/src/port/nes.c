@@ -12,6 +12,7 @@
 #include "../../python/gid_to_tile_shared.h"
 #include "../../python/gid_to_tile_collapse.h"
 #include "../../python/gid_to_tile_breakable_wall.h"
+#include "../../python/gid_to_tile_monument.h"
 #include "../../python/compression_dict_shared.h"
 #include "../../python/object_sprite_dict_shared_nes.h"
 #include "../../python/tilemap_level1_nes.h"
@@ -590,6 +591,9 @@ void port_buildBalloon(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildMonument(uint8_t index) {
+    // Monuments render as background tiles, not sprites
+    // They are handled by the background tile update system (port_updateCollapseTileNametable)
+    (void)index;
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -737,6 +741,19 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
             }
             // If oamTile doesn't match, tile_entry remains NULL (will clear the tile)
         }
+        // Handle monuments
+        else if (bgTileObj->eType == OBJ_MONUMENT) {
+            // Monuments: oamTile contains MONUMENT_SPRITE_1 (70)
+            // Monuments are 32x32 (4x4 tiles) composed of 4 sprites: 70, 71, 86, 87
+            // All monuments use the same tile data (index 0) which contains all 16 tiles
+            if (bgTileObj->oamTile == MONUMENT_SPRITE_1) {
+                // gid_to_tile_monument is in bank 5, switch to it before accessing
+                set_prg_bank(5);
+                tile_entry = gid_to_tile_monument[0];  // All monuments use index 0 (contains 16 tiles)
+                // Switch back to bank 6
+                set_prg_bank(6);
+            }
+        }
         // If object is OBJ_UNUSED, tile_entry remains NULL (will clear the tile)
         // This handles the case where a breakable wall was queued before being destroyed
         
@@ -746,9 +763,34 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
         // Destroyed breakable walls become OBJ_UNUSED but may still have BREAKABLE_WALL_SPRITE_1 in oamTile
         bool is_breakable_wall = (bgTileObj->eType == OBJ_BREAKABLE_WALL) || 
                                   (bgTileObj->eType == OBJ_UNUSED && bgTileObj->oamTile == BREAKABLE_WALL_SPRITE_1);
+        bool is_monument = (bgTileObj->eType == OBJ_MONUMENT);
         
-        if (is_breakable_wall) {
+        if (is_breakable_wall || is_monument) {
             // 4x4 grid for breakable walls
+            uint8_t nes_tile_x = tileX * 2;
+            uint8_t nes_tile_y_row1 = tileY * 2;
+            uint8_t nes_tile_y_row2 = nes_tile_y_row1 + 1;
+            uint8_t nes_tile_y_row3 = nes_tile_y_row1 + 2;
+            uint8_t nes_tile_y_row4 = nes_tile_y_row1 + 3;
+            
+            uint16_t nametable_base_row1 = (nes_tile_y_row1 < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_row2 = (nes_tile_y_row2 < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_row3 = (nes_tile_y_row3 < 30) ? 0x2000 : 0x2800;
+            uint16_t nametable_base_row4 = (nes_tile_y_row4 < 30) ? 0x2000 : 0x2800;
+            
+            uint8_t nes_tile_y_adj_row1 = (nes_tile_y_row1 < 30) ? nes_tile_y_row1 : (nes_tile_y_row1 - 30);
+            uint8_t nes_tile_y_adj_row2 = (nes_tile_y_row2 < 30) ? nes_tile_y_row2 : (nes_tile_y_row2 - 30);
+            uint8_t nes_tile_y_adj_row3 = (nes_tile_y_row3 < 30) ? nes_tile_y_row3 : (nes_tile_y_row3 - 30);
+            uint8_t nes_tile_y_adj_row4 = (nes_tile_y_row4 < 30) ? nes_tile_y_row4 : (nes_tile_y_row4 - 30);
+            
+            write->addr_top = nametable_base_row1 + ((uint16_t)nes_tile_y_adj_row1 * 32) + nes_tile_x;
+            write->addr_bottom = nametable_base_row2 + ((uint16_t)nes_tile_y_adj_row2 * 32) + nes_tile_x;
+            write->addr_row2 = nametable_base_row3 + ((uint16_t)nes_tile_y_adj_row3 * 32) + nes_tile_x;
+            write->addr_row3 = nametable_base_row4 + ((uint16_t)nes_tile_y_adj_row4 * 32) + nes_tile_x;
+            write->addr_row4 = 0;  // Not used, but initialize for consistency
+            write->is_4x4 = 1;
+        } else if (is_monument) {
+            // 4x4 grid for monuments (same as breakable walls)
             uint8_t nes_tile_x = tileX * 2;
             uint8_t nes_tile_y_row1 = tileY * 2;
             uint8_t nes_tile_y_row2 = nes_tile_y_row1 + 1;
@@ -821,7 +863,7 @@ static void execute_bg_tiles_nametable_writes(const BgTileWrite *writes, uint8_t
         const BgTileWrite *write = &writes[i];
         if (write->tile_data != NULL) {
             if (write->is_4x4) {
-                // 4x4 grid for breakable walls (16 tiles in row-major order)
+                // 4x4 grid for breakable walls and monuments (16 tiles in row-major order)
                 vram_adr(write->addr_top);
                 vram_put(write->tile_data[0]);
                 vram_put(write->tile_data[1]);

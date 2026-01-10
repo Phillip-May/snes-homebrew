@@ -31,6 +31,7 @@ background_tile_object_palette = {}
 # Store background tile object GID mappings separately
 collapse_tile_gid_data = []  # List of 3 tile entries for GIDs 24, 25, 26 (collapse tiles)
 breakable_wall_gid_data = []  # List of 1 tile entry for GID 27 (breakable walls)
+monument_gid_data = []  # List of 4 tile entries for GIDs 70, 71, 86, 87 (monuments)
 
 """
 NES Sprite Sheet Converter
@@ -61,8 +62,11 @@ arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 26, 28, 29,
 collapse_tile_indices = [23, 24, 25]  # COLLAPSE_TILE_SPRITE_1, COLLAPSE_TILE_SPRITE_2, COLLAPSE_TILE_SPRITE_3
 # Breakable walls (64) - can be in tilemap as background tiles
 breakable_wall_indices = [64]  # BREAKABLE_WALL_SPRITE_1
-# All background tile objects (collapse tiles, breakable walls, etc.)
-background_tile_object_indices = collapse_tile_indices + breakable_wall_indices
+# Monuments (70, 71, 86, 87) - can be in tilemap as background tiles
+# For monuments, the GID value equals the sprite index
+monument_indices = [70, 71, 86, 87]  # MONUMENT_SPRITE_1, MONUMENT_SPRITE_2, MONUMENT_SPRITE_3, MONUMENT_SPRITE_4
+# All background tile objects (collapse tiles, breakable walls, monuments, etc.)
+background_tile_object_indices = collapse_tile_indices + breakable_wall_indices + monument_indices
 
 # Tile GIDs to manually exclude from CHR banks
 # Add tile indices here to prevent them from being included in CHR bank data
@@ -590,6 +594,78 @@ def reserve_breakable_wall_gids(all_sprite_data, tile_mapping):
     
     return breakable_wall_gid_data
 
+def reserve_monument_gids(all_sprite_data, tile_mapping):
+    """
+    Reserve GIDs 70, 71, 86, 87 for monuments.
+    Extract tile data and store separately for header generation.
+    Note: These GIDs are reserved but not added to the main GID array yet.
+    They will be added when we generate the shared header, ensuring they're at indices 70, 71, 86, 87.
+    Monuments are 32x32 sprites (4x4 tiles = 16 tiles total).
+    For monuments, the GID value matches the sprite index (70, 71, 86, 87).
+    Monuments are arranged as:
+        [Sprite 70] [Sprite 71]
+        [Sprite 86] [Sprite 87]
+    Each sprite is 16x16 (4 tiles), together forming a 32x32 monument (16 tiles).
+    """
+    global monument_gid_data
+    
+    monument_gid_data = []
+    monument_gids = [70, 71, 86, 87]
+    # For monuments, GID equals sprite index
+    # Sprites are: 70 (top-left), 71 (top-right), 86 (bottom-left), 87 (bottom-right)
+    sprite_tl = 70  # Top-left 16x16
+    sprite_tr = 71  # Top-right 16x16
+    sprite_bl = 86  # Bottom-left 16x16
+    sprite_br = 87  # Bottom-right 16x16
+    
+    # Check if we have all 4 sprites
+    if sprite_tr < len(all_sprite_data) and sprite_bl < len(all_sprite_data) and sprite_br < len(all_sprite_data):
+        # Extract tiles in row-major order for the 4x4 grid
+        tiles_4x4 = []
+        
+        # Row 1: TL of sprite 70, TR of sprite 70, TL of sprite 71, TR of sprite 71
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 0, 0))  # Sprite 70, TL
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 1, 0))  # Sprite 70, TR
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 0, 0))  # Sprite 71, TL
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 1, 0))  # Sprite 71, TR
+        
+        # Row 2: BL of sprite 70, BR of sprite 70, BL of sprite 71, BR of sprite 71
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 2, 0))  # Sprite 70, BL
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 3, 0))  # Sprite 70, BR
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 2, 0))  # Sprite 71, BL
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 3, 0))  # Sprite 71, BR
+        
+        # Row 3: TL of sprite 86, TR of sprite 86, TL of sprite 87, TR of sprite 87
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 0, 0))  # Sprite 86, TL
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 1, 0))  # Sprite 86, TR
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 0, 0))  # Sprite 87, TL
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 1, 0))  # Sprite 87, TR
+        
+        # Row 4: BL of sprite 86, BR of sprite 86, BL of sprite 87, BR of sprite 87
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 2, 0))  # Sprite 86, BL
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 3, 0))  # Sprite 86, BR
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 2, 0))  # Sprite 87, BL
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 3, 0))  # Sprite 87, BR
+        
+        # Monuments use background palette 0 (palette_idx_encoded = 0, bit 2 = 0 for background)
+        palette_idx_encoded = 0  # Background palette 0
+        flip_flags = 0  # No flip
+        
+        # Store as tuple: (16 tiles, palette, flip) - same format as breakable walls
+        tile_entry = (tuple(tiles_4x4), palette_idx_encoded, flip_flags)
+        monument_gid_data.append(tile_entry)
+        
+        tiles_str = ", ".join(map(str, tiles_4x4))
+        print(f"Prepared monument sprites 70, 71, 86, 87 for GID 70 (16 tiles: {tiles_str})")
+    else:
+        # Not enough sprites, use empty tiles
+        tiles_4x4 = [0] * 16
+        tile_entry = (tuple(tiles_4x4), 0, 0)
+        monument_gid_data.append(tile_entry)
+        print(f"WARNING: Monument sprites 70, 71, 86, 87 not all found, using empty tiles")
+    
+    return monument_gid_data
+
 def rgb_to_nes_6bit(r, g, b):
     """
     Convert RGB (0-255) to NES 6-bit color index (0-63).
@@ -1003,8 +1079,9 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 shared_gid_mapping_global['gid_to_original_tile_index'][gid] = original_tile_index
         else:
             # Add new entry to shared mapping
-            # Skip GIDs 24, 25, 26 if we haven't reached them yet
-            while next_gid in collapse_gids or next_gid == 27:  # Skip reserved GIDs for background tile objects
+            # Skip reserved GIDs for background tile objects (collapse tiles, breakable walls, monuments)
+            monument_gids_list = [70, 71, 86, 87]
+            while next_gid in collapse_gids or next_gid == 27 or next_gid in monument_gids_list:
                 next_gid += 1
                 shared_gid_mapping_global['next_gid'] = next_gid
             
@@ -2294,6 +2371,8 @@ def main():
     reserve_collapse_tile_gids(all_sprite_data, tile_mapping)
     print("\nReserving GID 27 for breakable walls...")
     reserve_breakable_wall_gids(all_sprite_data, tile_mapping)
+    print("\nReserving GIDs 70, 71, 86, 87 for monuments...")
+    reserve_monument_gids(all_sprite_data, tile_mapping)
 
     # Process map JSON and create level previews and .h files
     tilemap_filename = os.path.join(script_dir, 'baseCelesteTileMap.json')
@@ -2591,9 +2670,10 @@ def main():
                     # Generate shared GID mapping header after all levels are processed
                     # Ensure it's always generated, even if empty (for compilation)
                     # Ensure background tile objects are at their reserved GIDs
-                    global collapse_tile_gid_data, breakable_wall_gid_data
+                    global collapse_tile_gid_data, breakable_wall_gid_data, monument_gid_data
                     collapse_gids = [24, 25, 26]
                     breakable_wall_gid = 27
+                    monument_gids = [70, 71, 86, 87]
                     if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
                         # Ensure gid_map_data is large enough
                         while len(shared_gid_mapping_global['gid_map_data']) <= collapse_gids[-1]:
@@ -2615,7 +2695,8 @@ def main():
                         f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
                         f.write("// GID 0 is reserved for empty tiles\n")
                         f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n")
-                        f.write("// GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)\n\n")
+                        f.write("// GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)\n")
+                        f.write("// GIDs 70, 71, 86, 87 are reserved for monuments (see gid_to_tile_monument.h)\n\n")
                         f.write("#ifndef GID_TO_TILE_SHARED_H\n")
                         f.write("#define GID_TO_TILE_SHARED_H\n\n")
                         if len(shared_gid_mapping_global['gid_map_data']) > 0:
@@ -2755,6 +2836,52 @@ def main():
                         f.write("#endif // GID_TO_TILE_BREAKABLE_WALL_H\n")
                     print(f"Generated breakable wall header with 1 entry")
                     
+                    # Generate separate monument header
+                    monument_header_filename = os.path.join(script_dir, 'gid_to_tile_monument.h')
+                    print(f"\nGenerating monument header: {monument_header_filename}")
+                    with open(monument_header_filename, 'w') as f:
+                        f.write("// Monument GID to tile mapping\n")
+                        f.write("// Generated from baseCelesteSpriteSheet.png\n")
+                        f.write("// GID 70 for monuments (composed of sprites 70, 71, 86, 87)\n")
+                        f.write("// Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags\n")
+                        f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+                        f.write("// Monuments are 32x32 sprites (4x4 tiles) extracted from sprite sheet\n")
+                        f.write("// Arranged as: [Sprite 70] [Sprite 71] / [Sprite 86] [Sprite 87]\n\n")
+                        f.write("#ifndef GID_TO_TILE_MONUMENT_H\n")
+                        f.write("#define GID_TO_TILE_MONUMENT_H\n\n")
+                        if monument_gid_data and len(monument_gid_data) == 1:
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                            f.write("#endif\n")
+                            f.write("const unsigned char gid_to_tile_monument[1][18] = {\n")
+                            tile_entry = monument_gid_data[0]
+                            tiles_4x4, pal_idx, flip = tile_entry
+                            # tiles_4x4 is already a tuple of 16 tiles in row-major order
+                            tiles_4x4_list = list(tiles_4x4)
+                            row1_str = ", ".join(map(str, tiles_4x4_list[0:4]))
+                            row2_str = ", ".join(map(str, tiles_4x4_list[4:8]))
+                            row3_str = ", ".join(map(str, tiles_4x4_list[8:12]))
+                            row4_str = ", ".join(map(str, tiles_4x4_list[12:16]))
+                            f.write("    // GID 70 - MONUMENT (composed of sprites 70, 71, 86, 87)\n")
+                            f.write(f"    // 4x4 grid: Row 1: {row1_str} | Row 2: {row2_str} | Row 3: {row3_str} | Row 4: {row4_str}\n")
+                            tiles_str = ", ".join(map(str, tiles_4x4_list))
+                            f.write(f"    {{ {tiles_str}, {pal_idx}, {flip} }}\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_MONUMENT_COUNT 1\n\n")
+                        else:
+                            # Default empty entry
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                            f.write("#endif\n")
+                            f.write("const unsigned char gid_to_tile_monument[1][18] = {\n")
+                            f.write("    // GID 70 - MONUMENT (composed of sprites 70, 71, 86, 87)\n")
+                            f.write("    // 4x4 grid: Row 1: 0,0,0,0 | Row 2: 0,0,0,0 | Row 3: 0,0,0,0 | Row 4: 0,0,0,0\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_MONUMENT_COUNT 1\n\n")
+                        f.write("#endif // GID_TO_TILE_MONUMENT_H\n")
+                    print(f"Generated monument header with 1 entry")
+                    
                     # Code-referenced objects: objects used dynamically in code but might not appear in level object data
                     # Format: (tile_index, palette_source, base_tile_or_none, palette_fallback)
                     # palette_source: 'inherit_from' = use palette from base_tile, 'mapping' = use object_palette_mapping, 'fixed' = use palette_fallback value, 'background' = use background palette index
@@ -2776,6 +2903,10 @@ def main():
                         (24, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_2, use background palette
                         (25, 'background', None, 0),  # COLLAPSE_TILE_SPRITE_3, use background palette
                         (64, 'background', None, 0),  # BREAKABLE_WALL_SPRITE_1, use background palette
+                        (70, 'background', None, 0),  # MONUMENT_SPRITE_1, use background palette
+                        (71, 'background', None, 0),  # MONUMENT_SPRITE_2, use background palette
+                        (86, 'background', None, 0),  # MONUMENT_SPRITE_3, use background palette
+                        (87, 'background', None, 0),  # MONUMENT_SPRITE_4, use background palette
                     ]
                     
                     # Add code-referenced objects if they're missing
@@ -2955,6 +3086,7 @@ def main():
         # Ensure background tile objects are at their reserved GIDs
         collapse_gids = [24, 25, 26]
         breakable_wall_gid = 27
+        monument_gids = [70, 71, 86, 87]
         if collapse_tile_gid_data and len(collapse_tile_gid_data) == 3:
             # Ensure gid_map_data is large enough
             while len(shared_gid_mapping_global['gid_map_data']) <= collapse_gids[-1]:
@@ -2975,7 +3107,8 @@ def main():
             f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
             f.write("// GID 0 is reserved for empty tiles\n")
             f.write("// GIDs 24, 25, 26 are reserved for collapse tiles (see gid_to_tile_collapse.h)\n")
-            f.write("// GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)\n\n")
+            f.write("// GID 27 is reserved for breakable walls (see gid_to_tile_breakable_wall.h)\n")
+            f.write("// GIDs 70, 71, 86, 87 are reserved for monuments (see gid_to_tile_monument.h)\n\n")
             f.write("#ifndef GID_TO_TILE_SHARED_H\n")
             f.write("#define GID_TO_TILE_SHARED_H\n\n")
             if len(shared_gid_mapping_global['gid_map_data']) > 0:
@@ -3109,6 +3242,52 @@ def main():
                 f.write("#define GID_TO_TILE_BREAKABLE_WALL_COUNT 1\n\n")
             f.write("#endif // GID_TO_TILE_BREAKABLE_WALL_H\n")
         print(f"Generated breakable wall header with 1 entry")
+        
+        # Monument header
+        monument_header_filename = os.path.join(script_dir, 'gid_to_tile_monument.h')
+        print(f"\nGenerating monument header: {monument_header_filename}")
+        with open(monument_header_filename, 'w') as f:
+            f.write("// Monument GID to tile mapping\n")
+            f.write("// Generated from baseCelesteSpriteSheet.png\n")
+            f.write("// GID 70 for monuments (composed of sprites 70, 71, 86, 87)\n")
+            f.write("// Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags\n")
+            f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+            f.write("// Monuments are 32x32 sprites (4x4 tiles) extracted from sprite sheet\n")
+            f.write("// Arranged as: [Sprite 70] [Sprite 71] / [Sprite 86] [Sprite 87]\n\n")
+            f.write("#ifndef GID_TO_TILE_MONUMENT_H\n")
+            f.write("#define GID_TO_TILE_MONUMENT_H\n\n")
+            if monument_gid_data and len(monument_gid_data) == 1:
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                f.write("#endif\n")
+                f.write("const unsigned char gid_to_tile_monument[1][18] = {\n")
+                tile_entry = monument_gid_data[0]
+                tiles_4x4, pal_idx, flip = tile_entry
+                # tiles_4x4 is already a tuple of 16 tiles in row-major order
+                tiles_4x4_list = list(tiles_4x4)
+                row1_str = ", ".join(map(str, tiles_4x4_list[0:4]))
+                row2_str = ", ".join(map(str, tiles_4x4_list[4:8]))
+                row3_str = ", ".join(map(str, tiles_4x4_list[8:12]))
+                row4_str = ", ".join(map(str, tiles_4x4_list[12:16]))
+                f.write("    // GID 70 - MONUMENT (composed of sprites 70, 71, 86, 87)\n")
+                f.write(f"    // 4x4 grid: Row 1: {row1_str} | Row 2: {row2_str} | Row 3: {row3_str} | Row 4: {row4_str}\n")
+                tiles_str = ", ".join(map(str, tiles_4x4_list))
+                f.write(f"    {{ {tiles_str}, {pal_idx}, {flip} }}\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_MONUMENT_COUNT 1\n\n")
+            else:
+                # Default empty entry
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                f.write("#endif\n")
+                f.write("const unsigned char gid_to_tile_monument[1][18] = {\n")
+                f.write("    // GID 70 - MONUMENT (composed of sprites 70, 71, 86, 87)\n")
+                f.write("    // 4x4 grid: Row 1: 0,0,0,0 | Row 2: 0,0,0,0 | Row 3: 0,0,0,0 | Row 4: 0,0,0,0\n")
+                f.write("    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_MONUMENT_COUNT 1\n\n")
+            f.write("#endif // GID_TO_TILE_MONUMENT_H\n")
+        print(f"Generated monument header with 1 entry")
 
 
     print(f"\nConversion complete!")

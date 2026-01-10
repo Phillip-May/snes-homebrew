@@ -747,6 +747,8 @@ void monumentInit(uint8_t index) {
     this->oamTile = MONUMENT_SPRITE_1;
     this->oamProps = 0x36; // priority 3, palette 5
     this->flags |= OBJ_FLAG_DIRTY;
+    // Update nametable to show the monument tile (monuments render as background tiles)
+    port_updateCollapseTileNametable(index);
 }
 
 
@@ -1303,7 +1305,7 @@ int main(void){
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_ActiveLevel.currentRoomID = 1; //12 for monument 20, 22 for big chest
+    GLOBAL_ActiveLevel.currentRoomID = 11; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
 
     for (;;) { 
