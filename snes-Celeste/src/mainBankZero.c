@@ -215,11 +215,7 @@ void collapseTileInit(uint8_t index) {
     this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
     this->data.collapseTile.linkedSpringIndex = -1;
 
-    // Assign fixed OAM slot (4 sprites per 16x16 object)
-    // Player uses slots 0-3, objects start at slot 4
-    // Each object gets 4 consecutive slots based on its index
-    this->extraSpriteBase = 4 + (index * 4);
-    this->extraSpriteCount = 4;
+    // Collapse tiles render as background tiles, not sprites, so no OAM slots are needed
 
     //Check if there is a spring linked to this tile
     // Note: We only search for springs that are already initialized (eType == OBJ_SPRING)
@@ -1346,7 +1342,6 @@ fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     return target;
 }
 
-PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;

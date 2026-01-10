@@ -94,7 +94,7 @@ extern OBJ_DATA GLOBAL_OBJList[];
 #define LEVEL_WIDTH 16
 #define LEVEL_HEIGHT 16
 #define LEVEL_TILE_COUNT 256
-#define LEVEL_BG_PALETTE_COUNT 1
+#define LEVEL_BG_PALETTE_COUNT 4
 
 typedef struct {
     const unsigned char *tilemap_compressed;
@@ -449,6 +449,14 @@ static uint16_t calculate_oam_offset(uint8_t index) {
     
     // Count slots used by all objects before this one
     for (uint8_t i = 1; i < index && i < GLOBAL_OBJ_LIST_SIZE; i++) {
+        // Skip objects that render as background tiles (they don't use sprite slots)
+        if (GLOBAL_OBJList[i].eType == OBJ_COLLAPSE_TILE ||
+            GLOBAL_OBJList[i].eType == OBJ_BREAKABLE_WALL ||
+            GLOBAL_OBJList[i].eType == OBJ_MONUMENT ||
+            GLOBAL_OBJList[i].eType == OBJ_BIG_CHEST) {
+            continue; // These render as BG tiles, not sprites
+        }
+        
         if (GLOBAL_OBJList[i].eType == OBJ_BALLOON) {
             offset += 32; // Balloon uses 8 slots (32 bytes)
         } else if (GLOBAL_OBJList[i].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[i].eType == OBJ_PLATMOV_R) {
