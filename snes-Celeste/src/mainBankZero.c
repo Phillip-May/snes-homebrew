@@ -817,6 +817,8 @@ void bigChestInit(uint8_t index) {
     this->oamTile = BIG_CHEST_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->flags |= OBJ_FLAG_DIRTY;
+    // Update nametable to show the big chest tile (big chest renders as background tiles)
+    port_updateCollapseTileNametable(index);
 }
 
 PORT_FUNC_BANK6
@@ -841,20 +843,25 @@ void bigChestUpdate(uint8_t index) {
                 this->data.bigChest.frameCount = 0;
                 GLOBAL_ActiveLevel.shakeFrames = 120;
                 GLOBAL_PausePlayerFrames = 120;
+                // Queue nametable update to clear top tiles when opening starts
+                port_updateCollapseTileNametable(index);
             }
             break;
         case BIG_CHEST_STATE_OPEN_ANIM:
             this->data.bigChest.frameCount += 1;
             if (this->data.bigChest.frameCount > 120) {
                 this->data.bigChest.state = BIG_CHEST_STATE_OPENED;
+                // Queue nametable update to show open state (top tiles cleared)
+                port_updateCollapseTileNametable(index);
             }
             break;
         case BIG_CHEST_STATE_OPENED:
             GLOBAL_ActiveLevel.swapCloudPal = true;
             initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
-            this->eType = OBJ_UNUSED;
+            // Don't set to OBJ_UNUSED - keep as OBJ_BIG_CHEST so bottom tiles (GIDs 112, 113) remain visible
+            // Top tiles are already cleared by the rendering logic checking state != IDLE
             this->flags |= OBJ_FLAG_DIRTY;
-            return;
+            break;
     }
 }
 
@@ -1305,7 +1312,7 @@ int main(void){
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_ActiveLevel.currentRoomID = 11; //12 for monument 20, 22 for big chest
+    GLOBAL_ActiveLevel.currentRoomID = 21; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
 
     for (;;) { 

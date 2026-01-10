@@ -13,6 +13,7 @@
 #include "../../python/gid_to_tile_collapse.h"
 #include "../../python/gid_to_tile_breakable_wall.h"
 #include "../../python/gid_to_tile_monument.h"
+#include "../../python/gid_to_tile_big_chest.h"
 #include "../../python/compression_dict_shared.h"
 #include "../../python/object_sprite_dict_shared_nes.h"
 #include "../../python/tilemap_level1_nes.h"
@@ -618,6 +619,9 @@ void port_buildChest(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildBigChest(uint8_t index) {
+    // Big chest renders as background tiles, not sprites
+    // It is handled by the background tile update system (port_updateCollapseTileNametable)
+    (void)index;
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -754,6 +758,37 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
                 set_prg_bank(6);
             }
         }
+        // Handle big chest
+        else if (bgTileObj->eType == OBJ_BIG_CHEST) {
+            // Big chest: oamTile contains BIG_CHEST_SPRITE_1 (96)
+            // Big chest is 32x32 (4x4 tiles) composed of sprites: 96, 97 (top), 112, 113 (bottom)
+            // All big chests use the same tile data (index 0) which contains all 16 tiles
+            if (bgTileObj->oamTile == BIG_CHEST_SPRITE_1) {
+                // gid_to_tile_big_chest is in bank 5, switch to it before accessing
+                set_prg_bank(5);
+                
+                // If chest is open (state != 0 means OPEN_ANIM or OPENED), clear top 8 tiles (rows 1 and 2)
+                // Keep bottom 8 tiles (rows 3 and 4, which are GIDs 112, 113) visible
+                // BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2
+                static unsigned char big_chest_open_tiles[18];  // Static buffer for modified tile data
+                if (bgTileObj->data.bigChest.state != 0) {  // 0 = BIG_CHEST_STATE_IDLE
+                    // Chest is open: clear top 8 tiles, keep bottom 8 tiles
+                    const unsigned char *full_tiles = gid_to_tile_big_chest[0];
+                    for (uint8_t i = 0; i < 8; i++) {
+                        big_chest_open_tiles[i] = 0;  // Clear top rows (indices 0-7)
+                    }
+                    for (uint8_t i = 8; i < 18; i++) {
+                        big_chest_open_tiles[i] = full_tiles[i];  // Keep bottom rows + palette + flip (indices 8-17)
+                    }
+                    tile_entry = big_chest_open_tiles;
+                } else {
+                    // Chest is closed: use full tile data
+                    tile_entry = gid_to_tile_big_chest[0];
+                }
+                // Switch back to bank 6
+                set_prg_bank(6);
+            }
+        }
         // If object is OBJ_UNUSED, tile_entry remains NULL (will clear the tile)
         // This handles the case where a breakable wall was queued before being destroyed
         
@@ -764,8 +799,9 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
         bool is_breakable_wall = (bgTileObj->eType == OBJ_BREAKABLE_WALL) || 
                                   (bgTileObj->eType == OBJ_UNUSED && bgTileObj->oamTile == BREAKABLE_WALL_SPRITE_1);
         bool is_monument = (bgTileObj->eType == OBJ_MONUMENT);
+        bool is_big_chest = (bgTileObj->eType == OBJ_BIG_CHEST);
         
-        if (is_breakable_wall || is_monument) {
+        if (is_breakable_wall || is_monument || is_big_chest) {
             // 4x4 grid for breakable walls
             uint8_t nes_tile_x = tileX * 2;
             uint8_t nes_tile_y_row1 = tileY * 2;

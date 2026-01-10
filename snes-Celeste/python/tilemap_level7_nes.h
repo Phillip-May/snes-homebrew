@@ -37,7 +37,7 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_background_le
     // Background Palette 0
     { 0x0d, 0x20, 0x21, 0x00 },
     // Background Palette 1
-    { 0x0d, 0x1b, 0x10, 0x25 },
+    { 0x0d, 0x1b, 0x10, 0x17 },
     // Background Palette 2
     { 0x0d, 0x0d, 0x0d, 0x0d },
     // Background Palette 3

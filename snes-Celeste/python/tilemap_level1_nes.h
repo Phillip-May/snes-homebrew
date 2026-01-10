@@ -38,14 +38,14 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_background_le
     // Background Palette 0
     { 0x0d, 0x20, 0x21, 0x00 },
     // Background Palette 1
-    { 0x0d, 0x1b, 0x10, 0x25 },
+    { 0x0d, 0x1b, 0x10, 0x17 },
     // Background Palette 2
     { 0x0d, 0x20, 0x21, 0x00 },
     // Background Palette 3
-    { 0x0d, 0x0d, 0x0d, 0x0d }
+    { 0x0d, 0x28, 0x27, 0x25 }
 };
 
-#define PALETTE_BACKGROUND_LEVEL1_COUNT 3
+#define PALETTE_BACKGROUND_LEVEL1_COUNT 4
 
 // Sprite palette data for layer 'level1' (NES 6-bit format)
 // 4 sprite palettes, each with 4 colors: [color0, color1, color2, color3]

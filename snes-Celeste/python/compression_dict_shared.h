@@ -39,11 +39,11 @@ const unsigned char compression_dict_shared[64][2] = {
     // Entry 13
     { 9, 12 },
     // Entry 14
-    { 0, 42 },
+    { 0, 45 },
     // Entry 15
     { 21, 21 },
     // Entry 16
-    { 41, 0 },
+    { 44, 0 },
     // Entry 17
     { 0, 17 },
     // Entry 18
@@ -55,7 +55,7 @@ const unsigned char compression_dict_shared[64][2] = {
     // Entry 21
     { 4, 3 },
     // Entry 22
-    { 40, 40 },
+    { 43, 43 },
     // Entry 23
     { 17, 9 },
     // Entry 24
@@ -87,11 +87,11 @@ const unsigned char compression_dict_shared[64][2] = {
     // Entry 37
     { 31, 21 },
     // Entry 38
-    { 0, 40 },
+    { 0, 43 },
     // Entry 39
     { 3, 5 },
     // Entry 40
-    { 40, 0 },
+    { 43, 0 },
     // Entry 41
     { 13, 0 },
     // Entry 42
@@ -101,21 +101,21 @@ const unsigned char compression_dict_shared[64][2] = {
     // Entry 44
     { 4, 22 },
     // Entry 45
-    { 22, 41 },
+    { 22, 44 },
     // Entry 46
     { 6, 9 },
     // Entry 47
     { 0, 2 },
     // Entry 48
-    { 42, 7 },
+    { 45, 7 },
     // Entry 49
     { 6, 0 },
     // Entry 50
-    { 62, 62 },
+    { 64, 64 },
     // Entry 51
     { 9, 28 },
     // Entry 52
-    { 36, 9 },
+    { 38, 9 },
     // Entry 53
     { 0, 12 },
     // Entry 54
@@ -125,7 +125,7 @@ const unsigned char compression_dict_shared[64][2] = {
     // Entry 56
     { 24, 0 },
     // Entry 57
-    { 42, 33 },
+    { 45, 33 },
     // Entry 58
     { 2, 3 },
     // Entry 59

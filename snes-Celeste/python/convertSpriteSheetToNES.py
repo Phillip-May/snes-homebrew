@@ -31,7 +31,8 @@ background_tile_object_palette = {}
 # Store background tile object GID mappings separately
 collapse_tile_gid_data = []  # List of 3 tile entries for GIDs 24, 25, 26 (collapse tiles)
 breakable_wall_gid_data = []  # List of 1 tile entry for GID 27 (breakable walls)
-monument_gid_data = []  # List of 4 tile entries for GIDs 70, 71, 86, 87 (monuments)
+monument_gid_data = []  # List of 1 tile entry for GID 70 (monuments, composed of sprites 70, 71, 86, 87)
+big_chest_gid_data = []  # List of 1 tile entry for GID 96 (big chest, composed of sprites 96, 97)
 
 """
 NES Sprite Sheet Converter
@@ -50,7 +51,7 @@ NES Format:
 
 # Collision and object definitions (from visualize_map.py)
 far_background_gids = [40, 41, 42, 56, 57, 58, 16, 103, 104, 88]
-deco_objects_gids = [44, 60,61,62,63]
+deco_objects_gids = [44, 60,61,62,63, 112, 113]
 solid_gids = [32, 33, 34, 35, 36, 37, 38, 39, 48, 49, 50, 51, 52, 53, 54, 55, 66, 67, 68, 69, 82, 83, 84, 85, 98, 99, 100, 101, 114, 115, 116, 117, 72]
 pointy_gids = [17, 27, 43, 59]
 icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
@@ -65,8 +66,11 @@ breakable_wall_indices = [64]  # BREAKABLE_WALL_SPRITE_1
 # Monuments (70, 71, 86, 87) - can be in tilemap as background tiles
 # For monuments, the GID value equals the sprite index
 monument_indices = [70, 71, 86, 87]  # MONUMENT_SPRITE_1, MONUMENT_SPRITE_2, MONUMENT_SPRITE_3, MONUMENT_SPRITE_4
-# All background tile objects (collapse tiles, breakable walls, monuments, etc.)
-background_tile_object_indices = collapse_tile_indices + breakable_wall_indices + monument_indices
+# Big chest (96, 97) - can be in tilemap as background tiles
+# For big chest, the GID value equals the sprite index (96)
+big_chest_indices = [96, 97]  # BIG_CHEST_SPRITE_1, BIG_CHEST_SPRITE_2
+# All background tile objects (collapse tiles, breakable walls, monuments, big chest, etc.)
+background_tile_object_indices = collapse_tile_indices + breakable_wall_indices + monument_indices + big_chest_indices
 
 # Tile GIDs to manually exclude from CHR banks
 # Add tile indices here to prevent them from being included in CHR bank data
@@ -666,6 +670,78 @@ def reserve_monument_gids(all_sprite_data, tile_mapping):
     
     return monument_gid_data
 
+def reserve_big_chest_gids(all_sprite_data, tile_mapping):
+    """
+    Reserve GID 96 for big chest.
+    Extract tile data and store separately for header generation.
+    Note: This GID is reserved but not added to the main GID array yet.
+    It will be added when we generate the shared header, ensuring it's at index 96.
+    Big chest is 32x32 sprites (4x4 tiles = 16 tiles total).
+    For big chest, the GID value matches the sprite index (96).
+    Big chest is arranged as:
+        [Sprite 96] [Sprite 97]
+        [Sprite 112] [Sprite 113]
+    Each sprite is 16x16 (4 tiles), together forming a 32x32 big chest (16 tiles).
+    """
+    global big_chest_gid_data
+    
+    big_chest_gid_data = []
+    big_chest_gid = 96
+    # For big chest, GID equals sprite index
+    # Sprites are: 96 (top-left 16x16), 97 (top-right 16x16), 112 (bottom-left 16x16), 113 (bottom-right 16x16)
+    sprite_tl = 96  # Top-left 16x16
+    sprite_tr = 97  # Top-right 16x16
+    sprite_bl = 112  # Bottom-left 16x16
+    sprite_br = 113  # Bottom-right 16x16
+    
+    # Check if we have all 4 sprites
+    if sprite_tl < len(all_sprite_data) and sprite_tr < len(all_sprite_data) and sprite_bl < len(all_sprite_data) and sprite_br < len(all_sprite_data):
+        # Extract tiles in row-major order for the 4x4 grid
+        tiles_4x4 = []
+        
+        # Row 1: TL of sprite 96, TR of sprite 96, TL of sprite 97, TR of sprite 97
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 0, 0))  # Sprite 96, TL
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 1, 0))  # Sprite 96, TR
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 0, 0))  # Sprite 97, TL
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 1, 0))  # Sprite 97, TR
+        
+        # Row 2: BL of sprite 96, BR of sprite 96, BL of sprite 97, BR of sprite 97
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 2, 0))  # Sprite 96, BL
+        tiles_4x4.append(tile_mapping.get(sprite_tl * 4 + 3, 0))  # Sprite 96, BR
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 2, 0))  # Sprite 97, BL
+        tiles_4x4.append(tile_mapping.get(sprite_tr * 4 + 3, 0))  # Sprite 97, BR
+        
+        # Row 3: TL of sprite 112, TR of sprite 112, TL of sprite 113, TR of sprite 113
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 0, 0))  # Sprite 112, TL
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 1, 0))  # Sprite 112, TR
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 0, 0))  # Sprite 113, TL
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 1, 0))  # Sprite 113, TR
+        
+        # Row 4: BL of sprite 112, BR of sprite 112, BL of sprite 113, BR of sprite 113
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 2, 0))  # Sprite 112, BL
+        tiles_4x4.append(tile_mapping.get(sprite_bl * 4 + 3, 0))  # Sprite 112, BR
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 2, 0))  # Sprite 113, BL
+        tiles_4x4.append(tile_mapping.get(sprite_br * 4 + 3, 0))  # Sprite 113, BR
+        
+        # Big chest uses background palette 0 (palette_idx_encoded = 0, bit 2 = 0 for background)
+        palette_idx_encoded = 0  # Background palette 0
+        flip_flags = 0  # No flip
+        
+        # Store as tuple: (16 tiles, palette, flip) - same format as breakable walls and monuments
+        tile_entry = (tuple(tiles_4x4), palette_idx_encoded, flip_flags)
+        big_chest_gid_data.append(tile_entry)
+        
+        tiles_str = ", ".join(map(str, tiles_4x4))
+        print(f"Prepared big chest sprites 96, 97, 112, 113 for GID 96 (16 tiles: {tiles_str})")
+    else:
+        # Not enough sprites, use empty tiles
+        tiles_4x4 = [0] * 16
+        tile_entry = (tuple(tiles_4x4), 0, 0)
+        big_chest_gid_data.append(tile_entry)
+        print(f"WARNING: Big chest sprites 96, 97, 112, 113 not all found, using empty tiles")
+    
+    return big_chest_gid_data
+
 def rgb_to_nes_6bit(r, g, b):
     """
     Convert RGB (0-255) to NES 6-bit color index (0-63).
@@ -1081,7 +1157,8 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
             # Add new entry to shared mapping
             # Skip reserved GIDs for background tile objects (collapse tiles, breakable walls, monuments)
             monument_gids_list = [70, 71, 86, 87]
-            while next_gid in collapse_gids or next_gid == 27 or next_gid in monument_gids_list:
+            big_chest_gids_list = [96, 97]
+            while next_gid in collapse_gids or next_gid == 27 or next_gid in monument_gids_list or next_gid in big_chest_gids_list:
                 next_gid += 1
                 shared_gid_mapping_global['next_gid'] = next_gid
             
@@ -2373,6 +2450,8 @@ def main():
     reserve_breakable_wall_gids(all_sprite_data, tile_mapping)
     print("\nReserving GIDs 70, 71, 86, 87 for monuments...")
     reserve_monument_gids(all_sprite_data, tile_mapping)
+    print("\nReserving GID 96 for big chest...")
+    reserve_big_chest_gids(all_sprite_data, tile_mapping)
 
     # Process map JSON and create level previews and .h files
     tilemap_filename = os.path.join(script_dir, 'baseCelesteTileMap.json')
@@ -2882,6 +2961,52 @@ def main():
                         f.write("#endif // GID_TO_TILE_MONUMENT_H\n")
                     print(f"Generated monument header with 1 entry")
                     
+                    # Generate separate big chest header
+                    big_chest_header_filename = os.path.join(script_dir, 'gid_to_tile_big_chest.h')
+                    print(f"\nGenerating big chest header: {big_chest_header_filename}")
+                    with open(big_chest_header_filename, 'w') as f:
+                        f.write("// Big chest GID to tile mapping\n")
+                        f.write("// Generated from baseCelesteSpriteSheet.png\n")
+                        f.write("// GID 96 for big chest (composed of sprites 96, 97, 112, 113)\n")
+                        f.write("// Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags\n")
+                        f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+                        f.write("// Big chest is 32x32 sprites (4x4 tiles) extracted from sprite sheet\n")
+                        f.write("// Arranged as: [Sprite 96] [Sprite 97] / [Sprite 112] [Sprite 113]\n\n")
+                        f.write("#ifndef GID_TO_TILE_BIG_CHEST_H\n")
+                        f.write("#define GID_TO_TILE_BIG_CHEST_H\n\n")
+                        if big_chest_gid_data and len(big_chest_gid_data) == 1:
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                            f.write("#endif\n")
+                            f.write("const unsigned char gid_to_tile_big_chest[1][18] = {\n")
+                            tile_entry = big_chest_gid_data[0]
+                            tiles_4x4, pal_idx, flip = tile_entry
+                            # tiles_4x4 is already a tuple of 16 tiles in row-major order
+                            tiles_4x4_list = list(tiles_4x4)
+                            row1_str = ", ".join(map(str, tiles_4x4_list[0:4]))
+                            row2_str = ", ".join(map(str, tiles_4x4_list[4:8]))
+                            row3_str = ", ".join(map(str, tiles_4x4_list[8:12]))
+                            row4_str = ", ".join(map(str, tiles_4x4_list[12:16]))
+                            f.write("    // GID 96 - BIG_CHEST (composed of sprites 96, 97)\n")
+                            f.write(f"    // 4x4 grid: Row 1: {row1_str} | Row 2: {row2_str} | Row 3: {row3_str} | Row 4: {row4_str}\n")
+                            tiles_str = ", ".join(map(str, tiles_4x4_list))
+                            f.write(f"    {{ {tiles_str}, {pal_idx}, {flip} }}\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_BIG_CHEST_COUNT 1\n\n")
+                        else:
+                            # Default empty entry
+                            f.write("#ifdef __NES_UNROM_512__\n")
+                            f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                            f.write("#endif\n")
+                            f.write("const unsigned char gid_to_tile_big_chest[1][18] = {\n")
+                            f.write("    // GID 96 - BIG_CHEST (composed of sprites 96, 97)\n")
+                            f.write("    // 4x4 grid: Row 1: 0,0,0,0 | Row 2: 0,0,0,0 | Row 3: 0,0,0,0 | Row 4: 0,0,0,0\n")
+                            f.write("    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }\n")
+                            f.write("};\n\n")
+                            f.write("#define GID_TO_TILE_BIG_CHEST_COUNT 1\n\n")
+                        f.write("#endif // GID_TO_TILE_BIG_CHEST_H\n")
+                    print(f"Generated big chest header with 1 entry")
+                    
                     # Code-referenced objects: objects used dynamically in code but might not appear in level object data
                     # Format: (tile_index, palette_source, base_tile_or_none, palette_fallback)
                     # palette_source: 'inherit_from' = use palette from base_tile, 'mapping' = use object_palette_mapping, 'fixed' = use palette_fallback value, 'background' = use background palette index
@@ -2907,6 +3032,8 @@ def main():
                         (71, 'background', None, 0),  # MONUMENT_SPRITE_2, use background palette
                         (86, 'background', None, 0),  # MONUMENT_SPRITE_3, use background palette
                         (87, 'background', None, 0),  # MONUMENT_SPRITE_4, use background palette
+                        (96, 'background', None, 0),  # BIG_CHEST_SPRITE_1, use background palette
+                        (97, 'background', None, 0),  # BIG_CHEST_SPRITE_2, use background palette
                     ]
                     
                     # Add code-referenced objects if they're missing
@@ -3288,6 +3415,52 @@ def main():
                 f.write("#define GID_TO_TILE_MONUMENT_COUNT 1\n\n")
             f.write("#endif // GID_TO_TILE_MONUMENT_H\n")
         print(f"Generated monument header with 1 entry")
+        
+        # Big chest header
+        big_chest_header_filename = os.path.join(script_dir, 'gid_to_tile_big_chest.h')
+        print(f"\nGenerating big chest header: {big_chest_header_filename}")
+        with open(big_chest_header_filename, 'w') as f:
+            f.write("// Big chest GID to tile mapping\n")
+            f.write("// Generated from baseCelesteSpriteSheet.png\n")
+            f.write("// GID 96 for big chest (composed of sprites 96, 97)\n")
+            f.write("// Each entry: 16 tiles for 4x4 grid (row-major order), palette_idx, flip_flags\n")
+            f.write("// flip_flags: bit 0=H, bit 1=V, bit 2=D\n")
+            f.write("// Big chest is 32x32 sprites (4x4 tiles) extracted from sprite sheet\n")
+            f.write("// Arranged as: [Sprite 96] [Sprite 97] / [Sprite 112] [Sprite 113]\n\n")
+            f.write("#ifndef GID_TO_TILE_BIG_CHEST_H\n")
+            f.write("#define GID_TO_TILE_BIG_CHEST_H\n\n")
+            if big_chest_gid_data and len(big_chest_gid_data) == 1:
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                f.write("#endif\n")
+                f.write("const unsigned char gid_to_tile_big_chest[1][18] = {\n")
+                tile_entry = big_chest_gid_data[0]
+                tiles_4x4, pal_idx, flip = tile_entry
+                # tiles_4x4 is already a tuple of 16 tiles in row-major order
+                tiles_4x4_list = list(tiles_4x4)
+                row1_str = ", ".join(map(str, tiles_4x4_list[0:4]))
+                row2_str = ", ".join(map(str, tiles_4x4_list[4:8]))
+                row3_str = ", ".join(map(str, tiles_4x4_list[8:12]))
+                row4_str = ", ".join(map(str, tiles_4x4_list[12:16]))
+                f.write("    // GID 96 - BIG_CHEST (composed of sprites 96, 97)\n")
+                f.write(f"    // 4x4 grid: Row 1: {row1_str} | Row 2: {row2_str} | Row 3: {row3_str} | Row 4: {row4_str}\n")
+                tiles_str = ", ".join(map(str, tiles_4x4_list))
+                f.write(f"    {{ {tiles_str}, {pal_idx}, {flip} }}\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_BIG_CHEST_COUNT 1\n\n")
+            else:
+                # Default empty entry
+                f.write("#ifdef __NES_UNROM_512__\n")
+                f.write("__attribute__((section(\".prg_rom_5\")))\n")
+                f.write("#endif\n")
+                f.write("const unsigned char gid_to_tile_big_chest[1][18] = {\n")
+                f.write("    // GID 96 - BIG_CHEST (composed of sprites 96, 97)\n")
+                f.write("    // 4x4 grid: Row 1: 0,0,0,0 | Row 2: 0,0,0,0 | Row 3: 0,0,0,0 | Row 4: 0,0,0,0\n")
+                f.write("    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }\n")
+                f.write("};\n\n")
+                f.write("#define GID_TO_TILE_BIG_CHEST_COUNT 1\n\n")
+            f.write("#endif // GID_TO_TILE_BIG_CHEST_H\n")
+        print(f"Generated big chest header with 1 entry")
 
 
     print(f"\nConversion complete!")
