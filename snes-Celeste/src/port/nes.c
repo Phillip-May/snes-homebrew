@@ -90,9 +90,6 @@ extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern struct sPlayerData GLOBAL_PlayerData;
 extern OBJ_DATA GLOBAL_OBJList[];
 
-// Object list size (must match definition in mainBankZero.c)
-#define GLBOAL_OBJ_LIST_SIZE 29
-
 // Fixed level dimensions (all levels are 16x16 = 256 tiles)
 #define LEVEL_WIDTH 16
 #define LEVEL_HEIGHT 16
@@ -451,7 +448,7 @@ static uint16_t calculate_oam_offset(uint8_t index) {
     uint16_t offset = 16; // Player sprite at index 0 uses first 16 bytes (4 slots)
     
     // Count slots used by all objects before this one
-    for (uint8_t i = 1; i < index && i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    for (uint8_t i = 1; i < index && i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_BALLOON) {
             offset += 32; // Balloon uses 8 slots (32 bytes)
         } else if (GLOBAL_OBJList[i].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[i].eType == OBJ_PLATMOV_R) {
@@ -494,13 +491,10 @@ void port_init(void) {
     ppu_off();
     oam_clear();
     oam_size(0);
+    PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
     
     // Enable both background and sprites
     ppu_on_all();
-    
-    PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
-    ppu_wait_nmi();
-
 }
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj) {
@@ -1236,7 +1230,7 @@ static inline uint8_t get_level_bank(uint16_t level_idx) {
     return 1;  // All levels are in bank 1
 }
 
-__attribute__((section(".prg_rom_6")))
+// Moved to fixed bank - code in bank 6 should not switch banks
 static void load_background_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
@@ -1250,10 +1244,10 @@ static void load_background_palettes(void) {
         }
     }
     pal_bg(palette_ram);
-    set_prg_bank(6);  // Switch back to bank 6 before returning (load_background_palettes is in bank 6)
+    set_prg_bank(0);  // Switch back to fixed bank before returning (load_background_palettes is in fixed bank)
 }
 
-__attribute__((section(".prg_rom_6")))
+// Moved to fixed bank - code in bank 6 should not switch banks
 static void load_sprite_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[16 + i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
@@ -1267,7 +1261,7 @@ static void load_sprite_palettes(void) {
         }
     }
     pal_spr(&palette_ram[16]);
-    set_prg_bank(6);  // Switch back to bank 6 before returning (load_sprite_palettes is in bank 6)
+    set_prg_bank(0);  // Switch back to fixed bank before returning (load_sprite_palettes is in fixed bank)
 }
 
 static void update_player_hair_color(void) {
@@ -1286,7 +1280,7 @@ static uint8_t get_palette_from_gid(uint8_t gid, const unsigned char (*gid_to_ti
     return (gid_to_tile_map[gid][4] & 0x03);
 }
 
-__attribute__((section(".prg_rom_6")))
+// Moved to fixed bank - code in bank 6 should not switch banks
 static void write_nametable(void) {
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
@@ -1370,7 +1364,7 @@ static void write_nametable(void) {
             vram_put(tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6));
         }
     }
-    set_prg_bank(6);  // Switch back to bank 6 before returning (write_nametable is in bank 6)
+    set_prg_bank(0);  // Switch back to fixed bank before returning (write_nametable is in fixed bank)
 }
 
 static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
@@ -1395,7 +1389,7 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
     }
 }
 
-__attribute__((section(".prg_rom_6")))
+// Moved to fixed bank - code in bank 6 should not switch banks
 void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
@@ -1434,9 +1428,7 @@ void port_LoadRoomData(uint16_t roomID) {
     load_background_palettes();
     load_sprite_palettes();
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
-    ppu_wait_nmi();
-    ppu_wait_nmi();
     ppu_on_all();
-    set_prg_bank(6);  // Switch back to bank 6 before returning (port_LoadRoomData is in bank 6)
+    set_prg_bank(0);  // Switch back to fixed bank before returning (port_LoadRoomData is in fixed bank)
 }
 

@@ -50,10 +50,8 @@ void playSoundEffect(enum eSoundEffect soundEffect){
 
 uint8_t GLOBAL_InputState = 0;
 
-#define GLBOAL_OBJ_LIST_SIZE 29
-OBJ_DATA GLOBAL_OBJList[GLBOAL_OBJ_LIST_SIZE] = {0};
+OBJ_DATA GLOBAL_OBJList[GLOBAL_OBJ_LIST_SIZE] = {0};
 
-uint16_t GLOBAL_FrameCountVBLANK = 0;
 uint16_t GLOBAL_FrameCount = 0;
 
 uint8_t GLOBAL_FreezeFrames = 0;
@@ -224,7 +222,10 @@ void collapseTileInit(uint8_t index) {
     this->extraSpriteCount = 4;
 
     //Check if there is a spring linked to this tile
-    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    // Note: We only search for springs that are already initialized (eType == OBJ_SPRING)
+    // If a spring hasn't been initialized yet, the link will be established when the spring initializes (in springInit)
+    // This ensures bidirectional linking works regardless of initialization order
+    for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_SPRING) {
             uint8_t springTileX = GLOBAL_OBJList[i].pos.x / 16;
             uint8_t springTileY = (GLOBAL_OBJList[i].pos.y + 1) / 16;
@@ -605,7 +606,7 @@ void keyInit(uint8_t index) {
     this->data.key.isFlipped = false;
     this->data.key.spriteValue = KEY_SPRITE_1;
 
-    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_CHEST) {
             this->data.key.linkedChestIndex = i;
         }
@@ -689,7 +690,7 @@ void chestInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->pos.x -= 8;
 
-    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_KEY) {
             OBJ_DATA *key = &GLOBAL_OBJList[i];
             key->data.key.linkedChestIndex = index;
@@ -1132,7 +1133,7 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
     // Find a free slot
     uint8_t i;
     //Starts from 1 to account for the fact that hardcoded player is using slot 0
-    for (i = 1; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_UNUSED) {
             GLOBAL_OBJList[i].eType = eType;
             GLOBAL_OBJList[i].pos.x = x;
@@ -1259,7 +1260,7 @@ void updateAllObjects(void) {
     uint8_t i;
     port_beginSpriteBuild(&GLOBAL_PlayerData);
     port_prg_bank_switch(6);  // Switch to object bank (code is in bank 6)
-    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         processObject(i);
     }
     port_prg_bank_switch(0);  // Switch back to fixed bank
@@ -1270,7 +1271,7 @@ void updateAllObjects(void) {
 PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this);
 
-PORT_FUNC_BANK6
+// onVblank is in fixed bank (bank 0), not bank 6
 void onVblank(void);
 
 
@@ -1285,15 +1286,16 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.swapCloudPal = false;
     GLOBAL_ActiveLevel.swapActivePalette = true;
     GLOBAL_ActiveLevel.textFlashActive = false;
-    port_prg_bank_switch(6);  // Switch to bank 6 for port_LoadRoomData (code is in bank 6)
+    // port_LoadRoomData is now in fixed bank, so no need to switch banks
     port_LoadRoomData(roomID);
-    // playerInit is now in bank 6, so keep bank 6 active
+    // playerInit is in bank 6, so switch to bank 6 before calling it
+    port_prg_bank_switch(6);
     playerInit(&GLOBAL_PlayerData);
     port_prg_bank_switch(0);  // Switch back to fixed bank for port_updatePlayerSprite
     port_updatePlayerSprite(&GLOBAL_PlayerData);
     port_beginSpriteBuild(&GLOBAL_PlayerData);
     port_prg_bank_switch(6);  // Switch to bank 6 for processObject (code is in bank 6)
-    for (i = 0; i < GLBOAL_OBJ_LIST_SIZE; ++i) {
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; ++i) {
         processObject(i);
     }
     port_prg_bank_switch(0);  // Switch back to fixed bank
@@ -1324,7 +1326,7 @@ int main(void){
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_ActiveLevel.currentRoomID = 22; //12 for monument 20, 22 for big chest
+    GLOBAL_ActiveLevel.currentRoomID = 4; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
 
     for (;;) { 
@@ -1383,7 +1385,7 @@ void playerInit(struct sPlayerData* this){
 
 
     //Clear out the object array
-    for (i = 1; i < GLBOAL_OBJ_LIST_SIZE; i++) {
+    for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         GLOBAL_OBJList[i].eType = OBJ_UNUSED;
         GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
         GLOBAL_OBJList[i].extraSpriteCount = 0;
@@ -1915,11 +1917,12 @@ void playerUpdate(struct sPlayerData* this) {
     // next level
     if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
         // LoadNextRoom and LoadRoomData are in fixed bank, and LoadRoomData already calls playerInit
-        port_prg_bank_switch(0);  // Switch to fixed bank for LoadNextRoom
+        // We're currently in bank 6, but we need to switch back to fixed bank before calling LoadNextRoom
+        // LoadNextRoom will handle its own bank switching
+        port_prg_bank_switch(0);  // Switch back to fixed bank before calling LoadNextRoom
         LoadNextRoom();
-        // LoadRoomData already called playerInit, and we've loaded a new room, so return early
-        // But we need to switch back to bank 6 since onVblank (our caller) is in bank 6
-        port_prg_bank_switch(6);  // Switch back to bank 6 for onVblank
+        // LoadNextRoom already handled all bank switching, and we're back in fixed bank
+        // Don't switch back to bank 6 - playerUpdate should end in fixed bank
         return;
      }
 
@@ -2040,24 +2043,4 @@ void onVblank(void) {
     playerUpdate(&GLOBAL_PlayerData);
     port_updatePlayerSprite(&GLOBAL_PlayerData);
 }
-
-//Interupt handler for VBlank
-void interuptVBlank(void){
-    GLOBAL_FrameCountVBLANK++;
-}
-
-// Cross-compiler interrupt handlers, must be present
-void snesXC_cop(void) {
-}
-
-void snesXC_brk(void) {
-}
-
-void snesXC_abort(void) {
-}
-
-void snesXC_nmi(void) {
-    interuptVBlank();
-}
-
 

@@ -1539,3 +1539,17 @@ void port_resetSprites(void)
 
 }
 
+
+// Cross-compiler interrupt handlers, must be present
+void snesXC_cop(void) {
+}
+
+void snesXC_brk(void) {
+}
+
+void snesXC_abort(void) {
+}
+
+void snesXC_nmi(void) {
+    interuptVBlank();
+}

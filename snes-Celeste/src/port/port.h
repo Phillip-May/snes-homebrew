@@ -190,6 +190,9 @@ struct sActiveLevelData
 #define OBJ_FLAG_DIRTY 0x80u
 #define PORT_EXTRA_SLOT_UNUSED 0xFFu
 
+// Object list size - must be defined once and used consistently across all files
+#define GLOBAL_OBJ_LIST_SIZE 29
+
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern uint16_t GLOBAL_FrameCount;
 
