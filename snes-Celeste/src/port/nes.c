@@ -535,6 +535,11 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildUnused(uint8_t index) {
+    // Hide sprites for unused objects
+    // Need to determine which build function to call based on the object's previous type
+    // For now, just hide sprites at the calculated offset
+    uint16_t oamOffset = calculate_oam_offset(index);
+    hide_sprites(oamOffset);
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -1094,6 +1099,16 @@ void port_buildFlyingBerry(uint8_t index) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildDoubleDashOrb(uint8_t index) {
+    OBJ_DATA *orb = &GLOBAL_OBJList[index];
+    uint16_t oamOffset = calculate_oam_offset(index);
+    if (orb->eType == OBJ_UNUSED) {
+        hide_sprites(oamOffset);
+        return;
+    }
+    render_object_sprite(orb, oamOffset);
+    // render_object_sprite calls get_object_sprite_data which switches to bank 5
+    // We need to switch back to bank 6 since this function is in bank 6
+    set_prg_bank(6);
 }
 
 __attribute__((section(".prg_rom_6")))

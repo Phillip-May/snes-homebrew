@@ -3034,6 +3034,8 @@ def main():
                         (87, 'background', None, 0),  # MONUMENT_SPRITE_4, use background palette
                         (96, 'background', None, 0),  # BIG_CHEST_SPRITE_1, use background palette
                         (97, 'background', None, 0),  # BIG_CHEST_SPRITE_2, use background palette
+                        # Double dash orb - use palette 0 (from nes.c: oamProps = 0x38 means priority 3, palette 0 on NES)
+                        (102, 'fixed', None, 0),  # DOUBLE_JUMP_ORB_SPRITE_1, use palette 0
                     ]
                     
                     # Add code-referenced objects if they're missing
@@ -3115,10 +3117,14 @@ def main():
     # NES format: sparse array indexed by tile_idx, format [pal_idx, tl, tr, bl, br]
     # SNES format: array with tile_idx field, format [tile_idx, pal_idx, tl, tr, bl, br]
     
-    # NES uses tile indices up to 47 (flying berry wings: tiles 45, 46, 47)
+    # NES uses tile indices up to 118 (double dash orb: tile 102, and other objects up to 118)
     # Keep lookup table small - only include tiles we actually use in code
     # The lookup table is in bank 5, but we want to minimize its size
-    nes_max_tile_idx = 47  # Flying berry wings are the highest tile indices we need
+    # Find the maximum tile index from arrMustBeObject and code-referenced objects
+    nes_max_tile_idx = max(arrMustBeObject) if arrMustBeObject else 47
+    # Also check code-referenced objects (like sprite 102 for double dash orb)
+    # Ensure we include at least up to sprite 102 (DOUBLE_JUMP_ORB_SPRITE_1) and 118
+    nes_max_tile_idx = max(nes_max_tile_idx, 102, 118)
     
     # Generate NES format header (compact format with lookup table)
     object_sprite_dict_nes_filename = os.path.join(script_dir, 'object_sprite_dict_shared_nes.h')

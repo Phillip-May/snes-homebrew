@@ -6,7 +6,7 @@
 #ifndef OBJECT_SPRITE_DICT_SHARED_SNES_H
 #define OBJECT_SPRITE_DICT_SHARED_SNES_H
 
-const unsigned char object_sprite_dict_shared[38][6] = {
+const unsigned char object_sprite_dict_shared[39][6] = {
     // Entry 0
     { 1, 3, 1, 2, 3, 4 },
     // Entry 1
@@ -82,9 +82,11 @@ const unsigned char object_sprite_dict_shared[38][6] = {
     // Entry 36
     { 97, 1, 214, 215, 103, 103 },
     // Entry 37
+    { 102, 0, 226, 227, 228, 229 },
+    // Entry 38
     { 118, 0, 241, 242, 243, 0 }
 };
 
-#define OBJECT_SPRITE_DICT_SHARED_COUNT 38
+#define OBJECT_SPRITE_DICT_SHARED_COUNT 39
 
 #endif // OBJECT_SPRITE_DICT_SHARED_SNES_H

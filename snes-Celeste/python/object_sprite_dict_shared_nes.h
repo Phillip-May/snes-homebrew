@@ -7,7 +7,7 @@
 #define OBJECT_SPRITE_DICT_SHARED_NES_H
 
 // Lookup table: maps tile_idx -> compact_index (0xFF = not found)
-const unsigned char object_sprite_lookup_table[48] = {
+const unsigned char object_sprite_lookup_table[121] = {
     /* tile 0 */  255,
     /* tile 1 */  0,
     /* tile 2 */  1,
@@ -55,12 +55,85 @@ const unsigned char object_sprite_lookup_table[48] = {
     /* tile 44 */  255,
     /* tile 45 */  27,
     /* tile 46 */  28,
-    /* tile 47 */  29
+    /* tile 47 */  29,
+    /* tile 48 */  255,
+    /* tile 49 */  255,
+    /* tile 50 */  255,
+    /* tile 51 */  255,
+    /* tile 52 */  255,
+    /* tile 53 */  255,
+    /* tile 54 */  255,
+    /* tile 55 */  255,
+    /* tile 56 */  255,
+    /* tile 57 */  255,
+    /* tile 58 */  255,
+    /* tile 59 */  255,
+    /* tile 60 */  255,
+    /* tile 61 */  255,
+    /* tile 62 */  255,
+    /* tile 63 */  255,
+    /* tile 64 */  30,
+    /* tile 65 */  255,
+    /* tile 66 */  255,
+    /* tile 67 */  255,
+    /* tile 68 */  255,
+    /* tile 69 */  255,
+    /* tile 70 */  31,
+    /* tile 71 */  32,
+    /* tile 72 */  255,
+    /* tile 73 */  255,
+    /* tile 74 */  255,
+    /* tile 75 */  255,
+    /* tile 76 */  255,
+    /* tile 77 */  255,
+    /* tile 78 */  255,
+    /* tile 79 */  255,
+    /* tile 80 */  255,
+    /* tile 81 */  255,
+    /* tile 82 */  255,
+    /* tile 83 */  255,
+    /* tile 84 */  255,
+    /* tile 85 */  255,
+    /* tile 86 */  33,
+    /* tile 87 */  34,
+    /* tile 88 */  255,
+    /* tile 89 */  255,
+    /* tile 90 */  255,
+    /* tile 91 */  255,
+    /* tile 92 */  255,
+    /* tile 93 */  255,
+    /* tile 94 */  255,
+    /* tile 95 */  255,
+    /* tile 96 */  35,
+    /* tile 97 */  36,
+    /* tile 98 */  255,
+    /* tile 99 */  255,
+    /* tile 100 */  255,
+    /* tile 101 */  255,
+    /* tile 102 */  37,
+    /* tile 103 */  255,
+    /* tile 104 */  255,
+    /* tile 105 */  255,
+    /* tile 106 */  255,
+    /* tile 107 */  255,
+    /* tile 108 */  255,
+    /* tile 109 */  255,
+    /* tile 110 */  255,
+    /* tile 111 */  255,
+    /* tile 112 */  255,
+    /* tile 113 */  255,
+    /* tile 114 */  255,
+    /* tile 115 */  255,
+    /* tile 116 */  255,
+    /* tile 117 */  255,
+    /* tile 118 */  38,
+    /* tile 119 */  255,
+    /* tile 120 */  255
 };
 
 // Compact sprite data array (only used entries)
 // Format: [pal_idx, tl, tr, bl, br]
-const unsigned char object_sprite_dict_compact[30][5] = {
+const unsigned char object_sprite_dict_compact[39][5] = {
     /* compact_idx 0: tile 1 */  { 3, 1, 2, 3, 4 },
     /* compact_idx 1: tile 2 */  { 3, 1, 2, 3, 5 },
     /* compact_idx 2: tile 3 */  { 3, 6, 7, 8, 9 },
@@ -90,10 +163,19 @@ const unsigned char object_sprite_dict_compact[30][5] = {
     /* compact_idx 26: tile 31 */  { 0, 89, 90, 91, 92 },
     /* compact_idx 27: tile 45 */  { 0, 121, 122, 123, 124 },
     /* compact_idx 28: tile 46 */  { 0, 0, 0, 123, 125 },
-    /* compact_idx 29: tile 47 */  { 0, 0, 0, 126, 16 }
+    /* compact_idx 29: tile 47 */  { 0, 0, 0, 126, 16 },
+    /* compact_idx 30: tile 64 */  { 1, 97, 167, 168, 100 },
+    /* compact_idx 31: tile 70 */  { 1, 0, 0, 184, 185 },
+    /* compact_idx 32: tile 71 */  { 1, 0, 0, 186, 187 },
+    /* compact_idx 33: tile 86 */  { 1, 205, 206, 207, 208 },
+    /* compact_idx 34: tile 87 */  { 1, 209, 210, 211, 212 },
+    /* compact_idx 35: tile 96 */  { 1, 213, 214, 103, 103 },
+    /* compact_idx 36: tile 97 */  { 1, 214, 215, 103, 103 },
+    /* compact_idx 37: tile 102 */  { 0, 226, 227, 228, 229 },
+    /* compact_idx 38: tile 118 */  { 0, 241, 242, 243, 0 }
 };
 
-#define OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE 48
-#define OBJECT_SPRITE_DICT_COMPACT_COUNT 30
+#define OBJECT_SPRITE_DICT_LOOKUP_TABLE_SIZE 121
+#define OBJECT_SPRITE_DICT_COMPACT_COUNT 39
 
 #endif // OBJECT_SPRITE_DICT_SHARED_NES_H
