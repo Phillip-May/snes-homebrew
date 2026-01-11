@@ -449,10 +449,10 @@ void balloonInit(uint8_t index) {
 }
 
 PORT_DATA_BANK6 static const uint8_t balloonStringFrames[75] = {
-    13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14,
-    14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 13, 13, 13, 13,
-    13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
-    14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 13, 13,
+    BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2,
+    BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1,
+    BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2,
+    BALLOON_STRING_2, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_1, BALLOON_STRING_1,
 };
 #define BALLON_YTABLE_SIZE 304
 PORT_DATA_BANK6 static const uint8_t balloon_ytable[] = {
@@ -848,18 +848,14 @@ void bigChestUpdate(uint8_t index) {
             this->data.bigChest.frameCount += 1;
             if (this->data.bigChest.frameCount > 120) {
                 this->data.bigChest.state = BIG_CHEST_STATE_OPENED;
-                this->data.bigChest.frameCount = 0; // Reset to 0 to use as flag for orb creation
                 // Queue nametable update to show open state (top tiles cleared)
                 port_updateCollapseTileNametable(index);
+                // Spawn the double dash orb only once when transitioning to OPENED state
+                GLOBAL_ActiveLevel.swapCloudPal = true;
+                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
             }
             break;
         case BIG_CHEST_STATE_OPENED:
-            GLOBAL_ActiveLevel.swapCloudPal = true;
-            // Only create the orb once - use frameCount as a flag (0 = not created, non-zero = created)
-            if (this->data.bigChest.frameCount == 0) {
-                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
-                this->data.bigChest.frameCount = 1; // Mark as created
-            }
             // Don't set to OBJ_UNUSED - keep as OBJ_BIG_CHEST so bottom tiles (GIDs 112, 113) remain visible
             // Top tiles are already cleared by the rendering logic checking state != IDLE
             this->flags |= OBJ_FLAG_DIRTY;
@@ -885,7 +881,6 @@ void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Speed starts at -8 and goes down by 0.5 every frame
     //alternatively 1 every 2 frames
-    // Use per-orb data instead of static variables so each orb has its own speed
     int16_t *speedY = &this->data.doubleJumpOrb.speedY;
     int16_t *accelAccumulator = &this->data.doubleJumpOrb.accelAccumulator;
 
@@ -900,8 +895,6 @@ void doubleDashOrbUpdate(uint8_t index) {
         *accelAccumulator %= 4;
     }
 
-
-
     if (*speedY >= 0) {
         bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 16) && 
                                 (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 16) && 
@@ -915,6 +908,7 @@ void doubleDashOrbUpdate(uint8_t index) {
             GLOBAL_ActiveLevel.swapActivePalette = true;
             this->eType = OBJ_UNUSED;
             this->flags |= OBJ_FLAG_DIRTY;
+            port_buildDoubleDashOrb(index);
             return;
         }
     }
@@ -1201,7 +1195,6 @@ static void processObject(uint8_t index)
         port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
         doubleDashOrbUpdate(index);
-        // Check obj->eType again in case it was set to OBJ_UNUSED during update
         port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_KEY) {
         keyUpdate(index);

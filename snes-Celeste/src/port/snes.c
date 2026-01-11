@@ -423,7 +423,8 @@ static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
         return false;
     }
 
-    bool hideMain = (obj->data.balloon.state == PORT_BALLOON_STATE_POPPED);
+    // Hide balloon and string if popped or during hide frame count
+    bool hideMain = (obj->data.balloon.state == PORT_BALLOON_STATE_POPPED) || (obj->data.balloon.hideFrameCount > 0);
     writeConditionalSprite(index, obj, hideMain);
 
     obj->extraSpriteCount = PORT_BALLOON_EXTRA_SPRITES;
@@ -439,7 +440,8 @@ static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)stringY;
     }
     GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = obj->data.balloon.stringTile;
-    GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = 0x34; // priority 3, palette 4
+    // String uses palette 2 (priority 3, palette 2)
+    GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = 0x32;
 
     return true;
 }

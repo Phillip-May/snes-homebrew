@@ -449,14 +449,6 @@ static uint16_t calculate_oam_offset(uint8_t index) {
     
     // Count slots used by all objects before this one
     for (uint8_t i = 1; i < index && i < GLOBAL_OBJ_LIST_SIZE; i++) {
-        // Skip objects that render as background tiles (they don't use sprite slots)
-        if (GLOBAL_OBJList[i].eType == OBJ_COLLAPSE_TILE ||
-            GLOBAL_OBJList[i].eType == OBJ_BREAKABLE_WALL ||
-            GLOBAL_OBJList[i].eType == OBJ_MONUMENT ||
-            GLOBAL_OBJList[i].eType == OBJ_BIG_CHEST) {
-            continue; // These render as BG tiles, not sprites
-        }
-        
         if (GLOBAL_OBJList[i].eType == OBJ_BALLOON) {
             offset += 32; // Balloon uses 8 slots (32 bytes)
         } else if (GLOBAL_OBJList[i].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[i].eType == OBJ_PLATMOV_R) {
@@ -499,10 +491,13 @@ void port_init(void) {
     ppu_off();
     oam_clear();
     oam_size(0);
-    PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
     
     // Enable both background and sprites
     ppu_on_all();
+    
+    PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
+    ppu_wait_nmi();
+
 }
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj) {
@@ -537,11 +532,6 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
 
 __attribute__((section(".prg_rom_6")))
 void port_buildUnused(uint8_t index) {
-    // Hide sprites for unused objects
-    // Need to determine which build function to call based on the object's previous type
-    // For now, just hide sprites at the calculated offset
-    uint16_t oamOffset = calculate_oam_offset(index);
-    hide_sprites(oamOffset);
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -1128,11 +1118,6 @@ void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
         obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
         return;
     }
-    // Check actual object type first, in case it changed during update
-    if (obj->eType == OBJ_UNUSED) {
-        port_buildUnused(index);
-        return;
-    }
     if (eType == OBJ_UNUSED) {
         port_buildUnused(index);
         return;
@@ -1257,7 +1242,7 @@ static void load_background_palettes(void) {
         }
     }
     pal_bg(palette_ram);
-    set_prg_bank(0);  // Switch back to fixed bank before returning (load_background_palettes is in fixed bank)
+    set_prg_bank(6);  // Switch back to bank 6 before returning (load_background_palettes is in bank 6)
 }
 
 // Moved to fixed bank - code in bank 6 should not switch banks
@@ -1287,7 +1272,6 @@ static void update_player_hair_color(void) {
     }
 }
 
-__attribute__((section(".prg_rom_6")))
 static uint8_t get_palette_from_gid(uint8_t gid, const unsigned char (*gid_to_tile_map)[6], uint16_t gid_map_count) {
     if (gid >= gid_map_count || !gid_to_tile_map) return 0;
     return (gid_to_tile_map[gid][4] & 0x03);
@@ -1402,7 +1386,7 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
     }
 }
 
-// Moved to fixed bank - code in bank 6 should not switch banks
+__attribute__((section(".prg_rom_6")))
 void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
