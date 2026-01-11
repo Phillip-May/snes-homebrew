@@ -1551,5 +1551,6 @@ void snesXC_abort(void) {
 }
 
 void snesXC_nmi(void) {
-    interuptVBlank();
+    // VBlank handling is done in onVblank() which is called from the main loop
 }
+

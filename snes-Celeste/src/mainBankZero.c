@@ -811,7 +811,6 @@ void bigChestInit(uint8_t index) {
     this->extraSpriteCount = 0;
     this->data.bigChest.state = BIG_CHEST_STATE_IDLE;
     this->data.bigChest.frameCount = 0;
-    this->data.bigChest.orbSpawned = false;
     this->oamTile = BIG_CHEST_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->flags |= OBJ_FLAG_DIRTY;
@@ -855,11 +854,7 @@ void bigChestUpdate(uint8_t index) {
             break;
         case BIG_CHEST_STATE_OPENED:
             GLOBAL_ActiveLevel.swapCloudPal = true;
-            // Only spawn the orb once when entering OPENED state
-            if (!this->data.bigChest.orbSpawned) {
-                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
-                this->data.bigChest.orbSpawned = true;
-            }
+            initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
             // Don't set to OBJ_UNUSED - keep as OBJ_BIG_CHEST so bottom tiles (GIDs 112, 113) remain visible
             // Top tiles are already cleared by the rendering logic checking state != IDLE
             this->flags |= OBJ_FLAG_DIRTY;
@@ -874,38 +869,32 @@ void doubleDashOrbInit(uint8_t index) {
     this->extraSpriteCount = 0;
     this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
-    // Initialize speed: starts at -4 (initial upward velocity)
-    this->data.doubleJumpOrb.speedY = -4;  // -2 * 2 (initial speed)
-    this->data.doubleJumpOrb.accelAccumulator = 0;
+    this->data.doubleJumpOrb.frameCount = 0;
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
 PORT_FUNC_BANK6
 void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    
-    // If already collected/unused, just mark dirty and return
-    if (this->eType == OBJ_UNUSED) {
-        this->flags |= OBJ_FLAG_DIRTY;
-        return;
-    }
-    
-    //Speed starts at -4 and increases by 0.5 every frame (gravity effect)
+    //Speed starts at -8 and goes down by 0.5 every frame
     //alternatively 1 every 2 frames
+    static int16_t speedY = -4;  // -2 * 2 (initial speed)
+    static int16_t accelAccumulator = 0;
 
     this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->flags |= OBJ_FLAG_DIRTY;
 
-    // Every frame: apply gravity
-    this->data.doubleJumpOrb.accelAccumulator += 1;  // 0.5 * 2
-    if (this->data.doubleJumpOrb.accelAccumulator >= 4) {  // 2 * 2
-        this->data.doubleJumpOrb.speedY += this->data.doubleJumpOrb.accelAccumulator / 4;
-        this->data.doubleJumpOrb.accelAccumulator %= 4;
+    // Every frame:
+    accelAccumulator += 1;  // 0.5 * 2
+    if (accelAccumulator >= 4) {  // 2 * 2
+        speedY += accelAccumulator / 4;
+        accelAccumulator %= 4;
     }
 
-    // When speed becomes positive (falling), check for player collision
-    if (this->data.doubleJumpOrb.speedY >= 0) {
+
+
+    if (speedY >= 0) {
         bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 16) && 
                                 (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 16) && 
                                 (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 16) && 
@@ -922,8 +911,7 @@ void doubleDashOrbUpdate(uint8_t index) {
         }
     }
     else {
-        // Still moving upward, apply movement
-        this->pos.y += this->data.doubleJumpOrb.speedY;
+        this->pos.y += speedY;
     }
 }
 
@@ -1310,7 +1298,7 @@ int main(void){
 	//Variables
 	static int something = 5;
 	int8_t regRead1; //Variable for storing hardware registers
-	int8_t regRead2; //Variable for Ctoring hardware registers
+	int8_t regRead2; //Variable for storing hardware registers
 	uint8_t *test_heap;
 	uint32_t counter = 40000;
 	uint32_t i;
@@ -1322,7 +1310,7 @@ int main(void){
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_ActiveLevel.currentRoomID = 4; //12 for monument 20, 22 for big chest
+    GLOBAL_ActiveLevel.currentRoomID = 1; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
 
     for (;;) { 
@@ -1911,7 +1899,6 @@ void playerUpdate(struct sPlayerData* this) {
 
     // next level
     if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
-        // LoadNextRoom and LoadRoomData are in fixed bank, and LoadRoomData already calls playerInit
         // We're currently in bank 6, but we need to switch back to fixed bank before calling LoadNextRoom
         // LoadNextRoom will handle its own bank switching
         port_prg_bank_switch(0);  // Switch back to fixed bank before calling LoadNextRoom
@@ -1942,7 +1929,6 @@ void playerUpdate(struct sPlayerData* this) {
     this->objData.oamTile = (uint8_t)this->eSriteState;
     this->objData.oamProps = this->isFliped ? (uint8_t)(0x38u | 0x40u) : 0x38u;
     this->objData.flags |= OBJ_FLAG_DIRTY;
-    port_prg_bank_switch(0);  // Switch back to fixed bank
 }
 
 
@@ -2012,9 +1998,8 @@ void onVblank(void) {
     if ((GLOBAL_FrameCount % (60*4)) == 0) {
         static uint16_t lastVBlankAmount = 0;
         static uint16_t lastFrameCount = 0;
-        lastVBlankAmount = GLOBAL_FrameCountVBLANK;
+        lastVBlankAmount = 0;  // GLOBAL_FrameCountVBLANK removed
         lastFrameCount = GLOBAL_FrameCount;
-        GLOBAL_FrameCountVBLANK = 0;
         GLOBAL_FrameCount = 0;
         //sprintf(testStringRam, "FPS: %02d", (uint16_t)((lastFrameCount * 60) / lastVBlankAmount));
         port_drawText((const unsigned char *)testStringRam, 0, 0);
@@ -2038,4 +2023,6 @@ void onVblank(void) {
     playerUpdate(&GLOBAL_PlayerData);
     port_updatePlayerSprite(&GLOBAL_PlayerData);
 }
+
+
 

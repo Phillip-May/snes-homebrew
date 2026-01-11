@@ -128,11 +128,9 @@ typedef struct sOBJ_DATA {
         struct sBigChestData {
             uint8_t state;
             uint8_t frameCount;
-            bool orbSpawned;
         } bigChest;
         struct sDoubleJumpOrbData {
-            int16_t speedY;
-            int16_t accelAccumulator;
+            int8_t frameCount;
         } doubleJumpOrb;
     } data;
     
