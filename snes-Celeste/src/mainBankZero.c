@@ -848,13 +848,18 @@ void bigChestUpdate(uint8_t index) {
             this->data.bigChest.frameCount += 1;
             if (this->data.bigChest.frameCount > 120) {
                 this->data.bigChest.state = BIG_CHEST_STATE_OPENED;
+                this->data.bigChest.frameCount = 0; // Reset to 0 to use as flag for orb creation
                 // Queue nametable update to show open state (top tiles cleared)
                 port_updateCollapseTileNametable(index);
             }
             break;
         case BIG_CHEST_STATE_OPENED:
             GLOBAL_ActiveLevel.swapCloudPal = true;
-            initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
+            // Only create the orb once - use frameCount as a flag (0 = not created, non-zero = created)
+            if (this->data.bigChest.frameCount == 0) {
+                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
+                this->data.bigChest.frameCount = 1; // Mark as created
+            }
             // Don't set to OBJ_UNUSED - keep as OBJ_BIG_CHEST so bottom tiles (GIDs 112, 113) remain visible
             // Top tiles are already cleared by the rendering logic checking state != IDLE
             this->flags |= OBJ_FLAG_DIRTY;
@@ -870,6 +875,8 @@ void doubleDashOrbInit(uint8_t index) {
     this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->data.doubleJumpOrb.frameCount = 0;
+    this->data.doubleJumpOrb.speedY = -4;  // -2 * 2 (initial speed)
+    this->data.doubleJumpOrb.accelAccumulator = 0;
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
@@ -878,23 +885,24 @@ void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Speed starts at -8 and goes down by 0.5 every frame
     //alternatively 1 every 2 frames
-    static int16_t speedY = -4;  // -2 * 2 (initial speed)
-    static int16_t accelAccumulator = 0;
+    // Use per-orb data instead of static variables so each orb has its own speed
+    int16_t *speedY = &this->data.doubleJumpOrb.speedY;
+    int16_t *accelAccumulator = &this->data.doubleJumpOrb.accelAccumulator;
 
     this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->flags |= OBJ_FLAG_DIRTY;
 
     // Every frame:
-    accelAccumulator += 1;  // 0.5 * 2
-    if (accelAccumulator >= 4) {  // 2 * 2
-        speedY += accelAccumulator / 4;
-        accelAccumulator %= 4;
+    *accelAccumulator += 1;  // 0.5 * 2
+    if (*accelAccumulator >= 4) {  // 2 * 2
+        *speedY += *accelAccumulator / 4;
+        *accelAccumulator %= 4;
     }
 
 
 
-    if (speedY >= 0) {
+    if (*speedY >= 0) {
         bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 16) && 
                                 (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 16) && 
                                 (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 16) && 
@@ -911,7 +919,7 @@ void doubleDashOrbUpdate(uint8_t index) {
         }
     }
     else {
-        this->pos.y += speedY;
+        this->pos.y += *speedY;
     }
 }
 
@@ -1193,6 +1201,7 @@ static void processObject(uint8_t index)
         port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
         doubleDashOrbUpdate(index);
+        // Check obj->eType again in case it was set to OBJ_UNUSED during update
         port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_KEY) {
         keyUpdate(index);
@@ -1310,7 +1319,7 @@ int main(void){
     //Player is hardcoded to slot 0 for now
     //Setup game state
     GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_ActiveLevel.currentRoomID = 1; //12 for monument 20, 22 for big chest
+    GLOBAL_ActiveLevel.currentRoomID = 22; //12 for monument 20, 22 for big chest
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
 
     for (;;) { 

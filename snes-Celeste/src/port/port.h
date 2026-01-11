@@ -131,6 +131,8 @@ typedef struct sOBJ_DATA {
         } bigChest;
         struct sDoubleJumpOrbData {
             int8_t frameCount;
+            int16_t speedY;
+            int16_t accelAccumulator;
         } doubleJumpOrb;
     } data;
     
