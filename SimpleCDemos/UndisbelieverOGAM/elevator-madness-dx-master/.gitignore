@@ -1,0 +1,13 @@
+*.swp
+*~
+
+states.gv.png
+
+bin
+obj
+unit_tests/bin
+resources/*/*.2bpp
+resources/*/*.4bpp
+resources/*/*.map
+resources/*/*.clr
+

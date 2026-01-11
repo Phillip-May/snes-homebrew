@@ -1,0 +1,97 @@
+// This Graph documents the various states of the
+// system and how the interact with each other.
+
+digraph Combined {
+	node [shape=box, fontsize=12, fixedsize=true, width=1.8, height=0.25];
+	graph [color=blue];
+	newrank = true;
+	overlap = false;
+
+	subgraph clusterPlayer {
+		label="Player";
+		sortv=1;
+
+		WALKING -> JUMPING;
+		WALKING -> FALLING;
+		WALKING -> PUSH_BUTTON;
+
+		JUMPING -> FALLING
+
+		FALLING -> WALKING;
+
+		PUSH_BUTTON -> WALKING;
+
+		{ rank=same; JUMPING; FALLING; PUSH_BUTTON; }
+	}
+
+	subgraph clusterElevator {
+		label="Elevator";
+		sortv=2;
+
+		DOOR_CLOSED -> DOOR_OPENING -> DOOR_OPEN;
+		DOOR_OPEN -> DOOR_CLOSING -> DOOR_CLOSED;
+
+		DOOR_OPEN -> NPC_LEAVING -> DOOR_OPEN;
+		DOOR_OPEN -> NPC_ENTERING -> DOOR_OPEN;
+
+		DOOR_CLOSED -> MOVING_UP -> DOOR_CLOSED;
+		DOOR_CLOSED -> MOVING_DOWN -> DOOR_CLOSED;
+
+		MOVING_UP -> CRASHED;
+		MOVING_DOWN -> CRASHED;
+
+		CRASHED[fontcolor=red];
+
+		{ rank=same; DOOR_CLOSING; DOOR_OPENING; }
+		{ rank=same; NPC_LEAVING; NPC_ENTERING }
+	}
+
+	subgraph clusterNPC {
+		label="NPC";
+		sortv=3;
+
+		WALK_TO_ELEVATOR -> WAIT_IN_LINE;
+
+		WAIT_IN_LINE ->	ENTER_ELEVATOR;
+		WAIT_IN_LINE -> FIGHTING;
+
+		ENTER_ELEVATOR -> WAIT_DOOR_CLOSE;
+
+		WAIT_DOOR_CLOSE -> LIMBO -> WAIT_DOOR_OPEN[style = dashed];
+
+		WAIT_DOOR_OPEN -> WRONG_FLOOR;
+
+		WAIT_DOOR_OPEN -> EXIT_ELEVATOR;
+
+		EXIT_ELEVATOR -> WALK_OFFSCREEN;
+
+		LIMBO[shape=oval]
+		FIGHTING[fontcolor=red]
+		WRONG_FLOOR[fontcolor=red]
+		WALK_OFFSCREEN[fontcolor=darkgreen]
+	}
+
+	// Player - Elevator links.
+	edge[style=dashed, color=darkorange];
+	PUSH_BUTTON -> MOVING_UP;
+	PUSH_BUTTON -> MOVING_DOWN;
+	PUSH_BUTTON -> DOOR_OPENING;
+	PUSH_BUTTON -> DOOR_CLOSING;
+
+	// Elevator - NPC links.
+	edge[style=dashed, color=goldenrod];
+	ENTER_ELEVATOR -> NPC_ENTERING;
+	DOOR_CLOSED -> WAIT_DOOR_CLOSE;
+	DOOR_OPEN -> WAIT_DOOR_OPEN;
+	EXIT_ELEVATOR -> NPC_LEAVING;
+
+	// Make it look neat
+	{ rank=same WALKING; WALK_TO_ELEVATOR; }
+	{ rank=same DOOR_CLOSED; WAIT_DOOR_CLOSE; }
+	{ rank=same NPC_ENTERING; EXIT_ELEVATOR; }
+	{ rank=same WRONG_FLOOR; WAIT_DOOR_OPEN; }
+	{ rank=same LIMBO; MOVING_DOWN; }
+	{ rank=same WAIT_DOOR_OPEN; DOOR_OPEN; }
+	{ rank=same WALK_OFFSCREEN; EXIT_ELEVATOR; }
+}
+
