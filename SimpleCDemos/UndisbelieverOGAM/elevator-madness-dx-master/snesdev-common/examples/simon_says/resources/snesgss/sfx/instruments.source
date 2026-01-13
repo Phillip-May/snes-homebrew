@@ -1,0 +1,20 @@
+
+square-7th-med - Square 7th Harmonic
+====================================
+Author: The UnDisbeliever
+License: CC0
+
+Created with a sine wave generator.
+
+Code:
+	w = 2 * M_PI * i / S_RATE * 500;
+	sample[i] = (sin(w) + 0.75*sin(w*3) + 0.5*sin(w*5)+0.14*sin(w*7)+0.5*sin(w*9)+0.12*sin(11*w)+0.17*sin(w*13))/(1+.75+.5+.14+.17);
+
+
+square-25 - Square wave 25% duty cycle
+======================================
+Author: The UnDisbeliever
+License: CC0
+
+Created with Audacity's tone generator.
+

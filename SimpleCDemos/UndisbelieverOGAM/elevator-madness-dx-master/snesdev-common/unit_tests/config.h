@@ -1,0 +1,5 @@
+
+.define VERSION 1
+.define REGION NTSC
+.define ROM_NAME "SNESDEV-COMMON TESTS"
+

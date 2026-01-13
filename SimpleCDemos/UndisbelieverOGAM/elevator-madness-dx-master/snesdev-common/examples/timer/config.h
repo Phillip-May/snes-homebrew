@@ -1,0 +1,6 @@
+.define VERSION 1
+.define REGION PAL
+.define ROM_NAME "TIMER"
+
+TEXT_N_WINDOWS = 2
+
