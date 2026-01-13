@@ -26,5 +26,3 @@ void snesXC_abort(void) {
 void snesXC_nmi(void) {
 }
 
-void snesXC_irq(void) {
-}

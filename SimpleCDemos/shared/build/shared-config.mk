@@ -110,6 +110,8 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	POST_LINK = 
 	LLVM_MOS_PATH = C:\llvm-mos
 	COMPILER_NAME = llvm-mos
+	# Map file generation (can be overridden by project Makefiles)
+	MAP_FILE = $(BUILD_DIR)/mainBankZero_llvm-mos.map
 endif
 
 # CC65 Configuration

@@ -203,7 +203,6 @@ void main(void){
 	}
 }
 
-// snesXC_irq removed - using assembly buffer for per-scanline palette updates
 
 // Cross-compiler interrupt handler implementations
 void snesXC_cop(void) {

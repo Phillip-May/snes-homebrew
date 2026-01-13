@@ -12,6 +12,7 @@ ASSERT(__rc31 == 0x001f, "Inconsistent zero page map.")
 MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x100 - (__rc31 + 1)
     ram (rw) : ORIGIN = 0x0200, LENGTH = 0x1C00
+    bank_7e_ram (rw) : ORIGIN = 0x7E2000, LENGTH = 0xE000
     rom_bank_0 (rx) : ORIGIN = 0x8000,  LENGTH = 0x8000
 }
 
@@ -42,7 +43,18 @@ SECTIONS {
     *(.bss .bss.*)
     *(COMMON)
     . = ALIGN(2);
-  } >ram  
+  } >ram
+  
+  /* Bank 7E RAM section for data that should be in bank 7E */
+  .bank_7e_data : {
+    *(.bank_7e_data .bank_7e_data.*)
+    . = ALIGN(2);
+  } >bank_7e_ram
+  
+  .bank_7e_bss : {
+    *(.bank_7e_bss .bank_7e_bss.*)
+    . = ALIGN(2);
+  } >bank_7e_ram  
   
   /* SNES Interrupt Vectors - Native Mode */
   .vectors_native 0xFFE4 : {
