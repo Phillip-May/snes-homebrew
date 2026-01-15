@@ -1230,5 +1230,114 @@ union uOAMCopy{
 //void snesXC_nmi(void);   // NMI (Non-Maskable Interrupt)
 //void snesXC_irq(void);   // IRQ (Interrupt Request)
 
+// =============================================================================
+// Bank Switching Functions
+// =============================================================================
+// For llvm-mos: Real bank switching functions (implemented in bankswitch.s)
+// For other compilers: No-ops (flat memory model)
+
+#ifdef __mos__
+// LLVM-MOS: Real bank switching functions
+extern void asm_init65816(void);  // Initialize 65816 to native mode
+extern void asm_switch_to_code_bank_0(void);
+extern void asm_switch_to_code_bank_1(void);
+extern void asm_switch_to_code_bank_2(void);
+extern void asm_switch_to_code_bank_3(void);
+
+extern void asm_switch_to_const_bank_0(void);
+extern void asm_switch_to_const_bank_1(void);
+extern void asm_switch_to_const_bank_2(void);
+extern void asm_switch_to_const_bank_3(void);
+
+extern uint8_t asm_get_data_bank(void);
+
+extern void asm_setDB00(void);  // Set DBR to $00 for lower RAM access
+extern void asm_setDB7E(void);  // Set DBR to $7E for WRAM access
+
+// Convenience macros for code banks
+#define SET_CODE_BANK_0() asm_switch_to_code_bank_0()
+#define SET_CODE_BANK_1() asm_switch_to_code_bank_1()
+#define SET_CODE_BANK_2() asm_switch_to_code_bank_2()
+#define SET_CODE_BANK_3() asm_switch_to_code_bank_3()
+
+// Convenience macros for ROM const data banks
+#define SET_CONST_BANK_0() asm_switch_to_const_bank_0()
+#define SET_CONST_BANK_1() asm_switch_to_const_bank_1()
+#define SET_CONST_BANK_2() asm_switch_to_const_bank_2()
+#define SET_CONST_BANK_3() asm_switch_to_const_bank_3()
+
+// Convenience macros for RAM banking
+#define SET_DB_00() asm_setDB00()  // Access lower RAM (bank $00)
+#define SET_DB_7E() asm_setDB7E()  // Access WRAM (bank $7E)
+
+// Section attributes for bank placement (llvm-mos only)
+// Note: noinline prevents functions from being inlined, ensuring they stay in their designated banks
+#define BANK0_FUNC __attribute__((section(".text.bank0"), noinline))
+#define BANK1_FUNC __attribute__((section(".text.bank1"), noinline))
+#define BANK2_FUNC __attribute__((section(".text.bank2"), noinline))
+#define BANK3_FUNC __attribute__((section(".text.bank3"), noinline))
+#define BANK0_CRITICAL __attribute__((section(".text.bank0_critical"), noinline))
+
+#define BANK0_CONST __attribute__((section(".rodata.bank0")))
+#define BANK1_CONST __attribute__((section(".rodata.bank1")))
+#define BANK2_CONST __attribute__((section(".rodata.bank2")))
+#define BANK3_CONST __attribute__((section(".rodata.bank3")))
+
+// RAM section attributes for WRAM (bank $7E)
+// BANK7E_DATA: Compiler automatically chooses .bank_7e_data or .bank_7e_bss based on initialization
+// For zero-initialized data, compiler uses .bank_7e_bss (saves ROM space)
+// For initialized data, compiler uses .bank_7e_data (initializers in ROM)
+#define BANK7E_DATA __attribute__((section(".bank_7e_bss")))
+
+#else
+// Other compilers: Flat memory model - no-ops
+static inline void asm_init65816(void) { }
+static inline void asm_switch_to_code_bank_0(void) { }
+static inline void asm_switch_to_code_bank_1(void) { }
+static inline void asm_switch_to_code_bank_2(void) { }
+static inline void asm_switch_to_code_bank_3(void) { }
+
+static inline void asm_switch_to_const_bank_0(void) { }
+static inline void asm_switch_to_const_bank_1(void) { }
+static inline void asm_switch_to_const_bank_2(void) { }
+static inline void asm_switch_to_const_bank_3(void) { }
+
+static inline uint8_t asm_get_data_bank(void) { return 0; }
+
+static inline void asm_setDB00(void) { }
+static inline void asm_setDB7E(void) { }
+
+// Convenience macros for code banks (no-ops for flat memory model)
+#define SET_CODE_BANK_0() ((void)0)
+#define SET_CODE_BANK_1() ((void)0)
+#define SET_CODE_BANK_2() ((void)0)
+#define SET_CODE_BANK_3() ((void)0)
+
+// Convenience macros for ROM const data banks (no-ops for flat memory model)
+#define SET_CONST_BANK_0() ((void)0)
+#define SET_CONST_BANK_1() ((void)0)
+#define SET_CONST_BANK_2() ((void)0)
+#define SET_CONST_BANK_3() ((void)0)
+
+// Convenience macros for RAM banking (no-ops for flat memory model)
+#define SET_DB_00() ((void)0)
+#define SET_DB_7E() ((void)0)
+
+// Section attributes are no-ops for flat memory model
+#define BANK0_FUNC
+#define BANK1_FUNC
+#define BANK2_FUNC
+#define BANK3_FUNC
+#define BANK0_CRITICAL
+
+#define BANK0_CONST
+#define BANK1_CONST
+#define BANK2_CONST
+#define BANK3_CONST
+
+// RAM section attributes (no-ops for flat memory model)
+#define BANK7E_DATA
+#endif
+
 #endif //__SNES_REGS_H
 

@@ -37,7 +37,13 @@ COP:
     pha
     lda $07
     pha
+    ; Save current Program Bank Register (PBR) - interrupts can occur in any bank
+    ; NOTE: PBR restoration is complex (requires JML) and not fully implemented here
+    ; Interrupt handlers must be in bank 0, and interrupts should ideally occur when in bank 0
+    phk             ; Push current PBR to stack (saved for potential future use)
+    ; Call user handler (must be in bank 0)
     jsr snesXC_cop
+    ; NOTE: PBR is not restored here - restoration would require JML which is incompatible with normal return
     ; Restore zero page registers
     pla
     sta $07
@@ -55,6 +61,10 @@ COP:
     sta $01
     pla
     sta $00
+    ; NOTE: PBR was saved with PHK but cannot be easily restored here
+    ; (would require JML which is a jump, incompatible with normal return)
+    ; Pull the saved PBR value from stack (discard it for now)
+    pla             ; Discard saved PBR value
     plp
     pla
     tay
@@ -89,7 +99,13 @@ BRK:
     pha
     lda $07
     pha
+    ; Save current Program Bank Register (PBR) - interrupts can occur in any bank
+    ; NOTE: PBR restoration is complex (requires JML) and not fully implemented here
+    ; Interrupt handlers must be in bank 0, and interrupts should ideally occur when in bank 0
+    phk             ; Push current PBR to stack (saved for potential future use)
+    ; Call user handler (must be in bank 0)
     jsr snesXC_brk
+    ; NOTE: PBR is not restored here - restoration would require JML which is incompatible with normal return
     ; Restore zero page registers
     pla
     sta $07
@@ -107,6 +123,10 @@ BRK:
     sta $01
     pla
     sta $00
+    ; NOTE: PBR was saved with PHK but cannot be easily restored here
+    ; (would require JML which is a jump, incompatible with normal return)
+    ; Pull the saved PBR value from stack (discard it for now)
+    pla             ; Discard saved PBR value
     plp
     pla
     tay
@@ -141,7 +161,13 @@ ABORT:
     pha
     lda $07
     pha
+    ; Save current Program Bank Register (PBR) - interrupts can occur in any bank
+    ; NOTE: PBR restoration is complex (requires JML) and not fully implemented here
+    ; Interrupt handlers must be in bank 0, and interrupts should ideally occur when in bank 0
+    phk             ; Push current PBR to stack (saved for potential future use)
+    ; Call user handler (must be in bank 0)
     jsr snesXC_abort
+    ; NOTE: PBR is not restored here - restoration would require JML which is incompatible with normal return
     ; Restore zero page registers
     pla
     sta $07
@@ -159,6 +185,10 @@ ABORT:
     sta $01
     pla
     sta $00
+    ; NOTE: PBR was saved with PHK but cannot be easily restored here
+    ; (would require JML which is a jump, incompatible with normal return)
+    ; Pull the saved PBR value from stack (discard it for now)
+    pla             ; Discard saved PBR value
     plp
     pla
     tay
@@ -193,9 +223,15 @@ NMI:
     pha
     lda $07
     pha
+    ; Save current Program Bank Register (PBR) - interrupts can occur in any bank
+    ; NOTE: PBR restoration is complex (requires JML) and not fully implemented here
+    ; Interrupt handlers must be in bank 0, and interrupts should ideally occur when in bank 0
+    phk             ; Push current PBR to stack (saved for potential future use)
     ; Acknowledge NMI interrupt
     lda $4210       ; Read NMI status to acknowledge
+    ; Call user handler (must be in bank 0)
     jsr snesXC_nmi
+    ; NOTE: PBR is not restored here - restoration would require JML which is incompatible with normal return
     ; Restore zero page registers
     pla
     sta $07
@@ -247,9 +283,15 @@ IRQ:
     pha
     lda $07
     pha
+    ; Save current Program Bank Register (PBR) - interrupts can occur in any bank
+    ; NOTE: PBR restoration is complex (requires JML) and not fully implemented here
+    ; Interrupt handlers must be in bank 0, and interrupts should ideally occur when in bank 0
+    phk             ; Push current PBR to stack (saved for potential future use)
     ; Acknowledge IRQ interrupt
     lda $4211       ; Read IRQ status to acknowledge
+    ; Call user handler (must be in bank 0)
     jsr snesXC_irq
+    ; NOTE: PBR is not restored here - restoration would require JML which is incompatible with normal return
     ; Restore zero page registers
     pla
     sta $07
@@ -267,6 +309,10 @@ IRQ:
     sta $01
     pla
     sta $00
+    ; NOTE: PBR was saved with PHK but cannot be easily restored here
+    ; (would require JML which is a jump, incompatible with normal return)
+    ; Pull the saved PBR value from stack (discard it for now)
+    pla             ; Discard saved PBR value
     plp
     pla
     tay

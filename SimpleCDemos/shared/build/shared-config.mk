@@ -210,7 +210,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
-	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/vectors.s $(SHARED_PORT_DIR)/llvm-mos/startup.s
+	ASM_SOURCES = $(SHARED_PORT_DIR)/llvm-mos/vectors.s $(SHARED_PORT_DIR)/llvm-mos/startup.s $(SHARED_PORT_DIR)/llvm-mos/bankswitch.s
 	OBJECTS = 
 	vpath %.c $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
 	vpath %.s $(SHARED_PORT_DIR)/llvm-mos
