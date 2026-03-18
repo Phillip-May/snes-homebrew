@@ -353,11 +353,12 @@ def load_tile_override(platform, tile_index):
     """
     Searches override directories for a tile override.
 
-    Looks for the group spritesheet ({group_name}.png) and extracts the correct
-    frame by position. Also checks for a .pal sidecar.
+    Returns the 16x16 frame directly (no downscaling). The converter
+    splits it into four 8x8 NES tiles for CHR, or downscales if needed
+    for palette quantization.
 
     Returns:
-        (PIL.Image, palette_or_None) if override found, (None, None) otherwise.
+        (PIL.Image 16x16, palette_or_None) if override found, (None, None) otherwise.
     """
     group_info = get_tile_group(tile_index)
 
@@ -373,9 +374,7 @@ def load_tile_override(platform, tile_index):
 
         try:
             sheet = Image.open(override_path)
-            expected_frames = len(TILE_GROUPS[group_name])
 
-            # Validate sheet dimensions (16x16 per frame)
             if sheet.height != 16:
                 print(f"  [OVERRIDE WARNING] {override_path} height is {sheet.height}, expected 16")
                 return None, None
@@ -383,9 +382,7 @@ def load_tile_override(platform, tile_index):
                 print(f"  [OVERRIDE WARNING] {override_path} is too narrow for frame {frame_idx}")
                 return None, None
 
-            # Crop out the 16x16 frame and scale back to 8x8 for the converter
             override_img = sheet.crop((frame_idx * 16, 0, (frame_idx + 1) * 16, 16))
-            override_img = override_img.resize((8, 8), Image.NEAREST)
 
             # bpp validation (warn only - converter will quantize)
             if tile_index not in OBJECT_GIDS:
@@ -394,7 +391,6 @@ def load_tile_override(platform, tile_index):
                 if colors and len(colors) > 4:
                     print(f"  [OVERRIDE WARNING] {override_path} frame {frame_idx} has {len(colors)} colors but tile {tile_index} is 2bpp (max 4). Colors will be quantized.")
 
-            # Check for palette sidecar
             override_pal = None
             pal_path = get_override_path(platform, f'tiles/{render_type}/{group_name}', pal_name)
             if pal_path:
@@ -406,9 +402,6 @@ def load_tile_override(platform, tile_index):
             print(f"  [OVERRIDE ERROR] Failed to load {override_path}: {e}")
             return None, None
     else:
-        # Unmapped tile: look for other.png spritesheet
-        # We can't know the frame position without the export, so fall back to
-        # individual file: other/tile_NNN.png
         filename = f"tile_{tile_index:03d}.png"
         pal_filename = f"tile_{tile_index:03d}.pal"
 
@@ -418,9 +411,10 @@ def load_tile_override(platform, tile_index):
 
         try:
             override_img = Image.open(override_path)
-            if override_img.size == (16, 16):
-                override_img = override_img.resize((8, 8), Image.NEAREST)
-            elif override_img.size != (8, 8):
+            # Accept 8x8 or 16x16; upscale 8x8 to 16x16
+            if override_img.size == (8, 8):
+                override_img = override_img.resize((16, 16), Image.NEAREST)
+            elif override_img.size != (16, 16):
                 print(f"  [OVERRIDE WARNING] {override_path} is {override_img.size}, expected (16, 16) or (8, 8)")
                 return None, None
 

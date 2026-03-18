@@ -14,8 +14,8 @@ __attribute__((section(".prg_rom_5")))
 #endif
 const unsigned char gid_to_tile_monument[1][18] = {
     // GID 70 - MONUMENT (composed of sprites 70, 71, 86, 87)
-    // 4x4 grid: Row 1: 0, 0, 0, 0 | Row 2: 187, 188, 189, 190 | Row 3: 207, 208, 211, 212 | Row 4: 209, 210, 213, 214
-    { 0, 0, 0, 0, 187, 188, 189, 190, 207, 208, 211, 212, 209, 210, 213, 214, 0, 0 }
+    // 4x4 grid: Row 1: 0, 0, 0, 0 | Row 2: 200, 201, 202, 203 | Row 3: 221, 222, 224, 225 | Row 4: 223, 125, 125, 226
+    { 0, 0, 0, 0, 200, 201, 202, 203, 221, 222, 224, 225, 223, 125, 125, 226, 0, 0 }
 };
 
 #define GID_TO_TILE_MONUMENT_COUNT 1

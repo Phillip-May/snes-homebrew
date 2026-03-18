@@ -22,7 +22,7 @@ __attribute__((section(".prg_rom_1"))) const unsigned char tilemap_level18_compr
     0x2c, 0xd5, 0xcf, 0x0a, 0xd0, 0xc0, 0xc7, 0xd3, 0xe8, 0xda, 0xd5, 0xe8, 0xc0, 0xc0, 0xdb, 0xc1,
     0xd5, 0xc1, 0xc0, 0xc0, 0xc0, 0xc0, 0xc1, 0xc1, 0xcd, 0xc9, 0xc0, 0xc0, 0xc0, 0xc0, 0xcd, 0xc6,
     0xc1, 0xe1, 0x12, 0xd5, 0xe2, 0xc0, 0x00, 0xc4, 0xc0, 0xc6, 0xc1, 0xc1, 0x12, 0x2d, 0x26, 0xd0,
-    0xc0, 0xc0, 0xc0, 0xc0, 0xc1, 0xc1, 0xf9, 0xd0, 0xc0, 0xc0, 0xc0, 0xca, 0xca, 0xcd, 0x2d, 0x23,
+    0xc0, 0xc0, 0xc0, 0xc0, 0xc1, 0xc1, 0xf8, 0xd0, 0xc0, 0xc0, 0xc0, 0xca, 0xca, 0xcd, 0x2d, 0x23,
     0xd0, 0x11, 0xce, 0x01, 0xca, 0x1f, 0xd9, 0x17, 0xe0, 0xc9, 0xc0, 0x0c, 0xd1, 0xfb, 0x15, 0xe4,
     0xc6, 0xc1, 0xc7, 0xd3, 0x09, 0xc2, 0xc2, 0xea, 0xc0, 0xc5, 0xc9, 0xc0, 0xc1
 };
@@ -52,13 +52,13 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_background_le
 // Palette 3 is reserved for player sprites
 __attribute__((section(".prg_rom_1"))) const unsigned char palette_sprite_level18[4][4] = {
     // Sprite Palette 0
-    { 0x0d, 0x15, 0x28, 0x1b },
+    { 0x0d, 0x15, 0x1b, 0x36 },
     // Sprite Palette 1
-    { 0x0d, 0x37, 0x15, 0x10 },
+    { 0x0d, 0x31, 0x28, 0x00 },
     // Sprite Palette 2
-    { 0x0d, 0x28, 0x27, 0x17 },
+    { 0x0d, 0x15, 0x18, 0x37 },
     // Sprite Palette 3 (Player)
-    { 0x0d, 0x15, 0x37, 0x1b }
+    { 0x0d, 0x15, 0x36, 0x1b }
 };
 
 #define PALETTE_SPRITE_LEVEL18_COUNT 4
@@ -81,28 +81,28 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_level18[] = {
 __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level18[] = {
     // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
     1, 3, 1, 2, 3, 4,
-    2, 3, 1, 2, 3, 5,
-    3, 3, 6, 7, 8, 9,
-    4, 3, 1, 2, 10, 4,
-    5, 3, 11, 12, 13, 14,
-    6, 3, 15, 16, 17, 18,
-    7, 3, 19, 20, 21, 22,
-    9, 2, 27, 28, 29, 26,
-    10, 0, 0, 30, 0, 30,
-    11, 1, 31, 32, 0, 0,
-    12, 1, 33, 34, 0, 0,
-    13, 1, 35, 36, 37, 38,
-    14, 1, 0, 39, 40, 0,
-    15, 1, 40, 0, 0, 39,
-    22, 1, 57, 58, 59, 60,
-    23, 1, 61, 62, 63, 64,
-    29, 1, 83, 84, 85, 86,
-    30, 1, 87, 88, 89, 90,
-    31, 1, 91, 92, 93, 94,
-    45, 1, 123, 124, 125, 126,
-    46, 1, 0, 0, 127, 128,
-    47, 1, 0, 0, 129, 16,
-    64, 1, 99, 170, 171, 102,
+    2, 3, 5, 6, 7, 8,
+    3, 3, 9, 10, 11, 12,
+    4, 3, 1, 2, 13, 14,
+    5, 3, 15, 16, 17, 18,
+    6, 3, 19, 20, 21, 22,
+    7, 3, 23, 24, 25, 26,
+    9, 2, 31, 32, 33, 30,
+    10, 2, 0, 30, 0, 30,
+    11, 1, 34, 35, 0, 0,
+    12, 1, 36, 37, 0, 0,
+    13, 1, 38, 39, 40, 41,
+    14, 1, 42, 43, 44, 45,
+    15, 1, 46, 47, 48, 49,
+    22, 0, 68, 69, 70, 71,
+    23, 1, 72, 73, 74, 75,
+    29, 2, 94, 95, 96, 97,
+    30, 2, 98, 99, 100, 101,
+    31, 2, 102, 103, 104, 105,
+    45, 1, 134, 135, 136, 137,
+    46, 1, 0, 0, 138, 139,
+    47, 1, 0, 0, 140, 141,
+    64, 1, 110, 183, 184, 113,
 };
 
 #define OBJECT_SPRITE_LEVEL18_COUNT 23
@@ -112,11 +112,11 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level18
 // Note: Palette 3 is reserved for the player
 __attribute__((section(".prg_rom_1"))) const unsigned char palette_object_level18[3][4] = {
     // Object Palette 0
-    { 0x0d, 0x15, 0x28, 0x1b },
+    { 0x0d, 0x15, 0x1b, 0x36 },
     // Object Palette 1
-    { 0x0d, 0x37, 0x15, 0x10 },
+    { 0x0d, 0x31, 0x28, 0x00 },
     // Object Palette 2
-    { 0x0d, 0x28, 0x27, 0x17 }
+    { 0x0d, 0x15, 0x18, 0x37 }
 };
 
 #define PALETTE_OBJECT_LEVEL18_COUNT 3

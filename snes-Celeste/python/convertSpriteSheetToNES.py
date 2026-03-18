@@ -2398,8 +2398,8 @@ def main():
         out.putdata(snapped)
         return out
 
-    # Also store 16x16 versions for override tiles (avoids lossy 16->8->16 resize)
-    final_tile_16x16 = {}  # tile_index -> PIL.Image (16x16) for overrides only
+    # Store 16x16 versions for override tiles (used directly for CHR conversion)
+    final_tile_16x16 = {}  # tile_index -> PIL.Image (16x16)
 
     for y in range(num_rows):
         for x in range(tiles_per_row):
@@ -2410,23 +2410,13 @@ def main():
             # Export the original tile for future editing
             export_tile(tile_8x8, tile_index, platform='nes')
 
-            # Check for NES tile override
+            # Check for NES tile override (returns 16x16 directly)
             override_img, override_pal = load_tile_override('nes', tile_index)
             if override_img is not None:
-                # override_img is 8x8 (downsized from the 16x16 spritesheet frame)
-                # Re-load the 16x16 frame directly for CHR conversion
-                # to avoid lossy 16->8->16 round-trip
-                group_info = get_tile_group(tile_index)
-                if group_info:
-                    group_name, frame_idx = group_info
-                    sheet_path = get_override_path('nes', f'tiles/{group_name}', f'{group_name}.png')
-                    if sheet_path:
-                        sheet = Image.open(sheet_path)
-                        frame_16x16 = sheet.crop((frame_idx * 16, 0, (frame_idx + 1) * 16, 16))
-                        final_tile_16x16[tile_index] = snap_to_nes_palette(frame_16x16)
-
-                # Snap the 8x8 for palette quantization
-                tile_8x8 = snap_to_nes_palette(override_img)
+                # override_img is 16x16 — store snapped version for CHR
+                final_tile_16x16[tile_index] = snap_to_nes_palette(override_img)
+                # Downscale to 8x8 for palette quantization
+                tile_8x8 = snap_to_nes_palette(override_img.resize((8, 8), Image.NEAREST))
                 print(f"  [OVERRIDE] Tile {tile_index} from override file")
 
             final_tile_images[tile_index] = tile_8x8

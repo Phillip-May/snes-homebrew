@@ -475,15 +475,15 @@
    19764    19764       10     1                 palette_sprite_level31
    19774    19774        3     1                 object_level31
    19777    19777      174     1                 level_data
-   58000    58000      361     1 .prg_rom_5
-   58000    58000      361     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_5)
-   58000    58000      23a     1                 gid_to_tile_shared
-   5823a    5823a       5f     1                 gid_to_collision
-   58299    58299       12     1                 gid_to_tile_collapse
-   582ab    582ab       12     1                 gid_to_tile_breakable_wall
-   582bd    582bd       12     1                 gid_to_tile_monument
-   582cf    582cf       12     1                 gid_to_tile_big_chest
-   582e1    582e1       80     1                 compression_dict_shared
+   58000    58000      368     1 .prg_rom_5
+   58000    58000      368     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_5)
+   58000    58000      240     1                 gid_to_tile_shared
+   58240    58240       60     1                 gid_to_collision
+   582a0    582a0       12     1                 gid_to_tile_collapse
+   582b2    582b2       12     1                 gid_to_tile_breakable_wall
+   582c4    582c4       12     1                 gid_to_tile_monument
+   582d6    582d6       12     1                 gid_to_tile_big_chest
+   582e8    582e8       80     1                 compression_dict_shared
    68000    68000     3981     1 .prg_rom_6
    68000    68000     3606     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_6)
    68000    68000      8e4     1                 initObject

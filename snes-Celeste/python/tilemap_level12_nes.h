@@ -25,7 +25,7 @@ __attribute__((section(".prg_rom_1"))) const unsigned char tilemap_level12_compr
     0xc2, 0xc2, 0xe4, 0xc0, 0xc0, 0xf1, 0xc0, 0xf0, 0xdf, 0xc2, 0xf1, 0xc0, 0xc0, 0xc0, 0xc0, 0x31,
     0x33, 0x37, 0xcc, 0xd8, 0xd5, 0xc0, 0xc0, 0xc0, 0x00, 0x30, 0x32, 0x38, 0xfe, 0xd8, 0xc7, 0xc0,
     0xc0, 0x0f, 0xc0, 0x30, 0x32, 0x38, 0xcc, 0xd8, 0x0b, 0x1c, 0x11, 0xd5, 0x00, 0xe5, 0x01, 0x30,
-    0x32, 0x38, 0xcc, 0xee, 0xc1, 0x0c, 0xc4, 0xf5, 0xc8, 0x30, 0x32, 0x38, 0xe9, 0xc1, 0xc1, 0xc1,
+    0x32, 0x38, 0xcc, 0xee, 0xc1, 0x0c, 0xc4, 0xf4, 0xc8, 0x30, 0x32, 0x38, 0xe9, 0xc1, 0xc1, 0xc1,
     0x12
 };
 
@@ -54,13 +54,13 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_background_le
 // Palette 3 is reserved for player sprites
 __attribute__((section(".prg_rom_1"))) const unsigned char palette_sprite_level12[4][4] = {
     // Sprite Palette 0
-    { 0x0d, 0x15, 0x28, 0x1b },
+    { 0x0d, 0x15, 0x1b, 0x36 },
     // Sprite Palette 1
-    { 0x0d, 0x37, 0x15, 0x10 },
+    { 0x0d, 0x31, 0x28, 0x00 },
     // Sprite Palette 2
-    { 0x0d, 0x28, 0x27, 0x17 },
+    { 0x0d, 0x15, 0x18, 0x37 },
     // Sprite Palette 3 (Player)
-    { 0x0d, 0x15, 0x37, 0x1b }
+    { 0x0d, 0x15, 0x36, 0x1b }
 };
 
 #define PALETTE_SPRITE_LEVEL12_COUNT 4
@@ -82,32 +82,32 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_level12[] = {
 __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level12[] = {
     // Format: [tile_index, palette_index, tl_tile, tr_tile, bl_tile, br_tile]
     1, 3, 1, 2, 3, 4,
-    2, 3, 1, 2, 3, 5,
-    3, 3, 6, 7, 8, 9,
-    4, 3, 1, 2, 10, 4,
-    5, 3, 11, 12, 13, 14,
-    6, 3, 15, 16, 17, 18,
-    7, 3, 19, 20, 21, 22,
-    9, 2, 27, 28, 29, 26,
-    10, 0, 0, 30, 0, 30,
-    11, 1, 31, 32, 0, 0,
-    12, 1, 33, 34, 0, 0,
-    13, 1, 35, 36, 37, 38,
-    14, 1, 0, 39, 40, 0,
-    15, 1, 40, 0, 0, 39,
-    23, 1, 61, 62, 63, 64,
-    28, 0, 79, 80, 81, 82,
-    29, 1, 83, 84, 85, 86,
-    30, 1, 87, 88, 89, 90,
-    31, 1, 91, 92, 93, 94,
-    45, 1, 123, 124, 125, 126,
-    46, 1, 0, 0, 127, 128,
-    47, 1, 0, 0, 129, 16,
-    64, 1, 99, 170, 171, 102,
-    70, 1, 0, 0, 187, 188,
-    71, 1, 0, 0, 189, 190,
-    86, 1, 207, 208, 209, 210,
-    87, 1, 211, 212, 213, 214,
+    2, 3, 5, 6, 7, 8,
+    3, 3, 9, 10, 11, 12,
+    4, 3, 1, 2, 13, 14,
+    5, 3, 15, 16, 17, 18,
+    6, 3, 19, 20, 21, 22,
+    7, 3, 23, 24, 25, 26,
+    9, 2, 31, 32, 33, 30,
+    10, 2, 0, 30, 0, 30,
+    11, 1, 34, 35, 0, 0,
+    12, 1, 36, 37, 0, 0,
+    13, 1, 38, 39, 40, 41,
+    14, 1, 42, 43, 44, 45,
+    15, 1, 46, 47, 48, 49,
+    23, 1, 72, 73, 74, 75,
+    28, 0, 90, 91, 92, 93,
+    29, 2, 94, 95, 96, 97,
+    30, 2, 98, 99, 100, 101,
+    31, 2, 102, 103, 104, 105,
+    45, 1, 134, 135, 136, 137,
+    46, 1, 0, 0, 138, 139,
+    47, 1, 0, 0, 140, 141,
+    64, 1, 110, 183, 184, 113,
+    70, 1, 0, 0, 200, 201,
+    71, 1, 0, 0, 202, 203,
+    86, 1, 221, 222, 223, 125,
+    87, 1, 224, 225, 125, 226,
 };
 
 #define OBJECT_SPRITE_LEVEL12_COUNT 27
@@ -117,11 +117,11 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level12
 // Note: Palette 3 is reserved for the player
 __attribute__((section(".prg_rom_1"))) const unsigned char palette_object_level12[3][4] = {
     // Object Palette 0
-    { 0x0d, 0x15, 0x28, 0x1b },
+    { 0x0d, 0x15, 0x1b, 0x36 },
     // Object Palette 1
-    { 0x0d, 0x37, 0x15, 0x10 },
+    { 0x0d, 0x31, 0x28, 0x00 },
     // Object Palette 2
-    { 0x0d, 0x28, 0x27, 0x17 }
+    { 0x0d, 0x15, 0x18, 0x37 }
 };
 
 #define PALETTE_OBJECT_LEVEL12_COUNT 3
