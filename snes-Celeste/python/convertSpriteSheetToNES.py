@@ -768,12 +768,23 @@ def _rgb_to_hsl_global(r, g, b):
 # Pre-compute HSL for NES palette
 _NES_PALETTE_HSL = [_rgb_to_hsl_global(*c) for c in NES_PALETTE]
 
+# Manual overrides for colors where the automatic mapping picks wrong brightness
+# Maps (R, G, B) -> NES palette index
+_NES_COLOR_OVERRIDES = {
+    (179, 175, 12): 0x28,   # chest/key yellow -> bright gold, not dark gold
+}
+
 
 def rgb_to_nes_6bit(r, g, b):
     """
     Convert RGB (0-255) to NES 6-bit color index (0-63).
     Uses hue-aware distance so darkened/TV-adjusted colors preserve hue.
     """
+    # Check manual overrides first
+    key = (r, g, b)
+    if key in _NES_COLOR_OVERRIDES:
+        return _NES_COLOR_OVERRIDES[key]
+
     h1, s1, l1 = _rgb_to_hsl_global(r, g, b)
 
     min_dist = float('inf')
@@ -791,7 +802,13 @@ def rgb_to_nes_6bit(r, g, b):
 
         ds = s1 - s2
         dl = l1 - l2
-        dist = (hue_weight * dh) ** 2 + (ds * 180) ** 2 + (dl * 360) ** 2
+        pr, pg, pb = NES_PALETTE[i]
+        dr = r - pr
+        dg = g - pg
+        db = b - pb
+        rgb_dist = dr*dr + dg*dg + db*db
+        hsl_dist = (hue_weight * dh) ** 2 + (ds * 200) ** 2 + (dl * 200) ** 2
+        dist = hsl_dist + rgb_dist * 0.5
 
         if dist < min_dist:
             min_dist = dist
@@ -1784,6 +1801,7 @@ def create_object_palettes(quantized_colors, num_palettes=3, tile_color_sets=Non
                 (0, 147, 59),    # green - strawberry leaves
                 (255, 191, 179), # highlight - strawberry, balloon
                 (27, 63, 95),    # dark blue - chest lock detail
+                (243, 191, 59),  # bright gold - chest, key, spring
             }
             set_weights = {}
             for cs in unique_sets:
@@ -2314,7 +2332,15 @@ def main():
         ds = s1 - s2
         dl = l1 - l2
 
-        return (hue_weight * dh) ** 2 + (ds * 180) ** 2 + (dl * 360) ** 2
+        # Balance hue accuracy with lightness matching
+        # Use Euclidean RGB distance as a tiebreaker to catch cases where
+        # hue-based matching picks a color that's too dark/bright
+        dr = c1[0] - c2[0]
+        dg = c1[1] - c2[1]
+        db = c1[2] - c2[2]
+        rgb_dist = dr*dr + dg*dg + db*db
+        hsl_dist = (hue_weight * dh) ** 2 + (ds * 200) ** 2 + (dl * 200) ** 2
+        return hsl_dist + rgb_dist * 0.5
 
     # Build list of unique non-black NES colors for tile palette search
     _nes_nonblack = []
@@ -2326,74 +2352,44 @@ def main():
 
     def snap_to_nes_palette(tile_img):
         """
-        Snap an 8x8 tile to valid NES colors by finding the best 3 NES colors
-        for the tile as a whole, then mapping each pixel to those + black.
-        This prevents hue errors where e.g. a darkened red maps to purple.
+        Snap a tile to valid NES colors using rgb_to_nes_6bit (which includes
+        manual color overrides). For tiles with <=3 unique colors, ensures no
+        two source colors collapse to the same NES color.
         """
         rgb = tile_img.convert('RGB')
         pixels = list(rgb.getdata())
 
-        # Separate black and non-black pixels
         nonblack_pixels = [p for p in pixels if p != (0,0,0)]
         if not nonblack_pixels:
             return tile_img.copy()
 
-        # Get unique non-black source colors
         src_colors = list(set(nonblack_pixels))
 
         if len(src_colors) <= 3:
-            # Few enough colors: find best NES match for each source color,
-            # but ensure we don't collapse two distinct source colors to the same NES color
-            # Try top candidates for each and pick the best non-conflicting assignment
-            candidates = []
+            # Map each source color via rgb_to_nes_6bit (respects override table)
+            assignment = {}
+            used = set()
             for sc in src_colors:
-                ranked = sorted(_nes_nonblack, key=lambda nc: _nes_color_dist(sc, nc))
-                candidates.append(ranked[:8])  # top 8 candidates per color
-
-            # Find best assignment with no duplicate NES colors
-            best_assignment = None
-            best_cost = float('inf')
-
-            def _search(idx, chosen, cost):
-                nonlocal best_assignment, best_cost
-                if cost >= best_cost:
-                    return
-                if idx == len(src_colors):
-                    if cost < best_cost:
-                        best_cost = cost
-                        best_assignment = dict(chosen)
-                    return
-                sc = src_colors[idx]
-                used = set(chosen.values())
-                for nc in candidates[idx]:
-                    if nc not in used:
-                        d = _nes_color_dist(sc, nc)
-                        _search(idx + 1, {**chosen, sc: nc}, cost + d)
-
-            _search(0, {}, 0)
-
-            if best_assignment is None:
-                # Fallback: allow duplicates
-                best_assignment = {}
-                for sc in src_colors:
-                    best_assignment[sc] = min(_nes_nonblack, key=lambda nc: _nes_color_dist(sc, nc))
-
-            # Map pixels
-            snapped = []
-            for p in pixels:
-                if p == (0,0,0):
-                    snapped.append((0,0,0))
+                nes = NES_PALETTE[rgb_to_nes_6bit(*sc)]
+                if nes not in used:
+                    assignment[sc] = nes
+                    used.add(nes)
                 else:
-                    snapped.append(best_assignment[p])
+                    # Conflict: two source colors map to same NES color
+                    # Find next best that isn't taken
+                    ranked = sorted(_nes_nonblack, key=lambda nc: _nes_color_dist(sc, nc))
+                    for nc in ranked:
+                        if nc not in used:
+                            assignment[sc] = nc
+                            used.add(nc)
+                            break
+                    else:
+                        assignment[sc] = nes  # fallback: allow duplicate
+
+            snapped = [(0,0,0) if p == (0,0,0) else assignment[p] for p in pixels]
         else:
-            # More than 3 unique colors: per-pixel snap (rare for valid NES tiles)
-            snapped = []
-            for r, g, b in pixels:
-                if (r, g, b) == (0,0,0):
-                    snapped.append((0,0,0))
-                else:
-                    best = min(_nes_nonblack, key=lambda nc: _nes_color_dist((r,g,b), nc))
-                    snapped.append(best)
+            # More than 3 unique colors: per-pixel snap
+            snapped = [(0,0,0) if p == (0,0,0) else NES_PALETTE[rgb_to_nes_6bit(*p)] for p in pixels]
 
         out = Image.new('RGB', tile_img.size)
         out.putdata(snapped)

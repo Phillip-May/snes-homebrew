@@ -40,7 +40,7 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_background_le
     // Background Palette 1
     { 0x0d, 0x37, 0x1b, 0x1a },
     // Background Palette 2
-    { 0x0d, 0x28, 0x17, 0x0c },
+    { 0x0d, 0x17, 0x28, 0x0c },
     // Background Palette 3
     { 0x0d, 0x0d, 0x0d, 0x0d }
 };
@@ -55,9 +55,9 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_sprite_level2
     // Sprite Palette 0
     { 0x0d, 0x15, 0x36, 0x1b },
     // Sprite Palette 1
-    { 0x0d, 0x15, 0x18, 0x0c },
+    { 0x0d, 0x28, 0x15, 0x0c },
     // Sprite Palette 2
-    { 0x0d, 0x31, 0x28, 0x00 },
+    { 0x0d, 0x28, 0x31, 0x00 },
     // Sprite Palette 3 (Player)
     { 0x0d, 0x15, 0x36, 0x1b }
 };
@@ -99,8 +99,8 @@ __attribute__((section(".prg_rom_1"))) const unsigned char object_sprite_level22
     46, 2, 0, 0, 139, 140,
     47, 2, 0, 0, 141, 142,
     64, 1, 111, 184, 185, 114,
-    96, 1, 227, 228, 117, 117,
-    97, 1, 228, 229, 117, 117,
+    96, 1, 226, 227, 228, 228,
+    97, 1, 227, 229, 228, 228,
 };
 
 #define OBJECT_SPRITE_LEVEL22_COUNT 24
@@ -112,9 +112,9 @@ __attribute__((section(".prg_rom_1"))) const unsigned char palette_object_level2
     // Object Palette 0
     { 0x0d, 0x15, 0x36, 0x1b },
     // Object Palette 1
-    { 0x0d, 0x15, 0x18, 0x0c },
+    { 0x0d, 0x28, 0x15, 0x0c },
     // Object Palette 2
-    { 0x0d, 0x31, 0x28, 0x00 }
+    { 0x0d, 0x28, 0x31, 0x00 }
 };
 
 #define PALETTE_OBJECT_LEVEL22_COUNT 3

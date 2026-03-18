@@ -167,10 +167,10 @@ const unsigned char object_sprite_dict_compact[39][5] = {
     /* compact_idx 30: tile 64 */  { 1, 111, 184, 185, 114 },
     /* compact_idx 31: tile 70 */  { 1, 0, 0, 201, 202 },
     /* compact_idx 32: tile 71 */  { 1, 0, 0, 203, 204 },
-    /* compact_idx 33: tile 86 */  { 1, 221, 222, 223, 117 },
-    /* compact_idx 34: tile 87 */  { 1, 224, 225, 117, 226 },
-    /* compact_idx 35: tile 96 */  { 1, 227, 228, 117, 117 },
-    /* compact_idx 36: tile 97 */  { 1, 228, 229, 117, 117 },
+    /* compact_idx 33: tile 86 */  { 1, 220, 221, 222, 117 },
+    /* compact_idx 34: tile 87 */  { 1, 223, 224, 117, 225 },
+    /* compact_idx 35: tile 96 */  { 1, 226, 227, 228, 228 },
+    /* compact_idx 36: tile 97 */  { 1, 227, 229, 228, 228 },
     /* compact_idx 37: tile 102 */  { 0, 240, 241, 242, 243 },
     /* compact_idx 38: tile 118 */  { 0, 255, 256, 0, 0 }
 };
