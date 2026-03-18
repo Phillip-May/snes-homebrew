@@ -143,11 +143,11 @@ R:320-5c3:GLOBAL_ActiveLevel
 R:31:s_pendingBgTileCount
 R:32-4f:s_pendingBgTileUpdates
 R:20:global_randSeed
-P:1b651-1b850:rand_table
+P:1b650-1b84f:rand_table
 P:7f751:__umodhi3
 P:188e4:processObject
 R:51-88:GLOBAL_PlayerData
-P:1b851-1b980:balloon_ytable
+P:1b850-1b97f:balloon_ytable
 P:7f6ed:__udivqi3
 P:1ab9e:port_buildKey
 R:24-25:GLOBAL_FrameCount
@@ -161,7 +161,7 @@ R:27:GLOBAL_DoubleDashUnlocked
 P:1ac6c:port_buildDoubleDashOrb
 P:7f7fc:__modhi3
 P:7fcf1-7fd18:flyingBerryUpdate.y_positions
-P:1b606-1b650:balloonStringFrames
+P:1b605-1b64f:balloonStringFrames
 P:7f308:fix16_mul
 P:1ad3a:port_buildSpriteIfDirty
 P:7c1a5:LoadRoomData

@@ -13,8 +13,8 @@ __attribute__((section(".prg_rom_5")))
 #endif
 const unsigned char gid_to_tile_breakable_wall[1][18] = {
     // GID 27 - BREAKABLE_WALL_SPRITE_1
-    // 4x4 grid: Row 1: 110, 183, 185, 117 | Row 2: 184, 113, 118, 186 | Row 3: 207, 145, 150, 209 | Row 4: 146, 208, 210, 151
-    { 110, 183, 185, 117, 184, 113, 118, 186, 207, 145, 150, 209, 146, 208, 210, 151, 0, 0 }
+    // 4x4 grid: Row 1: 111, 184, 186, 118 | Row 2: 185, 114, 119, 187 | Row 3: 208, 146, 151, 210 | Row 4: 147, 209, 211, 152
+    { 111, 184, 186, 118, 185, 114, 119, 187, 208, 146, 151, 210, 147, 209, 211, 152, 0, 0 }
 };
 
 #define GID_TO_TILE_BREAKABLE_WALL_COUNT 1

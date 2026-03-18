@@ -12,11 +12,11 @@ __attribute__((section(".prg_rom_5")))
 #endif
 const unsigned char gid_to_tile_collapse[3][6] = {
     // GID 24 - COLLAPSE_TILE_SPRITE_1 (idle)
-    { 72, 73, 74, 75, 0, 0 },
+    { 73, 74, 75, 76, 0, 0 },
     // GID 25 - COLLAPSE_TILE_SPRITE_2 (collapsing)
-    { 76, 77, 78, 79, 0, 0 },
+    { 77, 78, 79, 80, 0, 0 },
     // GID 26 - COLLAPSE_TILE_SPRITE_3 (collapsing)
-    { 80, 81, 82, 83, 0, 0 }
+    { 81, 82, 83, 84, 0, 0 }
 };
 
 #define GID_TO_TILE_COLLAPSE_COUNT 3

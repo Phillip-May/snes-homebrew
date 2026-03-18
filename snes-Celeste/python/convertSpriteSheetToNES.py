@@ -1783,6 +1783,7 @@ def create_object_palettes(quantized_colors, num_palettes=3, tile_color_sets=Non
                 (231, 0, 91),    # red - strawberry, key, chest
                 (0, 147, 59),    # green - strawberry leaves
                 (255, 191, 179), # highlight - strawberry, balloon
+                (27, 63, 95),    # dark blue - chest lock detail
             }
             set_weights = {}
             for cs in unique_sets:

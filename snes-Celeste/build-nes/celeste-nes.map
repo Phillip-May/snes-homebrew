@@ -484,8 +484,8 @@
    582c4    582c4       12     1                 gid_to_tile_monument
    582d6    582d6       12     1                 gid_to_tile_big_chest
    582e8    582e8       80     1                 compression_dict_shared
-   68000    68000     3981     1 .prg_rom_6
-   68000    68000     3606     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_6)
+   68000    68000     3980     1 .prg_rom_6
+   68000    68000     3605     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_6)
    68000    68000      8e4     1                 initObject
    688e4    688e4     1b48     1                 processObject
    6a42c    6a42c      1b2     1                 playerInit
@@ -493,11 +493,11 @@
    6ab02    6ab02       9c     1                 render_object_sprite
    6ab9e    6ab9e       ce     1                 port_buildKey
    6ac6c    6ac6c       ce     1                 port_buildDoubleDashOrb
-   6ad3a    6ad3a      8cc     1                 port_buildSpriteIfDirty
-   6b606    6b606      37b     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_6.rodata)
-   6b606    6b606       4b     1                 balloonStringFrames
-   6b651    6b651      200     1                 rand_table
-   6b851    6b851      130     1                 balloon_ytable
+   6ad3a    6ad3a      8cb     1                 port_buildSpriteIfDirty
+   6b605    6b605      37b     1         build-nes/celeste-nes-temp.nes.lto.o:(.prg_rom_6.rodata)
+   6b605    6b605       4b     1                 balloonStringFrames
+   6b650    6b650      200     1                 rand_table
+   6b850    6b850      130     1                 balloon_ytable
  1000000  1000000     2000     1 .chr_rom_0
  1000000  1000000     2000     1         build-nes/sprite_chr.o:(.chr_rom_0)
     fe58     fe58        1     1 .rom_poke_table_0
