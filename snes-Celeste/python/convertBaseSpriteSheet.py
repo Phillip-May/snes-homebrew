@@ -1,5 +1,9 @@
 from PIL import Image
 import os
+from override_loader import (
+    load_tile_override, export_tile, flush_exports, write_generated_tables,
+    generate_sprite_enums_snes, EXPORTS_DIR, OBJECT_GIDS
+)
 
 """
 SNES Sprite Sheet Converter with Advanced Palette Optimization
@@ -1025,12 +1029,27 @@ def main():
         for x in range(0, tiles_per_row):
             box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
             tile_8x8 = img.crop(box)
+
+            # Export the auto-converted tile for future editing
+            export_tile(tile_8x8, tile_count, platform='snes')
+
+            # Check for override
+            override_img, override_pal = load_tile_override('snes', tile_count)
+            if override_img is not None:
+                tile_8x8 = override_img
+                print(f"  [OVERRIDE] Tile {tile_count} from override file")
+
             tile = tile_8x8.resize((16, 16), Image.NEAREST)
 
             # --- Per-sprite palette generation and processing ---
-            tile_rgb = tile.convert('RGB')
-            colors = tile_rgb.getcolors(maxcolors=256)
-            num_colors = len(colors) if colors else 0
+            # If override palette provided, use it instead of extracting from image
+            if override_pal is not None:
+                colors = [(1, color) for color in override_pal]
+                num_colors = len(override_pal)
+            else:
+                tile_rgb = tile.convert('RGB')
+                colors = tile_rgb.getcolors(maxcolors=256)
+                num_colors = len(colors) if colors else 0
 
             #Force objects to be 4bpp
             if tile_count in arrMustBeObject:
@@ -1284,6 +1303,17 @@ def main():
             f.write("};\n\n")
 
         f.write(f"#endif // {header_guard}\n")
+
+    # Flush buffered tile exports as spritesheets
+    flush_exports(platform='snes')
+
+    # Write shared tables JSON for visualize_map.py and NES converter
+    write_generated_tables(outputIndexTranslationTable, all_2bpp_palettes)
+
+    # Auto-generate SNES sprite animation enums
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    snes_enums_path = os.path.join(script_dir, '..', 'src', 'port', 'sprite_animation_enums_snes.h')
+    generate_sprite_enums_snes(sprite_info, snes_enums_path)
 
     print(f"Successfully converted '{image_filename}' to '{output_filename_h}'.")
     print(f"Total tiles processed: {tile_count} ({len(all_2bpp_palettes)} 2bpp, {len(all_4bpp_palettes)} 4bpp)")

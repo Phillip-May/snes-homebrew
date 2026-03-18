@@ -1,6 +1,7 @@
 import os
 from PIL import Image
 import numpy as np
+from override_loader import load_clouds_override
 
 # Configuration
 INPUT_IMAGE_FILE = 'clouds.png'
@@ -48,12 +49,19 @@ def to_snes_2bpp(tile_8x8, palette_map):
 
 def main():
     """Main conversion function."""
-    if not os.path.exists(INPUT_IMAGE_FILE):
-        print(f"Error: Input image '{INPUT_IMAGE_FILE}' not found.")
+    # Check for cloud image override
+    input_file = INPUT_IMAGE_FILE
+    cloud_override = load_clouds_override('snes')
+    if cloud_override:
+        input_file = cloud_override
+        print(f"  [OVERRIDE] Using cloud image from {cloud_override}")
+
+    if not os.path.exists(input_file):
+        print(f"Error: Input image '{input_file}' not found.")
         return
 
     # Load image and convert to paletted mode
-    img = Image.open(INPUT_IMAGE_FILE)
+    img = Image.open(input_file)
     if img.mode != 'P':
         img = img.convert('P', palette=Image.ADAPTIVE, colors=4)
 

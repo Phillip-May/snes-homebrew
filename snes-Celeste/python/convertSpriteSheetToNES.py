@@ -7,6 +7,11 @@ import gzip
 import struct
 import re
 from collections import Counter
+from override_loader import (
+    load_tile_override, export_tile, flush_exports, load_level_override,
+    generate_sprite_enums_nes, get_tile_group, get_override_path, TILE_GROUPS,
+    EXPORTS_DIR
+)
 
 
 # Shared GID mapping (built incrementally as levels are processed)
@@ -742,18 +747,52 @@ def reserve_big_chest_gids(all_sprite_data, tile_mapping):
     
     return big_chest_gid_data
 
+def _rgb_to_hsl_global(r, g, b):
+    """Convert RGB (0-255) to HSL. Returns (h: 0-360, s: 0-1, l: 0-1)."""
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    mx, mn = max(r, g, b), min(r, g, b)
+    l = (mx + mn) / 2.0
+    if mx == mn:
+        return (0, 0, l)
+    d = mx - mn
+    s = d / (2.0 - mx - mn) if l > 0.5 else d / (mx + mn)
+    if mx == r:
+        h = ((g - b) / d + (6 if g < b else 0)) * 60
+    elif mx == g:
+        h = ((b - r) / d + 2) * 60
+    else:
+        h = ((r - g) / d + 4) * 60
+    return (h, s, l)
+
+
+# Pre-compute HSL for NES palette
+_NES_PALETTE_HSL = [_rgb_to_hsl_global(*c) for c in NES_PALETTE]
+
+
 def rgb_to_nes_6bit(r, g, b):
     """
     Convert RGB (0-255) to NES 6-bit color index (0-63).
-    Finds the closest matching color from the NES 64-color palette.
+    Uses hue-aware distance so darkened/TV-adjusted colors preserve hue.
     """
-    # Find the closest NES color by Euclidean distance
+    h1, s1, l1 = _rgb_to_hsl_global(r, g, b)
+
     min_dist = float('inf')
     closest_idx = 0
 
-    for i, (nr, ng, nb) in enumerate(NES_PALETTE):
-        # Calculate Euclidean distance in RGB space
-        dist = ((r - nr) ** 2 + (g - ng) ** 2 + (b - nb) ** 2) ** 0.5
+    for i, (h2, s2, l2) in enumerate(_NES_PALETTE_HSL):
+        dh = abs(h1 - h2)
+        if dh > 180:
+            dh = 360 - dh
+
+        if s1 > 0.15 and s2 > 0.15:
+            hue_weight = 4.0
+        else:
+            hue_weight = 0.5
+
+        ds = s1 - s2
+        dl = l1 - l2
+        dist = (hue_weight * dh) ** 2 + (ds * 180) ** 2 + (dl * 360) ** 2
+
         if dist < min_dist:
             min_dist = dist
             closest_idx = i
@@ -814,35 +853,22 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
     # Sprite palette 1: will be set to background palette 0 (for collapse tiles)
     # Sprite palette 2: object_palettes[1] (for other objects)
     # Sprite palette 3: reserved for player
+    # Sprite palettes 0-2: available for objects (collapse tiles moved to BG)
     if object_palettes is not None and len(object_palettes) > 0:
-        # Set sprite palette 0 to object_palettes[0] (for regular objects)
-        normalized_obj_pal_0 = list(object_palettes[0])
-        while len(normalized_obj_pal_0) < 4:
-            normalized_obj_pal_0.append((0, 0, 0))
-        normalized_obj_pal_0 = normalized_obj_pal_0[:4]
-        sprite_palettes.append(normalized_obj_pal_0)
-        sprite_palette_to_index[tuple(normalized_obj_pal_0)] = 0
-        print(f"Initialized sprite palette 0 with object palette 0: {normalized_obj_pal_0}")
-        
-        # Reserve slot 1 for background palette 0 (for collapse tiles), will be set later
-        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Placeholder for index 1
-        
-        # Set sprite palette 2 to object_palettes[1] (for objects like springs)
-        if len(object_palettes) > 1:
-            normalized_obj_pal_1 = list(object_palettes[1])
-            while len(normalized_obj_pal_1) < 4:
-                normalized_obj_pal_1.append((0, 0, 0))
-            normalized_obj_pal_1 = normalized_obj_pal_1[:4]
-            sprite_palettes.append(normalized_obj_pal_1)
-            sprite_palette_to_index[tuple(normalized_obj_pal_1)] = 2
-            print(f"Initialized sprite palette 2 with object palette 1: {normalized_obj_pal_1}")
-        else:
+        for pal_idx in range(min(3, len(object_palettes))):
+            normalized = list(object_palettes[pal_idx])
+            while len(normalized) < 4:
+                normalized.append((0, 0, 0))
+            normalized = normalized[:4]
+            sprite_palettes.append(normalized)
+            sprite_palette_to_index[tuple(normalized)] = pal_idx
+            print(f"Initialized sprite palette {pal_idx} with object palette {pal_idx}: {normalized}")
+        # Pad remaining slots up to 3
+        while len(sprite_palettes) < 3:
             sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
     else:
-        # No object palettes, initialize with placeholders
-        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Palette 0
-        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Palette 1 (for collapse tiles)
-        sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])  # Palette 2
+        for _ in range(3):
+            sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
     
     # Ensure sprite_palettes has at least 4 entries (pad with black if needed)
     while len(sprite_palettes) < 4:
@@ -1010,26 +1036,18 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                 if palette_key in sprite_palette_to_index:
                     palette_idx = sprite_palette_to_index[palette_key]
                 else:
-                    # Find an available slot (2 only - skip 0 which is object_palettes[0], skip 1 which is background palette for collapse tiles, skip 3 which is reserved for player)
-                    # Slot 0 is object_palettes[0], slot 1 is background palette 0 (for collapse tiles), slot 2 is object_palettes[1]
-                    if 2 < len(sprite_palettes):
-                        # Check if slot 2 is empty (all black) or can be reused
-                        if sprite_palettes[2] == [(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)]:
-                            sprite_palettes[2] = normalized_palette
-                            sprite_palette_to_index[palette_key] = 2
-                            palette_idx = 2
-                        else:
-                            # Slot 2 is taken, use slot 2 anyway (will overwrite)
-                            palette_idx = 2
-                            sprite_palettes[2] = normalized_palette
-                            sprite_palette_to_index[palette_key] = 2
-                    else:
-                        # Slot 2 doesn't exist, use slot 2 (will be created)
-                        palette_idx = 2
-                        while len(sprite_palettes) <= 2:
-                            sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
-                        sprite_palettes[2] = normalized_palette
-                        sprite_palette_to_index[palette_key] = 2
+                    # Find best matching existing sprite palette (0-2)
+                    # by picking the one with most color overlap
+                    best_slot = 0
+                    best_overlap = -1
+                    pal_colors = set(normalized_palette) - {(0, 0, 0)}
+                    for slot_idx in range(min(3, len(sprite_palettes))):
+                        slot_colors = set(sprite_palettes[slot_idx]) - {(0, 0, 0)}
+                        overlap = len(pal_colors & slot_colors)
+                        if overlap > best_overlap:
+                            best_overlap = overlap
+                            best_slot = slot_idx
+                    palette_idx = best_slot
             else:
                 palette_idx = sprite_palette_to_index[palette_key]
 
@@ -1066,18 +1084,7 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
         else:
             collision_data.append(0)
 
-    # Set sprite palette 1 to match background palette 0 (for collapse tiles)
-    # Collapse tiles use background palettes but are rendered as sprites using sprite palette 1
-    # This ensures collapse tiles render with the correct colors
-    # Note: Sprite palette 0 is used by regular objects (strawberry, flying berry, etc.) and uses object_palettes[0]
-    if len(background_palettes) > 0:
-        # Ensure sprite_palettes has at least 4 entries
-        while len(sprite_palettes) < 4:
-            sprite_palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
-        
-        # Set sprite palette 1 to background palette 0 (collapse tiles use sprite palette 1)
-        sprite_palettes[1] = list(background_palettes[0])
-        print(f"Set sprite palette 1 to background palette 0 for collapse tiles: {background_palettes[0]}")
+    # Collapse tiles now use BG tiles - no longer need a sprite palette slot
     
     # Ensure player palette is still at sprite palette index 3 (in case it got overwritten)
     # This is a safety check - player palette should already be set above
@@ -1455,22 +1462,11 @@ def generate_nes_tilemap_header(tile_data, layer_name, map_width, map_height, al
                         # All background tile objects use sprite palette 1 regardless of which background palette they use
                         palette_idx = 1
                     else:
-                        # Get palette index for this object from object_palette_mapping (0-2 for object palettes)
-                        # Map to sprite palette indices:
-                        # object_palettes[0] -> sprite palette 0
-                        # object_palettes[1] -> sprite palette 2 (springs)
-                        # object_palettes[2] is not used (we only use 2 object palettes)
+                        # Object palettes map 1:1 to sprite palettes 0-2
                         obj_palette_idx = object_palette_mapping.get(obj_tile_idx, 0)
                         if obj_palette_idx >= len(object_palettes):
                             obj_palette_idx = 0
-                        
-                        # Map object palette index to sprite palette index
-                        if obj_palette_idx == 0:
-                            palette_idx = 0  # object_palettes[0] -> sprite palette 0
-                        elif obj_palette_idx == 1:
-                            palette_idx = 2  # object_palettes[1] -> sprite palette 2 (springs)
-                        else:
-                            palette_idx = 0  # Default to sprite palette 0
+                        palette_idx = obj_palette_idx
                     
                     object_sprite_mapping[obj_tile_idx] = len(object_sprite_data)
                     object_sprite_data.append((obj_tile_idx, palette_idx, tl_opt_idx, tr_opt_idx, bl_opt_idx, br_opt_idx))
@@ -1645,35 +1641,32 @@ def quantize_colors(color_counter, target_colors=9):
     return quantized[:10]
 
 
-def create_background_palettes(quantized_colors):
+def create_background_palettes(quantized_colors, tile_color_sets=None):
     """
     Create 4 background palettes from 10 quantized colors.
     Each palette has 4 colors, with black always as color 0.
+    If tile_color_sets provided, uses tile-aware grouping.
     Returns a list of 4 palettes, each with 4 colors.
     """
     black = (0, 0, 0)
     other_colors = [c for c in quantized_colors if c != black]
 
-    # Distribute the 9 non-black colors across 4 palettes
-    # Each palette: [black, color1, color2, color3]
-    palettes = []
+    if tile_color_sets is not None and len(tile_color_sets) > 0:
+        # Reuse the same tile-aware algorithm as object palettes
+        return create_object_palettes(quantized_colors, num_palettes=4, tile_color_sets=tile_color_sets)
 
-    # Strategy: distribute colors evenly
-    colors_per_palette = 3  # 3 non-black colors per palette (black is always 0)
+    # Fallback: round-robin
+    palettes = []
+    colors_per_palette = 3
 
     for pal_idx in range(4):
-        palette = [black]  # Always start with black
-
-        # Add 3 colors from the quantized set
+        palette = [black]
         for i in range(colors_per_palette):
             color_idx = (pal_idx * colors_per_palette + i) % len(other_colors)
             if color_idx < len(other_colors):
                 palette.append(other_colors[color_idx])
-
-        # Pad with black if needed
         while len(palette) < 4:
             palette.append(black)
-
         palettes.append(palette[:4])
 
     return palettes
@@ -1729,37 +1722,152 @@ def collect_object_colors(img, tiles_per_row, num_rows, arrMustBeObject):
     return color_counter
 
 
-def create_object_palettes(quantized_colors, num_palettes=3):
+def create_object_palettes(quantized_colors, num_palettes=3, tile_color_sets=None):
     """
     Create object palettes from quantized colors.
-    Each palette has 4 colors.
-    Note: We use 3 palettes for objects, reserving 1 palette for the player.
+    Each palette has 4 colors (black + 3).
+
+    If tile_color_sets is provided (list of sets of non-black colors per tile),
+    uses a greedy tile-aware algorithm that groups each tile's colors into the
+    same palette, minimizing color loss.
+
     Returns a list of palettes, each with 4 colors.
     """
     black = (0, 0, 0)
     other_colors = [c for c in quantized_colors if c != black]
 
-    palettes = []
+    if tile_color_sets is not None and len(tile_color_sets) > 0:
+        # Tile-aware palette creation:
+        # Try all possible palette assignments to minimize total tiles with missing colors.
 
-    # Strategy: distribute colors evenly across palettes
-    colors_per_palette = 3  # 3 non-black colors per palette (black is always 0)
+        palettes = [set() for _ in range(num_palettes)]
 
-    for pal_idx in range(num_palettes):
-        palette = [black]  # Always start with black
+        # Deduplicate tile color sets and count how many tiles share each set
+        from collections import Counter as _Counter
+        set_counts = _Counter()
+        unique_sets = []
+        for tc in tile_color_sets:
+            tc_clean = frozenset(tc - {black})
+            if tc_clean:
+                set_counts[tc_clean] += 1
+        unique_sets = list(set_counts.keys())
 
-        # Add 3 colors from the quantized set
-        for i in range(colors_per_palette):
-            color_idx = (pal_idx * colors_per_palette + i) % len(other_colors)
-            if color_idx < len(other_colors):
-                palette.append(other_colors[color_idx])
+        # Collect all unique non-black colors across all tiles
+        all_tile_colors = set()
+        for tc in tile_color_sets:
+            all_tile_colors |= (tc - {black})
 
-        # Pad with black if needed
-        while len(palette) < 4:
-            palette.append(black)
+        # Brute-force: try all possible ways to pick palettes of 3 colors
+        # from the available colors, maximizing total tiles fully covered.
+        all_colors_list = sorted(all_tile_colors)
 
-        palettes.append(palette[:4])
+        if num_palettes <= 3:
+            # Brute-force optimal: try all possible palette pairs (~44K for 12 colors)
+            from itertools import combinations
+            best_score = -1
+            best_palettes = None
 
-    return palettes
+            # Generate all possible palette candidates (1, 2, or 3 colors)
+            pal_candidates = []
+            for c in all_colors_list:
+                pal_candidates.append(frozenset([c]))
+            for pair in combinations(all_colors_list, 2):
+                pal_candidates.append(frozenset(pair))
+            for triple in combinations(all_colors_list, 3):
+                pal_candidates.append(frozenset(triple))
+
+            # Gameplay-critical tile sets get higher weight so the optimizer
+            # prioritizes them over cosmetic tiles like smoke
+            # Weight tiles containing colors unique to important objects
+            important_colors = {
+                (231, 0, 91),    # red - strawberry, key, chest
+                (0, 147, 59),    # green - strawberry leaves
+                (255, 191, 179), # highlight - strawberry, balloon
+            }
+            set_weights = {}
+            for cs in unique_sets:
+                base = set_counts[cs]
+                # Bonus for sets with important colors that are hard to fit
+                has_important = len(set(cs) & important_colors)
+                set_weights[cs] = base * (1 + has_important)
+
+            # Try all combinations of palettes
+            for combo in combinations(pal_candidates, num_palettes):
+                score = 0
+                for cs in unique_sets:
+                    for pal in combo:
+                        if cs <= pal:
+                            score += set_weights[cs]
+                            break
+
+                if score > best_score:
+                    best_score = score
+                    best_palettes = [set(p) for p in combo]
+
+            if best_palettes:
+                palettes = best_palettes
+                print(f"  Optimal palette packing: {best_score} weighted score ({len(pal_candidates)} candidates, {num_palettes} palettes)")
+                for dbg_p in palettes:
+                    print(f"    -> {dbg_p}")
+        else:
+            # Greedy for 3+ palettes (brute force too slow)
+            sorted_sets = sorted(unique_sets, key=lambda cs: (-set_counts[cs], -len(cs)))
+            for tile_colors_frozen in sorted_sets:
+                tile_q = set(tile_colors_frozen)
+                best_pal = -1
+                best_cost = float('inf')
+                for i, pal in enumerate(palettes):
+                    merged = pal | tile_q
+                    if len(merged) <= 3:
+                        cost = len(merged) - len(pal)
+                        if cost < best_cost:
+                            best_cost = cost
+                            best_pal = i
+                if best_pal >= 0:
+                    palettes[best_pal] |= tile_q
+                else:
+                    best_pal = 0
+                    best_overlap = -1
+                    for i, pal in enumerate(palettes):
+                        overlap = len(pal & tile_q)
+                        if overlap > best_overlap or (overlap == best_overlap and len(pal) < len(palettes[best_pal])):
+                            best_overlap = overlap
+                            best_pal = i
+                    room = 3 - len(palettes[best_pal])
+                    for c in sorted(tile_q, key=lambda c: c in palettes[best_pal], reverse=True):
+                        if c in palettes[best_pal]:
+                            continue
+                        if room > 0:
+                            palettes[best_pal].add(c)
+                            room -= 1
+
+        # Fill any remaining palette slots with unused frequent colors
+        used = set()
+        for pal in palettes:
+            used |= pal
+        unused = [c for c in other_colors if c not in used]
+        for pal in palettes:
+            while len(pal) < 3 and unused:
+                pal.add(unused.pop(0))
+
+        freq_order = {c: i for i, c in enumerate(other_colors)}
+        return [[black] + sorted(pal, key=lambda c: freq_order.get(c, 999)) for pal in palettes]
+    else:
+        # Fallback: round-robin distribution
+        palettes = []
+        colors_per_palette = 3
+
+        for pal_idx in range(num_palettes):
+            palette = [black]
+            for i in range(colors_per_palette):
+                color_idx = (pal_idx * colors_per_palette + i) % len(other_colors)
+                if color_idx < len(other_colors):
+                    palette.append(other_colors[color_idx])
+            while len(palette) < 4:
+                palette.append(black)
+            palettes.append(palette[:4])
+
+        return palettes
 
 
 def find_best_object_palette_for_tile(tile_image, object_palettes):
@@ -2159,18 +2267,192 @@ def main():
 
     print(f"Processing {total_tiles} tiles from {width}x{height} image...")
 
-    # First, collect colors from background tiles for quantization
-    print("\nCollecting colors from background tiles...")
-    background_color_counter = collect_background_colors(img, tiles_per_row, num_rows, all_background_gids)
+    # Player sprite frames map to sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
+    player_sprite_tile_indices = [1, 2, 3, 4, 5, 6, 7]
+
+    # === Pass 1: Collect all final tile images (with overrides applied) ===
+    print("\nPass 1: Collecting final tile images (applying overrides)...")
+    final_tile_images = {}  # tile_index -> PIL.Image (8x8)
+
+    def _rgb_to_hsl(r, g, b):
+        """Convert RGB (0-255) to HSL. Returns (h: 0-360, s: 0-1, l: 0-1)."""
+        r, g, b = r / 255.0, g / 255.0, b / 255.0
+        mx, mn = max(r, g, b), min(r, g, b)
+        l = (mx + mn) / 2.0
+        if mx == mn:
+            return (0, 0, l)
+        d = mx - mn
+        s = d / (2.0 - mx - mn) if l > 0.5 else d / (mx + mn)
+        if mx == r:
+            h = ((g - b) / d + (6 if g < b else 0)) * 60
+        elif mx == g:
+            h = ((b - r) / d + 2) * 60
+        else:
+            h = ((r - g) / d + 4) * 60
+        return (h, s, l)
+
+    def _nes_color_dist(c1, c2):
+        """
+        Hue-aware color distance. Heavily penalizes hue differences so that
+        a darkened red stays red instead of drifting to purple.
+        """
+        h1, s1, l1 = _rgb_to_hsl(*c1)
+        h2, s2, l2 = _rgb_to_hsl(*c2)
+
+        # Hue distance (circular, 0-180)
+        dh = abs(h1 - h2)
+        if dh > 180:
+            dh = 360 - dh
+
+        # For chromatic colors (saturation > 0.15), heavily weight hue
+        if s1 > 0.15 and s2 > 0.15:
+            hue_weight = 4.0
+        else:
+            hue_weight = 0.5  # Grey-ish colors: don't care about hue
+
+        ds = s1 - s2
+        dl = l1 - l2
+
+        return (hue_weight * dh) ** 2 + (ds * 180) ** 2 + (dl * 360) ** 2
+
+    # Build list of unique non-black NES colors for tile palette search
+    _nes_nonblack = []
+    _nes_nonblack_set = set()
+    for c in NES_PALETTE:
+        if c != (0,0,0) and c not in _nes_nonblack_set:
+            _nes_nonblack.append(c)
+            _nes_nonblack_set.add(c)
+
+    def snap_to_nes_palette(tile_img):
+        """
+        Snap an 8x8 tile to valid NES colors by finding the best 3 NES colors
+        for the tile as a whole, then mapping each pixel to those + black.
+        This prevents hue errors where e.g. a darkened red maps to purple.
+        """
+        rgb = tile_img.convert('RGB')
+        pixels = list(rgb.getdata())
+
+        # Separate black and non-black pixels
+        nonblack_pixels = [p for p in pixels if p != (0,0,0)]
+        if not nonblack_pixels:
+            return tile_img.copy()
+
+        # Get unique non-black source colors
+        src_colors = list(set(nonblack_pixels))
+
+        if len(src_colors) <= 3:
+            # Few enough colors: find best NES match for each source color,
+            # but ensure we don't collapse two distinct source colors to the same NES color
+            # Try top candidates for each and pick the best non-conflicting assignment
+            candidates = []
+            for sc in src_colors:
+                ranked = sorted(_nes_nonblack, key=lambda nc: _nes_color_dist(sc, nc))
+                candidates.append(ranked[:8])  # top 8 candidates per color
+
+            # Find best assignment with no duplicate NES colors
+            best_assignment = None
+            best_cost = float('inf')
+
+            def _search(idx, chosen, cost):
+                nonlocal best_assignment, best_cost
+                if cost >= best_cost:
+                    return
+                if idx == len(src_colors):
+                    if cost < best_cost:
+                        best_cost = cost
+                        best_assignment = dict(chosen)
+                    return
+                sc = src_colors[idx]
+                used = set(chosen.values())
+                for nc in candidates[idx]:
+                    if nc not in used:
+                        d = _nes_color_dist(sc, nc)
+                        _search(idx + 1, {**chosen, sc: nc}, cost + d)
+
+            _search(0, {}, 0)
+
+            if best_assignment is None:
+                # Fallback: allow duplicates
+                best_assignment = {}
+                for sc in src_colors:
+                    best_assignment[sc] = min(_nes_nonblack, key=lambda nc: _nes_color_dist(sc, nc))
+
+            # Map pixels
+            snapped = []
+            for p in pixels:
+                if p == (0,0,0):
+                    snapped.append((0,0,0))
+                else:
+                    snapped.append(best_assignment[p])
+        else:
+            # More than 3 unique colors: per-pixel snap (rare for valid NES tiles)
+            snapped = []
+            for r, g, b in pixels:
+                if (r, g, b) == (0,0,0):
+                    snapped.append((0,0,0))
+                else:
+                    best = min(_nes_nonblack, key=lambda nc: _nes_color_dist((r,g,b), nc))
+                    snapped.append(best)
+
+        out = Image.new('RGB', tile_img.size)
+        out.putdata(snapped)
+        return out
+
+    # Also store 16x16 versions for override tiles (avoids lossy 16->8->16 resize)
+    final_tile_16x16 = {}  # tile_index -> PIL.Image (16x16) for overrides only
+
+    for y in range(num_rows):
+        for x in range(tiles_per_row):
+            box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
+            tile_8x8 = img.crop(box)
+            tile_index = y * tiles_per_row + x
+
+            # Export the original tile for future editing
+            export_tile(tile_8x8, tile_index, platform='nes')
+
+            # Check for NES tile override
+            override_img, override_pal = load_tile_override('nes', tile_index)
+            if override_img is not None:
+                # override_img is 8x8 (downsized from the 16x16 spritesheet frame)
+                # Re-load the 16x16 frame directly for CHR conversion
+                # to avoid lossy 16->8->16 round-trip
+                group_info = get_tile_group(tile_index)
+                if group_info:
+                    group_name, frame_idx = group_info
+                    sheet_path = get_override_path('nes', f'tiles/{group_name}', f'{group_name}.png')
+                    if sheet_path:
+                        sheet = Image.open(sheet_path)
+                        frame_16x16 = sheet.crop((frame_idx * 16, 0, (frame_idx + 1) * 16, 16))
+                        final_tile_16x16[tile_index] = snap_to_nes_palette(frame_16x16)
+
+                # Snap the 8x8 for palette quantization
+                tile_8x8 = snap_to_nes_palette(override_img)
+                print(f"  [OVERRIDE] Tile {tile_index} from override file")
+
+            final_tile_images[tile_index] = tile_8x8
+
+    # === Quantize colors from the FINAL tiles (after overrides) ===
+    print("\nCollecting colors from final background tiles...")
+    background_color_counter = Counter()
+    bg_tile_color_sets = []
+    for tile_index, tile_8x8 in final_tile_images.items():
+        if tile_index in all_background_gids:
+            tile_rgb = tile_8x8.convert('RGB')
+            tile_colors = set()
+            for color in tile_rgb.getdata():
+                background_color_counter[color] += 1
+                if color != (0, 0, 0):
+                    tile_colors.add(color)
+            if tile_colors:
+                bg_tile_color_sets.append(tile_colors)
     print(f"  Found {len(background_color_counter)} unique colors in background tiles")
 
-    # Quantize to 9 colors + black and create 4 palettes
     background_palettes = None
     if len(background_color_counter) > 0:
         quantized_colors = quantize_colors(background_color_counter, target_colors=9)
         print(f"  Quantized to {len(quantized_colors)} colors (black + 9 colors)")
 
-        background_palettes = create_background_palettes(quantized_colors)
+        background_palettes = create_background_palettes(quantized_colors, tile_color_sets=bg_tile_color_sets)
         print(f"  Created {len(background_palettes)} background palettes")
         for i, pal in enumerate(background_palettes):
             print(f"    Palette {i}: {pal}")
@@ -2178,18 +2460,41 @@ def main():
         print("  No background tiles found, using default palettes")
         background_palettes = [[(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)] for _ in range(4)]
 
-    # Collect colors from object tiles for quantization
-    print("\nCollecting colors from object tiles...")
-    object_color_counter = collect_object_colors(img, tiles_per_row, num_rows, arrMustBeObject)
-    print(f"  Found {len(object_color_counter)} unique colors in object tiles")
+    print("\nCollecting colors from final object tiles...")
+    object_color_counter = Counter()
+    object_tile_color_sets = []  # Per-tile color sets for tile-aware palette creation
+    skipped_unmapped = 0
+    for tile_index, tile_8x8 in final_tile_images.items():
+        if tile_index in arrMustBeObject:
+            # Skip unmapped tiles and special-case tiles from palette quantization
+            # so they don't waste color budget
+            excluded_from_quantization = {
+                102,              # orb - handled specially
+                118, 119, 120,    # flag frames (in smoke group) - unique colors
+                70, 71, 86, 87,   # monument - only in one room
+            }
+            if get_tile_group(tile_index) is None or tile_index in excluded_from_quantization:
+                skipped_unmapped += 1
+                continue
+            tile_rgb = tile_8x8.convert('RGB')
+            tile_colors = set()
+            for color in tile_rgb.getdata():
+                object_color_counter[color] += 1
+                if color != (0, 0, 0):
+                    tile_colors.add(color)
+            if tile_colors:
+                object_tile_color_sets.append(tile_colors)
+    print(f"  Found {len(object_color_counter)} unique colors in object tiles (skipped {skipped_unmapped} unmapped)")
+    print(f"  Collected {len(object_tile_color_sets)} tile color sets for palette grouping")
 
-    # Quantize object colors to 9 colors + black and create 3 palettes (1 reserved for player)
     object_palettes = None
     if len(object_color_counter) > 0:
         object_quantized_colors = quantize_colors(object_color_counter, target_colors=9)
         print(f"  Quantized to {len(object_quantized_colors)} colors (black + 9 colors)")
 
-        object_palettes = create_object_palettes(object_quantized_colors, num_palettes=3)
+        # 3 NES sprite palette slots for objects (slots 0-2; slot 3 = player)
+        # Collapse tiles now use BG, freeing slot 1
+        object_palettes = create_object_palettes(object_quantized_colors, num_palettes=3, tile_color_sets=object_tile_color_sets)
         print(f"  Created {len(object_palettes)} object palettes (1 palette reserved for player)")
         for i, pal in enumerate(object_palettes):
             print(f"    Object Palette {i}: {pal}")
@@ -2197,57 +2502,43 @@ def main():
         print("  No object tiles found, using default palettes")
         object_palettes = [[(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)] for _ in range(3)]
 
-    # Process all tiles - each 8x8 tile becomes a 16x16 sprite (4 8x8 tiles)
+    # === Pass 2: Process tiles with quantized palettes ===
     all_sprite_data = []  # List of (sprite_4tiles, palette) tuples
     all_palettes = []
     all_chr_tiles = []  # Flat list of all 8x8 tile data for CHR banks
     object_palette_mapping = {}  # Maps tile_index -> object_palette_index (0-2)
 
-    # Player sprite frames map to sprite sheet tile indices: 1, 2, 3, 4, 5, 6, 7
-    # (corresponding to PLAYER_SPRITE_IDLE=0, WALK_1=2, WALK_2=4, WALK_3=6, WALL=8, DOWN=10, UP=12)
-    player_sprite_tile_indices = [1, 2, 3, 4, 5, 6, 7]
-
-    # First pass: Determine shared palettes for sprite groups
+    # Determine shared palettes for sprite groups (using final tile images)
     sprite_group_palette_map = {}  # Maps tile_index -> (palette_index, palette) for groups
-    
+
     print("\nDetermining shared palettes for sprite groups...")
     for group in sprite_palette_groups:
         if not group:
             continue
-        
-        # Collect tile images for all sprites in this group
+
         group_tile_images = []
         valid_indices = []
         for tile_idx in group:
-            if tile_idx < tiles_per_row * num_rows:
-                y = tile_idx // tiles_per_row
-                x = tile_idx % tiles_per_row
-                box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
-                tile_8x8 = img.crop(box)
-                group_tile_images.append(tile_8x8)
+            if tile_idx in final_tile_images:
+                group_tile_images.append(final_tile_images[tile_idx])
                 valid_indices.append(tile_idx)
-        
+
         if group_tile_images and all(idx in arrMustBeObject for idx in valid_indices):
-            # Find best palette for the entire group
             best_palette_idx, palette = find_best_object_palette_for_sprite_group(group_tile_images, object_palettes)
-            
-            # Assign this palette to all sprites in the group
             for tile_idx in valid_indices:
                 sprite_group_palette_map[tile_idx] = (best_palette_idx, palette)
             print(f"  Sprite group {group}: assigned object palette {best_palette_idx}")
-    
-    # Second pass: Process all tiles
-    # Track mapping from tile_index to position in all_chr_tiles (accounts for excluded tiles)
+
+    # Process all tiles using final images and quantized palettes
     tile_index_to_chr_position = {}  # Maps tile_index -> starting position in all_chr_tiles
-    
+    _player_canonical_palette = None  # Set by first player frame, reused by all others
+
     for y in range(num_rows):
         for x in range(tiles_per_row):
-            box = (x * 8, y * 8, (x + 1) * 8, (y + 1) * 8)
-            tile_8x8 = img.crop(box)
             tile_index = y * tiles_per_row + x
+            tile_8x8 = final_tile_images[tile_index]
 
             # For background tiles, use quantized palette; for objects use object palettes; otherwise extract palette
-            # Player sprite frames (tile indices 1-7) should extract their own palette
             if tile_index in all_background_gids:
                 # Find best palette from background_palettes
                 best_palette_idx, palette = find_best_palette_for_tile(tile_8x8, background_palettes)
@@ -2260,21 +2551,38 @@ def main():
                 best_palette_idx, palette = find_best_object_palette_for_tile(tile_8x8, object_palettes)
                 object_palette_mapping[tile_index] = best_palette_idx
             elif tile_index in player_sprite_tile_indices:
-                # Player sprites (tile indices 1-7): extract palette directly (they'll use sprite palette 3)
-                palette = extract_palette(tile_8x8, max_colors=4)
-                # Debug: print player palette if it's not all black
-                if palette and len(palette) > 0:
-                    is_all_black = all(color == (0, 0, 0) for color in palette)
-                    if not is_all_black:
-                        print(f"Player sprite tile index {tile_index} palette: {palette}")
-                    else:
-                        print(f"WARNING: Player sprite tile index {tile_index} has all-black palette!")
+                # Player sprites (tile indices 1-7): use a shared palette across all frames
+                # so color index 1 is always the hair color (swapped programmatically).
+                # Extract palette from the first player frame (idle) as canonical order,
+                # then force all other frames to use the same ordering.
+                if tile_index == player_sprite_tile_indices[0]:
+                    # First player frame: extract palette and store as canonical
+                    palette = extract_palette(tile_8x8, max_colors=4)
+                    _player_canonical_palette = palette
+                    print(f"Player canonical palette (from tile {tile_index}): {palette}")
+                else:
+                    # Subsequent frames: use the canonical palette order
+                    palette = _player_canonical_palette
             else:
                 # Extract palette (max 4 colors for NES)
                 palette = extract_palette(tile_8x8, max_colors=4)
 
-            # Convert 8x8 tile to 16x16 sprite (4 8x8 tiles)
-            sprite_4tiles = convert_8x8_to_16x16_sprite(tile_8x8, palette)
+            # Convert to 16x16 sprite (4 8x8 tiles)
+            # If we have a 16x16 override, split it directly instead of rescaling 8x8
+            if tile_index in final_tile_16x16:
+                tile_16x16 = final_tile_16x16[tile_index]
+                tl = tile_16x16.crop((0, 0, 8, 8))
+                tr = tile_16x16.crop((8, 0, 16, 8))
+                bl = tile_16x16.crop((0, 8, 8, 16))
+                br = tile_16x16.crop((8, 8, 16, 16))
+                sprite_4tiles = [
+                    convert_tile_to_2bpp(tl, palette),
+                    convert_tile_to_2bpp(tr, palette),
+                    convert_tile_to_2bpp(bl, palette),
+                    convert_tile_to_2bpp(br, palette)
+                ]
+            else:
+                sprite_4tiles = convert_8x8_to_16x16_sprite(tile_8x8, palette)
 
             all_sprite_data.append((sprite_4tiles, palette))
             all_palettes.append(palette)
@@ -2287,6 +2595,9 @@ def main():
                 all_chr_tiles.extend(sprite_4tiles)
             else:
                 print(f"Excluded tile GID {tile_index} from CHR banks")
+
+    # Flush buffered tile exports as spritesheets
+    flush_exports(platform='nes')
 
     print(f"\nProcessed {len(all_sprite_data)} original 8x8 tiles")
     print(f"Generated {len(all_chr_tiles)} 8x8 tiles for CHR output (4 tiles per sprite)")
@@ -2504,24 +2815,43 @@ def main():
                         topLeftX = (mapNum % xMaps) * map_width_tiles_local
                         topLeftY = (mapNum // xMaps) * map_height_tiles_local
 
-                        # Extract 16x16 tile data for this level
-                        submap_data = []
-                        for y in range(map_height_tiles_local):
-                            row = []
-                            for x in range(map_width_tiles_local):
-                                global_x = topLeftX + x
-                                global_y = topLeftY + y
+                        # Check for level tilemap override
+                        level_override_path = load_level_override('nes', mapNum + 1, 'tilemap.json')
+                        if level_override_path:
+                            print(f"  [OVERRIDE] Level {mapNum + 1} tilemap from {level_override_path}")
+                            with open(level_override_path, 'r') as lf:
+                                override_level = json.load(lf)
+                            submap_data = []
+                            for olayer in override_level.get("layers", []):
+                                if olayer.get("type") == "tilelayer":
+                                    override_data = olayer.get("data", [])
+                                    for y in range(map_height_tiles_local):
+                                        row = override_data[y * map_width_tiles_local:(y + 1) * map_width_tiles_local]
+                                        while len(row) < map_width_tiles_local:
+                                            row.append(0)
+                                        submap_data.append(row)
+                                    break
+                            if not submap_data:
+                                submap_data = [[0] * map_width_tiles_local for _ in range(map_height_tiles_local)]
+                        else:
+                            # Extract 16x16 tile data for this level
+                            submap_data = []
+                            for y in range(map_height_tiles_local):
+                                row = []
+                                for x in range(map_width_tiles_local):
+                                    global_x = topLeftX + x
+                                    global_y = topLeftY + y
 
-                                # Check bounds
-                                if global_x < map_width_global and global_y < map_height_global:
-                                    index = global_y * map_width_global + global_x
-                                    if index < len(tile_data_all):
-                                        row.append(tile_data_all[index])
+                                    # Check bounds
+                                    if global_x < map_width_global and global_y < map_height_global:
+                                        index = global_y * map_width_global + global_x
+                                        if index < len(tile_data_all):
+                                            row.append(tile_data_all[index])
+                                        else:
+                                            row.append(0)
                                     else:
                                         row.append(0)
-                                else:
-                                    row.append(0)
-                            submap_data.append(row)
+                                submap_data.append(row)
 
                         # Flatten submap_data
                         flat_submap_data = []
@@ -3468,6 +3798,12 @@ def main():
             f.write("#endif // GID_TO_TILE_BIG_CHEST_H\n")
         print(f"Generated big chest header with 1 entry")
 
+
+    # Auto-generate NES sprite animation enums
+    # For NES, values are the source tile indices directly
+    nes_tile_indices_map = {i: i for i in range(len(all_sprite_data))}
+    nes_enums_path = os.path.join(script_dir, '..', 'src', 'port', 'sprite_animation_enums_nes.h')
+    generate_sprite_enums_nes(nes_tile_indices_map, nes_enums_path)
 
     print(f"\nConversion complete!")
     print(f"  CHR Bank 0: {output_chr_bank0}")

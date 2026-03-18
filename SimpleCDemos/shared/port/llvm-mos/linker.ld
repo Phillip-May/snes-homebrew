@@ -22,10 +22,10 @@ MEMORY {
         
     /* Bank-specific code regions - ~24KB each, placed after the 8KB fixed section */
     /* Leave space for vectors at 0xFFE4-0xFFFF (28 bytes) */
-    code_bank_0_only (rx) : ORIGIN = 0x008000, LENGTH = 0x6000  /* ~24KB for bank 0 specific code (ends before vectors) */
-    code_bank_1_only (rx) : ORIGIN = 0x018000, LENGTH = 0x6000  /* ~24KB for bank 1 specific code */
-    code_bank_2_only (rx) : ORIGIN = 0x028000, LENGTH = 0x6000  /* ~24KB for bank 2 specific code */
-    code_bank_3_only (rx) : ORIGIN = 0x038000, LENGTH = 0x6000  /* ~24KB for bank 3 specific code */
+    code_bank_0_only (rx) : ORIGIN = 0xA000, LENGTH = 0x6000  /* ~24KB for bank 0 specific code (ends before vectors) */
+    code_bank_1_only (rx) : ORIGIN = 0x01A000, LENGTH = 0x6000  /* ~24KB for bank 1 specific code */
+    code_bank_2_only (rx) : ORIGIN = 0x02A000, LENGTH = 0x6000  /* ~24KB for bank 2 specific code */
+    code_bank_3_only (rx) : ORIGIN = 0x03A000, LENGTH = 0x6000  /* ~24KB for bank 3 specific code */
     
     /* Data Banks - Separate from code banks */
     data_bank_1 (r) : ORIGIN = 0x048000, LENGTH = 0x8000  /* Data bank 1 */
@@ -47,30 +47,6 @@ SECTIONS {
   .text.startup : { *(.text.startup) } >code_bank_0_only
   .text.vectors : { *(.text.vectors) } >rom_bank_0_fixed
   
-  /* Define bank-specific text sections FIRST, before c.ld */
-  /* In GNU ld, sections are matched in order, so .text.bankX will match and consume */
-  /* their input sections before c.ld's general .text pattern can match them */
-  /* This ensures bank-specific functions go to their designated banks */
-  .text.bank0 : { 
-    *(.text.bank0)
-    *(.text.bank0.*)
-  } >code_bank_0_only
-  
-  .text.bank1 : { 
-    *(.text.bank1)
-    *(.text.bank1.*)
-  } >code_bank_1_only
-  
-  .text.bank2 : { 
-    *(.text.bank2)
-    *(.text.bank2.*)
-  } >code_bank_2_only
-  
-  .text.bank3 : { 
-    *(.text.bank3)
-    *(.text.bank3.*)
-  } >code_bank_3_only
-  
   /* Define bank-specific rodata sections FIRST, before c.ld */
   /* In GNU ld, more specific section names take precedence, so .rodata.bankX will match */
   /* before c.ld's general .rodata pattern. This ensures bank-specific data goes to data banks */
@@ -80,19 +56,9 @@ SECTIONS {
   .rodata.bank3 : { *(.rodata.bank3 .rodata.bank3.*) } >data_bank_3
   
   /* Include c.ld which will define default .text and .rodata sections */
-  /* c.ld's .text and .rodata patterns will only match sections not already matched above */
-  /* Bank-specific sections are defined above and will have already matched their input sections */
+  /* c.ld's .rodata might use *(.rodata .rodata.*) which could match bank-specific sections */
+  /* We override it below to be more restrictive */
   INCLUDE c.ld
-  
-  /* Override .text to only match exact .text sections (not .text.*) */
-  /* This ensures bank-specific .text.bankX sections go to their designated code banks */
-  /* Bank-specific sections are defined above and will have already matched their input sections */
-  /* Note: The pattern *(.text) should only match sections named exactly ".text", not ".text.*" */
-  /* But we place it in rom_bank_0_fixed to match the REGION_ALIAS for c_readonly */
-  .text : {
-    *(.text)
-    /* Note: .text.startup, .text.vectors, and .text.bankX are already matched by their specific sections above */
-  } >rom_bank_0_fixed
   
   /* Override .rodata to only match exact .rodata sections (not .rodata.*) */
   /* This ensures bank-specific .rodata.bankX sections go to their designated data banks */
@@ -101,6 +67,12 @@ SECTIONS {
     *(.rodata)
     /* Explicitly exclude .rodata.* patterns - they are handled by bank-specific sections above */
   } >rom_bank_0_fixed
+  
+  /* Explicit code bank sections (only used with section attributes) */
+  .text.bank0 : { *(.text.bank0 .text.bank0.*) } >code_bank_0_only
+  .text.bank1 : { *(.text.bank1 .text.bank1.*) } >code_bank_1_only
+  .text.bank2 : { *(.text.bank2 .text.bank2.*) } >code_bank_2_only
+  .text.bank3 : { *(.text.bank3 .text.bank3.*) } >code_bank_3_only
   
   /* Ensure data initialization is properly handled */
   .data : {
