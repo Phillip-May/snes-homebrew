@@ -7,6 +7,33 @@
 #include <stdint.h>
 #include <string.h>
 #include <mapper.h>
+// FamiStudio Sound Engine - raw entry points (6502 register calling convention)
+extern void famistudio_init(void);       // X=data_lo, Y=data_hi
+extern void famistudio_music_play(void); // A=song_index
+extern void famistudio_music_stop(void);
+extern void famistudio_update(void);
+
+// C wrappers that set up 6502 registers for the engine's calling convention
+static void fs_init(const unsigned char *data) {
+    // famistudio_init wants X=lo, Y=hi of data pointer
+    uint8_t lo = (uint8_t)((uint16_t)data);
+    uint8_t hi = (uint8_t)((uint16_t)data >> 8);
+    __asm__ volatile(
+        "ldx %0\n"
+        "ldy %1\n"
+        "jsr famistudio_init\n"
+        : : "r"(lo), "r"(hi) : "a", "x", "y"
+    );
+}
+
+static void fs_play(uint8_t song) {
+    // famistudio_music_play wants A=song index
+    __asm__ volatile(
+        "lda %0\n"
+        "jsr famistudio_music_play\n"
+        : : "r"(song) : "a", "x", "y"
+    );
+}
 
 // sprite_animation_enums_nes.h is included by port.h when __NES__ is defined
 #include "../../python/gid_to_tile_shared.h"
@@ -65,25 +92,36 @@
 extern uint8_t OAM_BUF[];
 
 static volatile uint8_t s_inputState = 0;
-static uint8_t s_oamIndex = 0;
 static uint8_t s_scrollY = 0; // Vertical scroll position
 static uint8_t s_frameCounter = 0; // For screenshake pattern
 
+// Sprite flickering via alternating OAM write direction.
+// Player sprites always occupy OAM slots 0-3 (bytes 0-15).
+// Even frames: objects write forward from low OAM slots (first object = highest priority).
+// Odd frames:  objects write backward from high OAM slots (first object = lowest priority).
+// This flips OAM priority order every frame, giving even 50/50 flicker when
+// the hardware 8-per-scanline limit forces sprite drops.
+#define OAM_PLAYER_END 16   // Player uses bytes 0-15 (4 sprites)
+#define OAM_LAST_SLOT  252  // Last valid OAM byte offset (slot 63)
+static uint8_t s_oamCursor = OAM_PLAYER_END;
+static int8_t  s_oamDirection = 4;  // +4 = forward, -4 = backward
+static uint8_t s_rotateOffset = 0;
+
 // Queue of pending background tile object updates (collapse tiles, breakable walls, etc.)
-#define MAX_PENDING_BG_TILE_UPDATES 30
+#define MAX_PENDING_BG_TILE_UPDATES 8
 static uint8_t s_pendingBgTileUpdates[MAX_PENDING_BG_TILE_UPDATES];
 static uint8_t s_pendingBgTileCount = 0;
 
-// Pre-calculated VRAM write operations for background tile objects (to move calculations before vblank)
-#define MAX_BG_TILE_WRITES 30
+// Pre-calculated VRAM write operations for background tile objects
+// Only 1 processed per frame, static buffer replaces 390-byte stack allocation
+#define MAX_BG_TILE_WRITES 2
 typedef struct {
     uint16_t addr_top;
     uint16_t addr_bottom;
-    uint16_t addr_row2;  // For 4x4 breakable walls
-    uint16_t addr_row3;  // For 4x4 breakable walls
-    uint16_t addr_row4;  // For 4x4 breakable walls
-    const unsigned char *tile_data;  // Pointer to tile entry (2x2: TL, TR, BL, BR, palette, flip) or (4x4: 16 tiles, palette, flip)
-    uint8_t is_4x4;  // 1 for 4x4 breakable walls, 0 for 2x2 collapse tiles
+    uint16_t addr_row2;
+    uint16_t addr_row3;
+    const unsigned char *tile_data;
+    uint8_t is_4x4;
 } BgTileWrite;
 
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
@@ -398,16 +436,12 @@ static void decompress_tilemap(const unsigned char *compressed_data, uint8_t *ou
     while (out_idx < LEVEL_TILE_COUNT) output[out_idx++] = 0;
 }
 
-static void oam_upload(void) {
-    OAM_ADDR = 0x00;
-    OAM_DMA = (uint8_t)(((uintptr_t)OAM_BUF) >> 8);
-}
 
 static const unsigned char* get_object_sprite_data(uint8_t tile_index);
-static void hide_sprites(uint16_t oamOffset);
-static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset);
-static void render_16x8_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset);
-static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset);
+static void push_sprite(uint8_t y, uint8_t tile, uint8_t attr, uint8_t x);
+static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps);
+static void render_16x8_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps);
+static void render_object_sprite(OBJ_DATA *obj);
 
 // get_object_sprite_data must stay in fixed bank - used by port_updatePlayerSprite (fixed bank)
 // object_sprite_lookup_table and object_sprite_dict_compact are in bank 5
@@ -423,50 +457,25 @@ static const unsigned char* get_object_sprite_data(uint8_t tile_index) {
     // Note: Bank 5 remains active - caller must switch back to bank 0 after using the sprite data
 }
 
-static void hide_sprites(uint16_t oamOffset) {
-    OAM_BUF[oamOffset + 0] = 240;
-    OAM_BUF[oamOffset + 4] = 240;
-    OAM_BUF[oamOffset + 8] = 240;
-    OAM_BUF[oamOffset + 12] = 240;
-}
-
-static void hide_2_sprites(uint16_t oamOffset) {
-    OAM_BUF[oamOffset + 0] = 240;
-    OAM_BUF[oamOffset + 4] = 240;
-}
-
-// Calculate OAM offset for an object at the given index
-// Accounts for objects that use extra slots (e.g., balloon uses 8 slots instead of 4)
-// Returns offset in bytes (each sprite slot is 4 bytes)
+// Write a sprite to OAM_BUF at the current cursor, advancing in the current direction.
+// Forward: cursor goes 16→20→24→...→252 then wraps to 16
+// Backward: cursor goes 252→248→244→...→16 then wraps to 252
 __attribute__((section(".prg_rom_6")))
-static uint16_t calculate_oam_offset(uint8_t index) {
-    // Player uses index 0, objects start at index 1
-    // Each 16x16 sprite uses 4 OAM slots (4 bytes each = 16 bytes total)
-    // Balloon uses 8 slots (2 16x16 sprites = 32 bytes total)
-    // Moving platforms use 4 slots (2 16x8 sprites = 16 bytes total)
-    // Flying berry uses 12 slots (1 16x16 sprite + 2 wing sprites = 48 bytes total)
-    uint16_t offset = 16; // Player sprite at index 0 uses first 16 bytes (4 slots)
-    
-    // Count slots used by all objects before this one
-    for (uint8_t i = 1; i < index && i < GLOBAL_OBJ_LIST_SIZE; i++) {
-        if (GLOBAL_OBJList[i].eType == OBJ_BALLOON) {
-            offset += 32; // Balloon uses 8 slots (32 bytes)
-        } else if (GLOBAL_OBJList[i].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[i].eType == OBJ_PLATMOV_R) {
-            offset += 16; // Moving platforms use 4 slots (16 bytes: 2 sprites × 8 bytes each)
-        } else if (GLOBAL_OBJList[i].eType == OBJ_FLYING_BERRY) {
-            offset += 48; // Flying berry uses 12 slots (48 bytes: 1 16x16 sprite + 2 wing sprites)
-        } else {
-            offset += 16; // Normal objects use 4 slots (16 bytes)
-        }
+static void push_sprite(uint8_t y, uint8_t tile, uint8_t attr, uint8_t x) {
+    OAM_BUF[s_oamCursor + 0] = y;
+    OAM_BUF[s_oamCursor + 1] = tile;
+    OAM_BUF[s_oamCursor + 2] = attr;
+    OAM_BUF[s_oamCursor + 3] = x;
+    s_oamCursor += s_oamDirection;
+    // Wrap around within non-player region
+    if (s_oamCursor < OAM_PLAYER_END || s_oamCursor > OAM_LAST_SLOT) {
+        s_oamCursor = (s_oamDirection > 0) ? OAM_PLAYER_END : OAM_LAST_SLOT;
     }
-    
-    return offset;
 }
 
 __attribute__((section(".prg_rom_6")))
-static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset) {
+static void render_object_sprite(OBJ_DATA *obj) {
     if (obj->eType == OBJ_UNUSED) {
-        hide_sprites(oamOffset);
         return;
     }
     uint8_t baseX = (uint8_t)obj->pos.x;
@@ -475,63 +484,87 @@ static void render_object_sprite(OBJ_DATA *obj, uint16_t oamOffset) {
     uint8_t tile_index = obj->oamTile;
     const unsigned char *sprite_data = get_object_sprite_data(tile_index);
     if (sprite_data == NULL) {
-        hide_sprites(oamOffset);
         return;
     }
-    render_16x16_sprite(sprite_data, baseX, baseY, obj->oamProps, oamOffset);
+    render_16x16_sprite(sprite_data, baseX, baseY, obj->oamProps);
 }
 
 
+
+// Music data (assembled into bank 7)
+extern const unsigned char music_data_untitled[];
 
 void port_init(void) {
     memset(&GLOBAL_ActiveLevel, 0, sizeof(GLOBAL_ActiveLevel));
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
-    
 
     ppu_off();
     oam_clear();
     oam_size(0);
-    
-    // Enable both background and sprites
     ppu_on_all();
-    
     PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
-    ppu_wait_nmi();
+    ppu_wait_nmi();  // First NMI sets NTSC_MODE — must happen before music init
 
+    // Init FamiTone2 after NTSC_MODE is set
+    // Init FamiStudio engine (engine + data both in bank 7)
+    set_prg_bank(BANK_MUSIC);
+    fs_init(music_data_untitled);
+    fs_play(0);
+    set_prg_bank(0);
 }
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj) {
     (void)playerObj;
-    oam_set(0);
+    // Hide all non-player OAM entries; visible sprites overwrite them.
+    memset(&OAM_BUF[OAM_PLAYER_END], 240, 256 - OAM_PLAYER_END);
+    // Alternate write direction each frame:
+    // Even frames: write forward from low OAM (object 1 gets highest priority)
+    // Odd frames:  write backward from high OAM (object 1 gets lowest priority)
+    if (s_rotateOffset & 1) {
+        s_oamCursor = OAM_LAST_SLOT;
+        s_oamDirection = -4;
+    } else {
+        s_oamCursor = OAM_PLAYER_END;
+        s_oamDirection = 4;
+    }
 }
 
 void port_finishSpriteBuild(void) {
-
+    s_rotateOffset++;
 }
 
 void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     if (playerObj == NULL) {
         return;
     }
-    
+
     const struct sOBJ_DATA *playerData = &playerObj->objData;
     uint8_t baseX = (uint8_t)playerData->pos.x;
     uint8_t spriteY = (uint8_t)playerData->pos.y;
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
-    uint8_t tile_index = playerData->oamTile;
-    const unsigned char *player_sprite = get_object_sprite_data(tile_index);
-    if (player_sprite == NULL) {
-        set_prg_bank(0);  // get_object_sprite_data may have switched to bank 5, switch back
-        hide_sprites(0);
+    const unsigned char *sd = get_object_sprite_data(playerData->oamTile);
+    if (sd == NULL) {
+        set_prg_bank(0);
+        memset(OAM_BUF, 240, OAM_PLAYER_END);
         return;
     }
-    
-    render_16x16_sprite(player_sprite, baseX, baseY, playerData->oamProps, 0);
-    set_prg_bank(0);  // get_object_sprite_data switched to bank 5, switch back to fixed bank
+    // Write player directly to OAM slots 0-3 (fixed, no rotation)
+    uint8_t props = (sd[0] & 0x03) & ~0x20;
+    bool flipH = (playerData->oamProps & 0x40) != 0;
+    if (flipH) props |= 0x40;
+    uint8_t t0 = flipH ? sd[2] : sd[1], t1 = flipH ? sd[1] : sd[2];
+    uint8_t t2 = flipH ? sd[4] : sd[3], t3 = flipH ? sd[3] : sd[4];
+    OAM_BUF[0]=baseY;   OAM_BUF[1]=t0; OAM_BUF[2]=props;  OAM_BUF[3]=baseX;
+    OAM_BUF[4]=baseY;   OAM_BUF[5]=t1; OAM_BUF[6]=props;  OAM_BUF[7]=baseX+8;
+    OAM_BUF[8]=baseY+8; OAM_BUF[9]=t2; OAM_BUF[10]=props; OAM_BUF[11]=baseX;
+    OAM_BUF[12]=baseY+8;OAM_BUF[13]=t3;OAM_BUF[14]=props; OAM_BUF[15]=baseX+8;
+    set_prg_bank(0);
 }
 
 __attribute__((section(".prg_rom_6")))
 void port_buildUnused(uint8_t index) {
+    // Clear dirty flag - no sprites to push for unused objects
+    GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -545,46 +578,39 @@ void port_buildBreakableWall(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildBalloon(uint8_t index) {
     OBJ_DATA *balloon = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
-    
+
     // Check if balloon should be hidden (unused, popped, or hidden)
     // BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1
-    if (balloon->eType == OBJ_UNUSED || 
+    if (balloon->eType == OBJ_UNUSED ||
         balloon->data.balloon.state == 1 ||
         balloon->data.balloon.hideFrameCount > 0) {
-        // Hide both balloon and string sprites
-        hide_sprites(oamOffset);
-        hide_sprites(oamOffset + 16);  // String sprite offset (4 sprites * 4 bytes)
         return;
     }
-    
+
     // Calculate balloon position with Y offset for bob animation
     uint8_t baseX = (uint8_t)balloon->pos.x;
     uint8_t spriteY = (uint8_t)balloon->pos.y;
     int8_t yOffset = balloon->data.balloon.spriteYOffset;
     uint8_t balloonY = (spriteY < 240) ? ((uint8_t)((int16_t)spriteY - (int16_t)s_scrollY + (int16_t)yOffset)) : ((uint8_t)((int16_t)spriteY + (int16_t)yOffset));
-    
+
     // Render balloon sprite (top 16x16 sprite)
     uint8_t tile_index = balloon->oamTile;  // BALLOON_SPRITE_1 = 22
     const unsigned char *balloon_sprite_data = get_object_sprite_data(tile_index);
     if (balloon_sprite_data == NULL) {
-        hide_sprites(oamOffset);
-        hide_sprites(oamOffset + 16);
         return;
     }
-    render_16x16_sprite(balloon_sprite_data, baseX, balloonY, balloon->oamProps, oamOffset);
-    
+    render_16x16_sprite(balloon_sprite_data, baseX, balloonY, balloon->oamProps);
+
     // Render string sprite (bottom 16x16 sprite, positioned below balloon)
     uint8_t stringTile = balloon->data.balloon.stringTile;  // BALLOON_STRING_1, BALLOON_STRING_2, or BALLOON_STRING_3
     const unsigned char *string_sprite_data = get_object_sprite_data(stringTile);
     if (string_sprite_data == NULL) {
-        hide_sprites(oamOffset + 16);
         return;
     }
     // String sprite is positioned 14 pixels below the balloon (moved up 2 pixels)
     uint8_t stringY = balloonY + 14;
     // Use same palette as balloon
-    render_16x16_sprite(string_sprite_data, baseX, stringY, balloon->oamProps, oamOffset + 16);
+    render_16x16_sprite(string_sprite_data, baseX, stringY, balloon->oamProps);
 }
 
 __attribute__((section(".prg_rom_6")))
@@ -597,18 +623,15 @@ void port_buildMonument(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildChest(uint8_t index) {
     OBJ_DATA *chest = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
     if (chest->eType == OBJ_UNUSED) {
-        hide_sprites(oamOffset);
         return;
     }
     // Hide chest when it's in the OPEN state (state == 2)
     // CHEST_STATE_OPEN = 2
     if (chest->data.chest.state == 2) {
-        hide_sprites(oamOffset);
         return;
     }
-    render_object_sprite(chest, oamOffset);
+    render_object_sprite(chest);
     // render_object_sprite calls get_object_sprite_data which switches to bank 5
     // We need to switch back to bank 6 since this function is in bank 6
     set_prg_bank(6);
@@ -624,18 +647,18 @@ void port_buildBigChest(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildKey(uint8_t index) {
     OBJ_DATA *key = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
     if (key->eType == OBJ_UNUSED) {
-        hide_sprites(oamOffset);
         return;
     }
-    render_object_sprite(key, oamOffset);
+    render_object_sprite(key);
     // render_object_sprite calls get_object_sprite_data which switches to bank 5
     // We need to switch back to bank 6 since this function is in bank 6
     set_prg_bank(6);
 }
 
-static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset) {
+// Render a 16x16 object sprite into rotating OAM slots
+__attribute__((section(".prg_rom_6")))
+static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps) {
     if (sprite_data == NULL) return;
     uint8_t palette_idx = sprite_data[0];
     uint8_t tl_tile = sprite_data[1], tr_tile = sprite_data[2];
@@ -643,47 +666,46 @@ static void render_16x16_sprite(const unsigned char *sprite_data, uint8_t baseX,
     uint8_t baseProps = (palette_idx & 0x03) & ~0x20;
     bool flip_horizontal = (oamProps & 0x40) != 0;
     if (flip_horizontal) baseProps |= 0x40;
-    
+
     if (flip_horizontal) {
-        OAM_BUF[oamOffset + 0] = baseY; OAM_BUF[oamOffset + 1] = tr_tile; OAM_BUF[oamOffset + 2] = baseProps; OAM_BUF[oamOffset + 3] = baseX;
-        OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tl_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
-        OAM_BUF[oamOffset + 8] = baseY + 8; OAM_BUF[oamOffset + 9] = br_tile; OAM_BUF[oamOffset + 10] = baseProps; OAM_BUF[oamOffset + 11] = baseX;
-        OAM_BUF[oamOffset + 12] = baseY + 8; OAM_BUF[oamOffset + 13] = bl_tile; OAM_BUF[oamOffset + 14] = baseProps; OAM_BUF[oamOffset + 15] = baseX + 8;
+        push_sprite(baseY,     tr_tile, baseProps, baseX);
+        push_sprite(baseY,     tl_tile, baseProps, baseX + 8);
+        push_sprite(baseY + 8, br_tile, baseProps, baseX);
+        push_sprite(baseY + 8, bl_tile, baseProps, baseX + 8);
     } else {
-        OAM_BUF[oamOffset + 0] = baseY; OAM_BUF[oamOffset + 1] = tl_tile; OAM_BUF[oamOffset + 2] = baseProps; OAM_BUF[oamOffset + 3] = baseX;
-        OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tr_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
-        OAM_BUF[oamOffset + 8] = baseY + 8; OAM_BUF[oamOffset + 9] = bl_tile; OAM_BUF[oamOffset + 10] = baseProps; OAM_BUF[oamOffset + 11] = baseX;
-        OAM_BUF[oamOffset + 12] = baseY + 8; OAM_BUF[oamOffset + 13] = br_tile; OAM_BUF[oamOffset + 14] = baseProps; OAM_BUF[oamOffset + 15] = baseX + 8;
+        push_sprite(baseY,     tl_tile, baseProps, baseX);
+        push_sprite(baseY,     tr_tile, baseProps, baseX + 8);
+        push_sprite(baseY + 8, bl_tile, baseProps, baseX);
+        push_sprite(baseY + 8, br_tile, baseProps, baseX + 8);
     }
 }
 
 // Render a 16x8 sprite (2 sprites: left and right, top row only)
-static void render_16x8_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps, uint16_t oamOffset) {
+__attribute__((section(".prg_rom_6")))
+static void render_16x8_sprite(const unsigned char *sprite_data, uint8_t baseX, uint8_t baseY, uint8_t oamProps) {
     if (sprite_data == NULL) return;
     uint8_t palette_idx = sprite_data[0];
     uint8_t tl_tile = sprite_data[1], tr_tile = sprite_data[2];
     uint8_t baseProps = (palette_idx & 0x03) & ~0x20;
     bool flip_horizontal = (oamProps & 0x40) != 0;
     if (flip_horizontal) baseProps |= 0x40;
-    
+
     if (flip_horizontal) {
-        OAM_BUF[oamOffset + 0] = baseY; OAM_BUF[oamOffset + 1] = tr_tile; OAM_BUF[oamOffset + 2] = baseProps; OAM_BUF[oamOffset + 3] = baseX;
-        OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tl_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
+        push_sprite(baseY, tr_tile, baseProps, baseX);
+        push_sprite(baseY, tl_tile, baseProps, baseX + 8);
     } else {
-        OAM_BUF[oamOffset + 0] = baseY; OAM_BUF[oamOffset + 1] = tl_tile; OAM_BUF[oamOffset + 2] = baseProps; OAM_BUF[oamOffset + 3] = baseX;
-        OAM_BUF[oamOffset + 4] = baseY; OAM_BUF[oamOffset + 5] = tr_tile; OAM_BUF[oamOffset + 6] = baseProps; OAM_BUF[oamOffset + 7] = baseX + 8;
+        push_sprite(baseY, tl_tile, baseProps, baseX);
+        push_sprite(baseY, tr_tile, baseProps, baseX + 8);
     }
 }
 
 __attribute__((section(".prg_rom_6")))
 void port_buildSpring(uint8_t index) {
     OBJ_DATA *spring = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
     if (spring->eType == OBJ_UNUSED || spring->data.spring.isDisabled) {
-        hide_sprites(oamOffset);
         return;
     }
-    render_object_sprite(spring, oamOffset);
+    render_object_sprite(spring);
 }
 
 // Queue a background tile object update (called from mainBankZero.c when state changes)
@@ -820,7 +842,6 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
             write->addr_bottom = nametable_base_row2 + ((uint16_t)nes_tile_y_adj_row2 * 32) + nes_tile_x;
             write->addr_row2 = nametable_base_row3 + ((uint16_t)nes_tile_y_adj_row3 * 32) + nes_tile_x;
             write->addr_row3 = nametable_base_row4 + ((uint16_t)nes_tile_y_adj_row4 * 32) + nes_tile_x;
-            write->addr_row4 = 0;  // Not used, but initialize for consistency
             write->is_4x4 = 1;
         } else if (is_monument) {
             // 4x4 grid for monuments (same as breakable walls)
@@ -844,7 +865,6 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
             write->addr_bottom = nametable_base_row2 + ((uint16_t)nes_tile_y_adj_row2 * 32) + nes_tile_x;
             write->addr_row2 = nametable_base_row3 + ((uint16_t)nes_tile_y_adj_row3 * 32) + nes_tile_x;
             write->addr_row3 = nametable_base_row4 + ((uint16_t)nes_tile_y_adj_row4 * 32) + nes_tile_x;
-            write->addr_row4 = 0;  // Not used, but initialize for consistency
             write->is_4x4 = 1;
         } else {
             // 2x2 grid for collapse tiles
@@ -859,7 +879,6 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
             write->addr_bottom = nametable_base_bottom + ((uint16_t)nes_tile_y_adj_bottom * 32) + nes_tile_x;
             write->addr_row2 = 0;
             write->addr_row3 = 0;
-            write->addr_row4 = 0;
             write->is_4x4 = 0;
         }
         
@@ -979,52 +998,41 @@ void port_buildCollapseTile(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildStrawberry(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
-    if (strawberry->eType == OBJ_UNUSED || 
+    if (strawberry->eType == OBJ_UNUSED ||
         (strawberry->data.strawberry.isCollected && strawberry->data.strawberry.frameCount > 60)) {
-        hide_sprites(oamOffset);
         return;
     }
-    render_object_sprite(strawberry, oamOffset);
+    render_object_sprite(strawberry);
 }
 
 __attribute__((section(".prg_rom_6")))
 void port_buildPlatMov(uint8_t index) {
     OBJ_DATA *platMov = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
     if (platMov->eType == OBJ_UNUSED) {
-        // Hide both left and right sprites
-        hide_2_sprites(oamOffset);
-        hide_2_sprites(oamOffset + 8);
         return;
     }
-    
+
     uint8_t baseX = (uint8_t)platMov->pos.x;
     uint8_t spriteY = (uint8_t)platMov->pos.y;
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
     uint8_t oamProps = platMov->oamProps;
-    
+
     // Render left side (PLATMOV_SPRITE_1 = 11)
     const unsigned char *left_sprite_data = get_object_sprite_data(PLATMOV_SPRITE_1);
     if (left_sprite_data == NULL) {
-        // Hide both left and right sprites on error
-        hide_2_sprites(oamOffset);
-        hide_2_sprites(oamOffset + 8);
         set_prg_bank(6);
         return;
     }
-    render_16x8_sprite(left_sprite_data, baseX, baseY, oamProps, oamOffset);
-    
+    render_16x8_sprite(left_sprite_data, baseX, baseY, oamProps);
+
     // Render right side (PLATMOV_SPRITE_2 = 12) at baseX + 16
     const unsigned char *right_sprite_data = get_object_sprite_data(PLATMOV_SPRITE_2);
     if (right_sprite_data == NULL) {
-        // Hide right sprite on error (left already rendered)
-        hide_2_sprites(oamOffset + 8);
         set_prg_bank(6);
         return;
     }
-    render_16x8_sprite(right_sprite_data, baseX + 16, baseY, oamProps, oamOffset + 8);
-    
+    render_16x8_sprite(right_sprite_data, baseX + 16, baseY, oamProps);
+
     // get_object_sprite_data switches to bank 5, switch back to bank 6
     set_prg_bank(6);
 }
@@ -1032,27 +1040,21 @@ void port_buildPlatMov(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildFlyingBerry(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
-    bool isHidden = (berry->eType == OBJ_UNUSED || 
+    bool isHidden = (berry->eType == OBJ_UNUSED ||
                      (berry->data.strawberry.isCollected && berry->data.strawberry.frameCount > 60));
-    
+
     if (isHidden) {
-        // Hide main berry sprite and both wings
-        hide_sprites(oamOffset);
-        hide_sprites(oamOffset + 16);  // Left wing (16x16 = 4 slots)
-        hide_sprites(oamOffset + 32);  // Right wing (16x16 = 4 slots)
         return;
     }
-    
+
     // Render main berry sprite
-    render_object_sprite(berry, oamOffset);
-    
+    render_object_sprite(berry);
+
     // Calculate wing position and animation
     uint8_t baseX = (uint8_t)berry->pos.x;
     uint8_t spriteY = (uint8_t)berry->pos.y;
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
-    uint8_t oamProps = berry->oamProps;
-    
+
     // Determine wing tile based on vertical movement (comparing current Y to startY)
     int16_t deltaY = (int16_t)berry->pos.y - (int16_t)berry->data.strawberry.startY;
     uint8_t wingTile;
@@ -1063,28 +1065,26 @@ void port_buildFlyingBerry(uint8_t index) {
     } else {
         wingTile = FLYING_BERRY_WING_MID;  // At rest
     }
-    
+
     // Get wing sprite data
     const unsigned char *wing_sprite_data = get_object_sprite_data(wingTile);
     if (wing_sprite_data == NULL) {
-        hide_sprites(oamOffset + 16);
-        hide_sprites(oamOffset + 32);
         set_prg_bank(6);
         return;
     }
-    
+
     // Render left wing (at baseX - 14, baseY - 2)
     // Left wing uses flipped properties (0x74 = priority 3, palette 2, flip horizontal)
     uint8_t leftWingX = (baseX >= 14) ? (baseX - 14) : 0;
     uint8_t leftWingY = (baseY >= 2) ? (baseY - 2) : 0;
-    render_16x16_sprite(wing_sprite_data, leftWingX, leftWingY, 0x74, oamOffset + 16);
-    
+    render_16x16_sprite(wing_sprite_data, leftWingX, leftWingY, 0x74);
+
     // Render right wing (at baseX + 14, baseY - 2)
     // Right wing uses normal properties (0x34 = priority 3, palette 2)
     uint8_t rightWingX = baseX + 14;
     uint8_t rightWingY = (baseY >= 2) ? (baseY - 2) : 0;
-    render_16x16_sprite(wing_sprite_data, rightWingX, rightWingY, 0x34, oamOffset + 32);
-    
+    render_16x16_sprite(wing_sprite_data, rightWingX, rightWingY, 0x34);
+
     // get_object_sprite_data switches to bank 5, switch back to bank 6
     set_prg_bank(6);
 }
@@ -1092,12 +1092,10 @@ void port_buildFlyingBerry(uint8_t index) {
 __attribute__((section(".prg_rom_6")))
 void port_buildDoubleDashOrb(uint8_t index) {
     OBJ_DATA *orb = &GLOBAL_OBJList[index];
-    uint16_t oamOffset = calculate_oam_offset(index);
     if (orb->eType == OBJ_UNUSED) {
-        hide_sprites(oamOffset);
         return;
     }
-    render_object_sprite(orb, oamOffset);
+    render_object_sprite(orb);
     // render_object_sprite calls get_object_sprite_data which switches to bank 5
     // We need to switch back to bank 6 since this function is in bank 6
     set_prg_bank(6);
@@ -1111,21 +1109,47 @@ __attribute__((section(".prg_rom_6")))
 void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    if ((obj->flags & OBJ_FLAG_DIRTY) == 0U) {
-        return;
-    }
+    // Player sprite is handled by port_updatePlayerSprite, skip here
     if (index == 0U) {
         obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
         return;
     }
     if (eType == OBJ_UNUSED) {
-        port_buildUnused(index);
+        obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
         return;
     }
 
-    if (eType == OBJ_SMOKE) {
-        port_buildSmoke(index);
-    } else if (eType == OBJ_DOUBLE_JUMP_ORB) {
+    // BG-tile-only and no-op object types: only process when dirty.
+    // These don't push OAM sprites, so rebuilding every frame just
+    // wastes CPU cycles that are needed for vblank nametable updates.
+    if (eType == OBJ_COLLAPSE_TILE || eType == OBJ_BREAKABLE_WALL ||
+        eType == OBJ_MONUMENT || eType == OBJ_BIG_CHEST ||
+        eType == OBJ_DECO_TREE || eType == OBJ_DECO_FLOWER ||
+        eType == OBJ_SMOKE) {
+        if ((obj->flags & OBJ_FLAG_DIRTY) == 0U) {
+            return;
+        }
+        obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+        // Dispatch to their (mostly no-op) build functions
+        if (eType == OBJ_COLLAPSE_TILE) {
+            port_buildCollapseTile(index);
+        } else if (eType == OBJ_BREAKABLE_WALL) {
+            port_buildBreakableWall(index);
+        } else if (eType == OBJ_MONUMENT) {
+            port_buildMonument(index);
+        } else if (eType == OBJ_BIG_CHEST) {
+            port_buildBigChest(index);
+        }
+        // SMOKE, DECO_TREE, DECO_FLOWER have empty build functions
+        return;
+    }
+
+    // Sprite-based objects: always rebuild every frame.
+    // OAM slot assignments alternate direction each frame for flicker,
+    // so every visible sprite must be re-pushed regardless of dirty flag.
+    obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+
+    if (eType == OBJ_DOUBLE_JUMP_ORB) {
         port_buildDoubleDashOrb(index);
     } else if (eType == OBJ_KEY) {
         port_buildKey(index);
@@ -1137,25 +1161,19 @@ void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
         port_buildChest(index);
     } else if (eType == OBJ_BALLOON) {
         port_buildBalloon(index);
-    } else if (eType == OBJ_COLLAPSE_TILE) {
-        port_buildCollapseTile(index);
     } else if (eType == OBJ_STRAWBERRY) {
         port_buildStrawberry(index);
     } else if (eType == OBJ_FLYING_BERRY) {
         port_buildFlyingBerry(index);
-    } else if (eType == OBJ_DECO_TREE || eType == OBJ_DECO_FLOWER) {
-        port_buildStaticDecor(index);
-    } else if (eType == OBJ_BREAKABLE_WALL) {
-        port_buildBreakableWall(index);
-    } else if (eType == OBJ_MONUMENT) {
-        port_buildMonument(index);
-    } else if (eType == OBJ_BIG_CHEST) {
-        port_buildBigChest(index);
     }
 }
 
 void port_resetSprites(void) {
-    oam_hide_rest();
+    s_oamCursor = OAM_PLAYER_END;
+    // Hide all OAM entries
+    for (uint16_t i = 0; i < 256; i += 4) {
+        OAM_BUF[i] = 240;
+    }
     s_inputState = 0;
 }
 
@@ -1177,7 +1195,7 @@ __attribute__((noinline)) void port_vblank(void) {
     s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
     BgTileWrite bgTileWrites[MAX_BG_TILE_WRITES];
     uint8_t bgTileWriteCount = 0;
-    set_prg_bank(6);  // Switch to bank 6 for background tile object functions (code is in bank 6)
+    set_prg_bank(6);
     prepare_bg_tiles_nametable(bgTileWrites, &bgTileWriteCount);
     ppu_wait_nmi();
     volatile uint8_t raw_state = (uint8_t)pad_poll_fn(0);
@@ -1192,12 +1210,10 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_LEFT)   mapped_state |= PORT_INPUT_LEFT_MASK;
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
-    //oam_upload(); //This appears to trigger anyway looking in mesen
-    // execute_bg_tiles_nametable_writes is in bank 6, bank already switched above
     execute_bg_tiles_nametable_writes(bgTileWrites, bgTileWriteCount);
-    set_prg_bank(0);  // Switch back to fixed bank
+    set_prg_bank(0);
     update_player_hair_color();
-    
+
     // Apply screenshake to scroll if active
     int8_t shakeOffset = 0;
     if (GLOBAL_ActiveLevel.shakeFrames > 0) {
@@ -1222,44 +1238,39 @@ static uint8_t nes_6bit_to_palette_index(uint8_t nes_6bit) {
 // Upper 16 bytes (16-31): 4 sprite palettes * 4 colors
 static uint8_t palette_ram[32];
 
-// Determine which PRG-ROM bank contains a given level
-// Levels are organized: 1-10 in bank 1, 11-20 in bank 2, 21-31 in bank 3
 static inline uint8_t get_level_bank(uint16_t level_idx) {
-    return 1;  // All levels are in bank 1
+    (void)level_idx;
+    return 1; // All levels currently in bank 1
 }
 
-// Moved to fixed bank - code in bank 6 should not switch banks
 static void load_background_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
+    set_prg_bank(1);
     const LevelData *level = &level_data[level_idx];
-    uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             palette_ram[pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(level->bg_palettes[pal_idx][col_idx]);
         }
     }
     pal_bg(palette_ram);
-    set_prg_bank(6);  // Switch back to bank 6 before returning (load_background_palettes is in bank 6)
+    set_prg_bank(6);
 }
 
-// Moved to fixed bank - code in bank 6 should not switch banks
 static void load_sprite_palettes(void) {
     for (uint8_t i = 0; i < 16; i++) palette_ram[16 + i] = 0x0D;
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
-    set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
+    set_prg_bank(1);
     const LevelData *level = &level_data[level_idx];
-    uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
     for (uint8_t pal_idx = 0; pal_idx < 4; pal_idx++) {
         for (uint8_t col_idx = 0; col_idx < 4; col_idx++) {
             palette_ram[16 + pal_idx * 4 + col_idx] = nes_6bit_to_palette_index(level->sprite_palettes[pal_idx][col_idx]);
         }
     }
     pal_spr(&palette_ram[16]);
-    set_prg_bank(0);  // Switch back to fixed bank before returning (load_sprite_palettes is in fixed bank)
+    set_prg_bank(0);
 }
 
 static void update_player_hair_color(void) {
@@ -1277,7 +1288,6 @@ static uint8_t get_palette_from_gid(uint8_t gid, const unsigned char (*gid_to_ti
     return (gid_to_tile_map[gid][4] & 0x03);
 }
 
-// Moved to fixed bank - code in bank 6 should not switch banks
 static void write_nametable(void) {
     uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
     if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
@@ -1386,7 +1396,7 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
     }
 }
 
-__attribute__((section(".prg_rom_6")))
+// Must be in fixed bank — does internal bank switching to banks 1 and 5
 void port_LoadRoomData(uint16_t roomID) {
     ppu_off(); // Turn off rendering immediately when reloading
     uint16_t level_idx = roomID - 1;
@@ -1407,7 +1417,6 @@ void port_LoadRoomData(uint16_t roomID) {
     for (uint16_t i = 0; i < LEVEL_TILE_COUNT && i < 256; i++) {
         uint8_t gid = decompressed_tilemap[i];
         uint8_t collision_flag = (gid < GID_TO_COLLISION_COUNT) ? gid_to_collision[gid] : 0;
-        GLOBAL_ActiveLevel.collisionFlagsReset[i] = collision_flag;
         GLOBAL_ActiveLevel.collisionFlagsArr[i] = collision_flag;
     }
     // Switch back to bank 1 to access level_data array (all levels are in bank 1)
@@ -1426,6 +1435,24 @@ void port_LoadRoomData(uint16_t roomID) {
     load_sprite_palettes();
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
     ppu_on_all();
-    set_prg_bank(0);  // Switch back to fixed bank before returning (port_LoadRoomData is in fixed bank)
+    set_prg_bank(6); // Restore bank 6 for caller (LoadRoomData is in bank 6)
 }
 
+// Restore collision from ROM (death/respawn without full level reload)
+// Must be in fixed bank — does internal bank switching
+__attribute__((noinline)) void port_restoreCollisionFlags(void) {
+    uint16_t level_idx = GLOBAL_ActiveLevel.currentRoomID - 1;
+    if (level_idx >= LEVEL_DATA_COUNT) level_idx = 0;
+    set_prg_bank(1);
+    const LevelData *level = &level_data[level_idx];
+    uint8_t level_bank = get_level_bank(level_idx);
+    uint8_t *buf = (uint8_t *)GLOBAL_OBJList;
+    decompress_tilemap(level->tilemap_compressed, buf, level_bank);
+    set_prg_bank(5);
+    for (uint16_t i = 0; i < LEVEL_TILE_COUNT && i < 256; i++) {
+        uint8_t gid = buf[i];
+        uint8_t cf = (gid < GID_TO_COLLISION_COUNT) ? gid_to_collision[gid] : 0;
+        GLOBAL_ActiveLevel.collisionFlagsArr[i] = cf;
+    }
+    set_prg_bank(6); // Restore caller's bank (playerInit is in bank 6)
+}

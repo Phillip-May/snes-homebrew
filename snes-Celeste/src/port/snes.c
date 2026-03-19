@@ -592,6 +592,12 @@ static void LoadRoomDataVRAM(void) {
     LoadCGRam(paletteBg, 0x0040, 0x40); //Bg3 palette
 }
 
+void port_restoreCollisionFlags(void) {
+    for (uint16_t i = 0; i < 256; i++) {
+        GLOBAL_ActiveLevel.collisionFlagsArr[i] = GLOBAL_ActiveLevel.collisionFlagsReset[i];
+    }
+}
+
 void port_LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = false;
     REG_INIDISP = 0x8F;

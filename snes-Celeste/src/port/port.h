@@ -169,12 +169,16 @@ struct sActiveLevelData
     bool textFlashActive;
     bool textScrollActive;
 
+#ifdef __NES__
+    uint8_t _collisionResetPad; // NES: collision restored from ROM via port_restoreCollisionFlags
+#else
     uint8_t collisionFlagsReset[256];
+#endif
     uint8_t collisionFlagsArr[256];
 
     uint8_t movingPlatformCount;
-    uint8_t movingPlatformDir[16];
-    uint8_t movingPlatformHitboxes[16 * 4];
+    uint8_t movingPlatformDir[8];
+    uint8_t movingPlatformHitboxes[8 * 4];
 
     uint8_t shakeFrames;
     uint8_t textScrollOffsetX;
@@ -183,7 +187,7 @@ struct sActiveLevelData
     uint8_t playerSpawnX;
     uint8_t playerSpawnY;
     uint8_t objectCount;
-    uint8_t objectData[64];
+    uint8_t objectData[42]; // max 13 objects * 3 bytes + 3 padding
     bool isLevelLoadedVRAM;
 };
 
@@ -222,6 +226,9 @@ void port_drawText(const unsigned char *text, uint8_t x, uint8_t y);
 uint8_t port_getInputs(void);
 void port_vblank(void);
 void port_LoadRoomData(uint16_t roomID);
+void port_restoreCollisionFlags(void); // Re-derive collision from ROM (for future collisionFlagsReset removal)
+
+#define BANK_MUSIC 7 // Reserved for FamiStudio driver + song data
 
 #ifdef __NES_UNROM_512__
 // PRG-ROM bank switching for UNROM-512 (non-LLVM-MOS compilers)

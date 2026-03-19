@@ -98,6 +98,12 @@ typedef fix16_t fixed_t;
 #define FIXED_EIGHTH (FIXED_ONE >> 3)
 #define FIXED_SIXTEENTH (FIXED_ONE >> 4)
 
+// Fast constant multiplies using shifts+adds (avoids fix16_mul on 6502)
+#define FIXED_MUL_HALF(x)      ((x) >> 1)                              // x * 0.5
+#define FIXED_MUL_3_4(x)       ((x) - ((x) >> 2))                      // x * 0.75
+#define FIXED_MUL_1_5(x)       (((x) >> 2) - ((x) >> 5) + ((x) >> 7)) // x * ~0.2
+#define FIXED_MUL_DASH_DIAG(x) ((x) - ((x) >> 3) - ((x) >> 6))        // x * ~0.89
+
 // Zero and one
 #define FIXED_ZERO 0
 #define FIXED_NEG_ONE (-FIXED_ONE)

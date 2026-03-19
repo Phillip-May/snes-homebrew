@@ -41,9 +41,11 @@ enum eSoundEffect {
     SOUND_EFFECT_BIG_CHEST = 12
 };
 
+PORT_FUNC_BANK6
 void playSoundEffect(enum eSoundEffect soundEffect){
-    //Play sound effect
-    return;
+    // TODO: export SFX from FamiStudio, then:
+    // sfx_play((char)soundEffect, 0);
+    (void)soundEffect;
 }
 
 
@@ -59,6 +61,7 @@ uint8_t GLOBAL_FreezeFrames = 0;
 uint8_t GLOBAL_PausePlayerFrames = 0;
 //Game state globals
 bool GLOBAL_DoubleDashUnlocked = false;
+
 
 
 enum eMovingPlatformDir {MOVING_PLATFORM_DIR_IDLE = 0, MOVING_PLATFORM_DIR_LEFT = 1, MOVING_PLATFORM_DIR_RIGHT = 2};
@@ -151,8 +154,11 @@ void breakableWallUpdate(uint8_t index) {
         uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
         uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
         //Player collision with wall
-        GLOBAL_PlayerData.spd.x = FIXED_MUL(INT_TO_FIXED(-sign(FIXED_TO_INT(GLOBAL_PlayerData.spd.x))), FLOAT_TO_FIXED(1.5f*2));
-        GLOBAL_PlayerData.spd.y = FLOAT_TO_FIXED(-1.5f*2);
+        {
+            int16_t knockDir = -sign(FIXED_TO_INT(GLOBAL_PlayerData.spd.x));
+            GLOBAL_PlayerData.spd.x = (knockDir > 0) ? FLOAT_TO_FIXED(3.0f) : ((knockDir < 0) ? FLOAT_TO_FIXED(-3.0f) : 0);
+        }
+        GLOBAL_PlayerData.spd.y = FLOAT_TO_FIXED(-3.0f);
         GLOBAL_PlayerData.dashCounter = -1;
         playSoundEffect(SOUND_EFFECT_BREAKABLE_WALL_HIT);
         initObject(OBJ_SMOKE, thisX, thisY);
@@ -167,10 +173,11 @@ void breakableWallUpdate(uint8_t index) {
         wall->eType = OBJ_UNUSED;
         wall->flags |= OBJ_FLAG_DIRTY;
         //Restore the original collision data
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)];
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)]   = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)];
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY+1)]   = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY+1)];
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY+1)] = GLOBAL_ActiveLevel.collisionFlagsReset[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY+1)];
+        // Clear solid flag (bit 0) that breakableWallInit set
+        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     &= ~0x01;
+        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)]   &= ~0x01;
+        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY+1)]   &= ~0x01;
+        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY+1)] &= ~0x01;
         return;
     }
     wall->flags |= OBJ_FLAG_DIRTY;
@@ -401,7 +408,7 @@ void springUpdate(uint8_t index) {
         GLOBAL_PlayerData.posF.y = INT_TO_FIXED(GLOBAL_PlayerData.objData.pos.y);
         
         //Apply spring physics
-        GLOBAL_PlayerData.spd.x = FIXED_MUL(GLOBAL_PlayerData.spd.x, FLOAT_TO_FIXED(0.2f)); //Reduce horizontal speed
+        GLOBAL_PlayerData.spd.x = FIXED_MUL_1_5(GLOBAL_PlayerData.spd.x); //Reduce horizontal speed (~0.2)
         GLOBAL_PlayerData.spd.y = INT_TO_FIXED(-3*2); //Set upward velocity (scaled for 60fps/256x256)
         GLOBAL_PlayerData.dashesLeft = player->doubleDashUnlocked ? 2 : 1; //Restore dashes
         
@@ -917,6 +924,7 @@ void doubleDashOrbUpdate(uint8_t index) {
     }
 }
 
+PORT_FUNC_BANK6
 void strawberryInit(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
 
@@ -943,6 +951,7 @@ void decoTreeUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
 
+PORT_FUNC_BANK6
 void strawberryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Pre computed sine table
@@ -1177,11 +1186,17 @@ static void clearObjectDirtyFlag(uint8_t index)
     GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
+// NES staggered updates: non-critical objects skip logic on some frames.
+// Sprites still render every frame (OAM must be rebuilt for flicker rotation).
 PORT_FUNC_BANK6
 static void processObject(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
+#ifdef __NES__
+    uint8_t frameSlot = (uint8_t)(GLOBAL_FrameCount & 0x01); // alternating frames
+#endif
     // Use if-else instead of switch to avoid jump table issues with banking
+    // Ordered: UNUSED first (most slots empty), then gameplay-critical, then cosmetic
     if (obj->eType == OBJ_UNUSED) {
         if (obj->flags & OBJ_FLAG_DIRTY) {
             if (index == 0U) {
@@ -1190,6 +1205,55 @@ static void processObject(uint8_t index)
                 port_buildUnused(index);
             }
         }
+    // --- Always update every frame (gameplay-critical) ---
+    } else if (obj->eType == OBJ_COLLAPSE_TILE) {
+        collapseTileUpdate(index);
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_SPRING) {
+        springUpdate(index);
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
+        platMovUpdate(index);
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_BREAKABLE_WALL) {
+        breakableWallUpdate(index);
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_CHEST) {
+        chestUpdate(index);
+        port_buildSpriteIfDirty(index, obj->eType);
+#ifdef __NES__
+    // --- NES: stagger every other frame (non-critical animations) ---
+    } else if (obj->eType == OBJ_BALLOON) {
+        if (!frameSlot) balloonUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_STRAWBERRY) {
+        if (!frameSlot) strawberryUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_FLYING_BERRY) {
+        if (!frameSlot) flyingBerryUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_KEY) {
+        if (!frameSlot) keyUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
+        if (!frameSlot) doubleDashOrbUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+        port_buildSpriteIfDirty(index, obj->eType);
+    // --- NES: skip update entirely for purely decorative (render still runs) ---
+    } else if (obj->eType == OBJ_SMOKE) {
+        if (!frameSlot) smokeUpdate(index);
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_DECO_TREE) {
+        // Decorative: only needs initial dirty flag, no per-frame update needed
+        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_DECO_FLOWER) {
+        port_buildSpriteIfDirty(index, obj->eType);
+#else
+    // --- SNES: update everything every frame ---
     } else if (obj->eType == OBJ_SMOKE) {
         smokeUpdate(index);
         port_buildSpriteIfDirty(index, obj->eType);
@@ -1199,20 +1263,8 @@ static void processObject(uint8_t index)
     } else if (obj->eType == OBJ_KEY) {
         keyUpdate(index);
         port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
-        platMovUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_SPRING) {
-        springUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_CHEST) {
-        chestUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_BALLOON) {
         balloonUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_COLLAPSE_TILE) {
-        collapseTileUpdate(index);
         port_buildSpriteIfDirty(index, obj->eType);
     } else if (obj->eType == OBJ_STRAWBERRY) {
         strawberryUpdate(index);
@@ -1226,9 +1278,7 @@ static void processObject(uint8_t index)
     } else if (obj->eType == OBJ_DECO_FLOWER) {
         flowerUpdate(index);
         port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_BREAKABLE_WALL) {
-        breakableWallUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
+#endif
     } else if (obj->eType == OBJ_MONUMENT) {
         monumentUpdate(index);
         port_buildSpriteIfDirty(index, obj->eType);
@@ -1245,11 +1295,11 @@ static void processObject(uint8_t index)
 void updateAllObjects(void) {
     uint8_t i;
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-    port_prg_bank_switch(6);  // Switch to object bank (code is in bank 6)
+    port_prg_bank_switch(6);
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         processObject(i);
     }
-    port_prg_bank_switch(0);  // Switch back to fixed bank
+    port_prg_bank_switch(0);
     port_finishSpriteBuild();
 }
 
@@ -1264,7 +1314,7 @@ void onVblank(void);
 
 void LoadRoomData(uint16_t roomID) {
     uint8_t i = 0;
-    
+
     GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = 16;
     GLOBAL_ActiveLevel.roomSizeY = 16;
@@ -1272,24 +1322,22 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.swapCloudPal = false;
     GLOBAL_ActiveLevel.swapActivePalette = true;
     GLOBAL_ActiveLevel.textFlashActive = false;
-    // port_LoadRoomData is now in fixed bank, so no need to switch banks
+
     port_LoadRoomData(roomID);
-    // playerInit is in bank 6, so switch to bank 6 before calling it
+
     port_prg_bank_switch(6);
     playerInit(&GLOBAL_PlayerData);
-    port_prg_bank_switch(0);  // Switch back to fixed bank for port_updatePlayerSprite
+    port_prg_bank_switch(0);
     port_updatePlayerSprite(&GLOBAL_PlayerData);
+
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-    port_prg_bank_switch(6);  // Switch to bank 6 for processObject (code is in bank 6)
+    port_prg_bank_switch(6);
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; ++i) {
         processObject(i);
     }
-    port_prg_bank_switch(0);  // Switch back to fixed bank
+    port_prg_bank_switch(0);
     port_finishSpriteBuild();
-
 }
-
-
 
 void LoadNextRoom(void) {
     GLOBAL_ActiveLevel.currentRoomID++;
@@ -1297,23 +1345,9 @@ void LoadNextRoom(void) {
 }
 
 int main(void){
-	//Variables
-	static int something = 5;
-	int8_t regRead1; //Variable for storing hardware registers
-	int8_t regRead2; //Variable for storing hardware registers
-	uint8_t *test_heap;
-	uint32_t counter = 40000;
-	uint32_t i;
-	uint32_t j;
-    uint8_t regWrite1;
-
     port_init();
- 
-    //Player is hardcoded to slot 0 for now
-    //Setup game state
-    GLOBAL_ActiveLevel.currentRoomID = 7; //6  test for balloon, 8, 7 for stress test
-    GLOBAL_ActiveLevel.currentRoomID = 1; //12 for monument 20, 22 for big chest
-    LoadRoomData(GLOBAL_ActiveLevel.currentRoomID); //Test room
+    GLOBAL_ActiveLevel.currentRoomID = 1;
+    LoadRoomData(GLOBAL_ActiveLevel.currentRoomID);
 
     for (;;) { 
         onVblank();
@@ -1321,6 +1355,7 @@ int main(void){
 }
 
 
+PORT_FUNC_BANK6
 fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     fixed_t diff = FIXED_SUB(target, current);
     if (diff > amount) {
@@ -1332,6 +1367,7 @@ fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     return target;
 }
 
+PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;
@@ -1361,11 +1397,14 @@ void playerInit(struct sPlayerData* this){
     this->dashesLeft = this->doubleDashUnlocked ? 2 : 1;
     this->dashCounter = 0;
     
-    //Reset some global flags, maybe move this to a death function
-    //Reset the collision flags
+    //Reset collision flags
+#ifdef __NES__
+    port_restoreCollisionFlags(); // Re-derive from ROM
+#else
     for (i = 0; i < 256; i++) {
         GLOBAL_ActiveLevel.collisionFlagsArr[i] = GLOBAL_ActiveLevel.collisionFlagsReset[i];
     }
+#endif
     GLOBAL_ActiveLevel.movingPlatformCount = 0;
 
 
@@ -1396,80 +1435,75 @@ bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, in
     int i, j;
     int collisionIndex;
     
-    // For floor spikes, only check if player is moving down and touching the bottom edge
+    // Optimized: use >> 4 and & 0x0F instead of / 16 and % 16
+    // Coordinates are clamped to -15..271 by player physics, safe for uint16_t cast
+
+    // Floor spikes (moving down)
     if (yspd >= 0) {
-        int bottomY = y + h - 1;
-        int tileY = bottomY / 16;
-        int localY = bottomY % 16;
-        
-        // Only check if player's bottom edge is in the spike area (bottom 4 pixels)
+        uint16_t bottomY = (uint16_t)(y + h - 1);
+        uint8_t tileY = (uint8_t)(bottomY >> 4);
+        uint8_t localY = (uint8_t)(bottomY & 0x0F);
+
         if (localY >= 10) {
-            for (i = (int)((x + 4) / 16); i <= (int)((x + w - 5) / 16); i++) {
-                if (i < 0 || i >= 16 || tileY < 0 || tileY >= 16) {
-                    continue;
-                }
-                collisionIndex = tileY * 16 + i;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x04) {
+            uint8_t startX = (uint8_t)((uint16_t)(x + 4) >> 4);
+            uint8_t endX = (uint8_t)((uint16_t)(x + w - 5) >> 4);
+            for (i = startX; i <= endX; i++) {
+                if (i >= 16 || tileY >= 16) continue;
+                collisionIndex = (tileY << 4) + i;
+                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x04)
                     return true;
-                }
             }
         }
     }
-    
-    // For ceiling spikes, only check if player is moving up and touching the top edge
+
+    // Ceiling spikes (moving up)
     if (yspd <= 0) {
-        int tileY = y / 16;
-        int localY = y % 16;
-        
-        // Only check if player's top edge is in the spike area (top 8 pixels - over half of 16)
+        uint8_t tileY = (uint8_t)((uint16_t)y >> 4);
+        uint8_t localY = (uint8_t)((uint16_t)y & 0x0F);
+
         if (localY <= 2) {
-            for (i = (int)((x + 4) / 16); i <= (int)((x + w + 5) / 16); i++) {
-                if (i < 0 || i >= 16 || tileY < 0 || tileY >= 16) {
-                    continue;
-                }
-                collisionIndex = tileY * 16 + i;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x08) {
+            uint8_t startX = (uint8_t)((uint16_t)(x + 4) >> 4);
+            uint8_t endX = (uint8_t)((uint16_t)(x + w + 5) >> 4);
+            for (i = startX; i <= endX; i++) {
+                if (i >= 16 || tileY >= 16) continue;
+                collisionIndex = (tileY << 4) + i;
+                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x08)
                     return true;
-                }
             }
         }
     }
-    
-    // For left wall spikes, only check if player is moving left and touching the left edge
+
+    // Left wall spikes (moving left)
     if (xspd <= 0) {
-        int tileX = x / 16;
-        int localX = x % 16;
-        
-        // Only check if player's left edge is in the spike area (left 4 pixels)
+        uint8_t tileX = (uint8_t)((uint16_t)x >> 4);
+        uint8_t localX = (uint8_t)((uint16_t)x & 0x0F);
+
         if (localX <= 4) {
-            for (j = (int)(y / 16); j <= (int)((y + h - 1) / 16); j++) {
-                if (tileX < 0 || tileX >= 16 || j < 0 || j >= 16) {
-                    continue;
-                }
-                collisionIndex = j * 16 + tileX;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x10) {
+            uint8_t startY = (uint8_t)((uint16_t)y >> 4);
+            uint8_t endY = (uint8_t)((uint16_t)(y + h - 1) >> 4);
+            for (j = startY; j <= endY; j++) {
+                if (tileX >= 16 || j >= 16) continue;
+                collisionIndex = (j << 4) + tileX;
+                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x10)
                     return true;
-                }
             }
         }
     }
-    
-    // For right wall spikes, only check if player is moving right and touching the right edge
+
+    // Right wall spikes (moving right)
     if (xspd >= 0) {
-        int rightX = x + w - 6;
-        int tileX = rightX / 16;
-        int localX = rightX % 16;
-        
-        // Only check if player's right edge is in the spike area (right 4 pixels)
+        uint16_t rightX = (uint16_t)(x + w - 6);
+        uint8_t tileX = (uint8_t)(rightX >> 4);
+        uint8_t localX = (uint8_t)(rightX & 0x0F);
+
         if (localX >= 10) {
-            for (j = (int)(y / 16); j <= (int)((y + h - 1) / 16); j++) {
-                if (tileX < 0 || tileX >= 16 || j < 0 || j >= 16) {
-                    continue;
-                }
-                collisionIndex = j * 16 + tileX;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x20) {
+            uint8_t startY = (uint8_t)((uint16_t)y >> 4);
+            uint8_t endY = (uint8_t)((uint16_t)(y + h - 1) >> 4);
+            for (j = startY; j <= endY; j++) {
+                if (tileX >= 16 || j >= 16) continue;
+                collisionIndex = (j << 4) + tileX;
+                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x20)
                     return true;
-                }
             }
         }
     }
@@ -1493,11 +1527,10 @@ static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     int tileX;
     int tileY;
     int collisionIndex;
-    uint8_t i;
 
     // Convert world coordinates to tile coordinates
-    tileX = (int)(x / 16);
-    tileY = (int)(y / 16);
+    tileX = (int)((uint16_t)x >> 4);
+    tileY = (int)((uint16_t)y >> 4);
     
     // Check bounds for tile coordinates
     if (tileX < 0 || tileX >= 16 || tileY < 0 || tileY >= 16) {
@@ -1506,19 +1539,18 @@ static bool isTileSolidAtPoint(int16_t x, int16_t y) {
 
     // Get collision flag from collision_test array
     // Each row is 16 tiles, so multiply Y by 16 and add X
-    collisionIndex = tileY * 16 + tileX;
+    collisionIndex = (tileY << 4) + tileX;
     //Bit 1 contains the collision flag
     return GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x01;
 }
 
 PORT_FUNC_BANK6
 static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
-    int16_t x = this->objData.pos.x; 
+    int16_t x = this->objData.pos.x;
     int16_t y = this->objData.pos.y;
     int16_t checkX;
     int16_t checkY;
-    uint8_t i;
-    
+
     // Calculate check positions based on offset
     checkX = x + xOffset;
     checkY = y + yOffset;
@@ -1546,19 +1578,25 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
 
 #define FPS60_SCALE_FACTOR 1.0f
 void playerUpdate(struct sPlayerData* this) {
-    port_prg_bank_switch(6);  // Switch to bank 6 for collision functions (code is in bank 6)
-    int16_t prevPosX = this->objData.pos.x;
-    int16_t prevPosY = this->objData.pos.y;
-    uint8_t prevTile = this->objData.oamTile;
-    uint8_t prevProps = this->objData.oamProps;
+    port_prg_bank_switch(6);
     int16_t spdXstepInt;
     int16_t spdYStepInt;
 
     int8_t inputX = 0;
     int8_t inputY = 0;
 
-    fixed_t accel = FLOAT_TO_FIXED(0.6f * FPS60_SCALE_FACTOR); // Adjusted for 60fps vs 30fps
-    fixed_t deccel = FLOAT_TO_FIXED(0.15f * FPS60_SCALE_FACTOR); // Adjusted for 60fps vs 30fps
+    // Precomputed fixed-point constants (avoids fix16_from_float calls)
+    #define FP_ACCEL       0x00009999   // 0.6
+    #define FP_DECCEL      0x00002666   // 0.15
+    #define FP_ACCEL_AIR   0x00006666   // 0.4
+    #define FP_MAXRUN      0x00020000   // 2.0 (1.0 * 2)
+    #define FP_MAXFALL     0x00040000   // 4.0 (2.0 * 2)
+    #define FP_MAXFALL_WALL 0x0000CCCC  // 0.8 (0.4 * 2)
+    #define FP_GRAVITY     0x000035C2   // 0.21
+    #define FP_SPD_THRESH  0x00004CCC   // 0.30
+    #define FP_ZERO        0x00000000
+    fixed_t accel = FP_ACCEL;
+    fixed_t deccel = FP_DECCEL;
     fixed_t maxrun;
     fixed_t maxfall;
     fixed_t gravity;
@@ -1622,7 +1660,6 @@ void playerUpdate(struct sPlayerData* this) {
     //Smoke particles when landing
     static bool wasOnGround = false;
     if (onGround && !wasOnGround) {
-        // initObject is in bank 5, we're already in bank 5 (switched at start of function)
         initObject(OBJ_SMOKE, this->objData.pos.x, this->objData.pos.y + 4);
     }
     wasOnGround = onGround;
@@ -1650,42 +1687,38 @@ void playerUpdate(struct sPlayerData* this) {
         this->spd.y = approachFixed(this->spd.y, this->dashTarget.y, this->dashAccel.y);
     }
     else {
-        maxrun = FLOAT_TO_FIXED(1.0f * 2);
+        maxrun = FP_MAXRUN;
 
-        //Acceleration adjustments
         if (!onGround) {
-            accel = FLOAT_TO_FIXED(0.4f * FPS60_SCALE_FACTOR); // Adjusted for 60fps vs 30fps
+            accel = FP_ACCEL_AIR;
         }
-        //Note: Ice handling would go here but not implemented in current code
 
-        //Gravity
-        maxfall = FLOAT_TO_FIXED(2.0f * 2);
-        gravity = FLOAT_TO_FIXED(0.21f * FPS60_SCALE_FACTOR); // Adjusted for 60fps vs 30fps
+        maxfall = FP_MAXFALL;
+        gravity = FP_GRAVITY;
 
-        if (FIXED_ABS(this->spd.y) <= FLOAT_TO_FIXED(0.30f)) {
-            gravity = FIXED_MUL(gravity, FLOAT_TO_FIXED(0.5f));
+        if (FIXED_ABS(this->spd.y) <= FP_SPD_THRESH) {
+            gravity = FIXED_MUL_HALF(gravity);
         }
 
         // wall slide
         if (inputX!=0 && OBJ_isSolidAt(this, inputX,0)) {
-            maxfall=FLOAT_TO_FIXED(0.4f * 2);
+            maxfall=FP_MAXFALL_WALL;
             onWall = true;
             if (randint16(0,10)<2) {
-                // initObject is in bank 5, we're already in bank 5 (switched at start of function)
                 initObject(OBJ_SMOKE,this->objData.pos.x+inputX*6*2,this->objData.pos.y);
             }
         }
 
         //Gravity
         if (onGround) {
-            this->spd.y = FLOAT_TO_FIXED(0.0f);
+            this->spd.y = FP_ZERO;
             this->graceTimer = 10;
         }
         else {
             //Compensation for 60 fps, slowing it down more breaks other things
             //Like a spring would push you too high into death when before it did not
             if (this->spd.y > 0) {
-                gravity = FIXED_MUL(gravity, FLOAT_TO_FIXED(0.75f));
+                gravity = FIXED_MUL_3_4(gravity);
             }
             this->spd.y = approachFixed(this->spd.y, maxfall, gravity); 
         }
@@ -1713,9 +1746,9 @@ void playerUpdate(struct sPlayerData* this) {
                     playSoundEffect(SOUND_EFFECT_JUMP);
                     jumpBuffer = 0;
                     this->spd.y = INT_TO_FIXED(-2*2);
-                    this->spd.x = FIXED_MUL(INT_TO_FIXED(-wall_dir), FIXED_ADD(maxrun, INT_TO_FIXED(1*2)));
-                    // initObject is in bank 5, we're already in bank 5 (switched at start of function)
-                    initObject(OBJ_SMOKE,this->objData.pos.x+wall_dir*6*2,this->objData.pos.y);
+                    { fixed_t wallSpd = FIXED_ADD(maxrun, INT_TO_FIXED(2));
+                    this->spd.x = (wall_dir < 0) ? wallSpd : -wallSpd; }
+                        initObject(OBJ_SMOKE,this->objData.pos.x+wall_dir*6*2,this->objData.pos.y);
                 }
             }
         }
@@ -1723,8 +1756,9 @@ void playerUpdate(struct sPlayerData* this) {
         //Dash handling
         if (btnDash && this->dashesLeft > 0) {
             //Dash code
+            // Dash speeds as constants (avoids runtime multiply)
             #define DASH_FULL_SPEED (FLOAT_TO_FIXED(5.0f*2))
-            #define DASH_HALF_SPEED (FIXED_MUL(DASH_FULL_SPEED, FLOAT_TO_FIXED(0.70710678118f)))
+            #define DASH_HALF_SPEED (FLOAT_TO_FIXED(5.0f*2*0.70710678118f))
 
             VEC_I vInput;
 
@@ -1740,37 +1774,39 @@ void playerUpdate(struct sPlayerData* this) {
                 vInput.x = this->isFliped ? -1 : 1;
             }
 
+            // vInput.x/y are -1, 0, or 1 — just sign-flip the constant
             if (vInput.x != 0) {
                 if (vInput.y != 0) {
-                    this->spd.x = FIXED_MUL(INT_TO_FIXED(vInput.x), DASH_HALF_SPEED);
-                    this->spd.y = FIXED_MUL(INT_TO_FIXED(vInput.y), DASH_HALF_SPEED);
+                    this->spd.x = (vInput.x > 0) ? DASH_HALF_SPEED : -DASH_HALF_SPEED;
+                    this->spd.y = (vInput.y > 0) ? DASH_HALF_SPEED : -DASH_HALF_SPEED;
                 } else {
-                    this->spd.x = FIXED_MUL(INT_TO_FIXED(vInput.x), DASH_FULL_SPEED);
+                    this->spd.x = (vInput.x > 0) ? DASH_FULL_SPEED : -DASH_FULL_SPEED;
                     this->spd.y = INT_TO_FIXED(0);
                 }
             } else if (vInput.y != 0) {
                 this->spd.x = INT_TO_FIXED(0);
-                this->spd.y = FIXED_MUL(INT_TO_FIXED(vInput.y), DASH_FULL_SPEED);
+                this->spd.y = (vInput.y > 0) ? DASH_FULL_SPEED : -DASH_FULL_SPEED;
             }
 
             playSoundEffect(SOUND_EFFECT_DASH_START);
             GLOBAL_FreezeFrames = 2 * 2;
             GLOBAL_ActiveLevel.shakeFrames = 6 * 2;
-            this->dashTarget.x=FIXED_MUL(INT_TO_FIXED(2*2), INT_TO_FIXED(vInput.x));
-            this->dashTarget.y=FIXED_MUL(INT_TO_FIXED(2*2), INT_TO_FIXED(vInput.y));
-            this->dashAccel.x=FLOAT_TO_FIXED(1.5f*2);
-            this->dashAccel.y=FLOAT_TO_FIXED(1.5f*2);
+            // INT_TO_FIXED(4) * INT_TO_FIXED(vInput) = just sign-flip INT_TO_FIXED(4)
+            this->dashTarget.x = (vInput.x > 0) ? INT_TO_FIXED(4) : ((vInput.x < 0) ? INT_TO_FIXED(-4) : 0);
+            this->dashTarget.y = (vInput.y > 0) ? INT_TO_FIXED(4) : ((vInput.y < 0) ? INT_TO_FIXED(-4) : 0);
+            this->dashAccel.x=0x00030000; // 3.0 (1.5*2)
+            this->dashAccel.y=0x00030000;
 
             if (this->spd.y<0) {
-                this->dashTarget.y=FIXED_MUL(this->dashTarget.y, FLOAT_TO_FIXED(0.75f+0.15f));
+                this->dashTarget.y = FIXED_MUL_DASH_DIAG(this->dashTarget.y); // ~0.9
             }
 
             //0.1f is a small adjustment to make the dash feel more natural
             if (this->spd.y!=0) {
-                this->dashAccel.y=FIXED_MUL(this->dashAccel.y, FLOAT_TO_FIXED(0.70710678118f+0.1f)); 
+                this->dashAccel.y = FIXED_MUL_DASH_DIAG(this->dashAccel.y); // ~0.807
             }
             if (this->spd.x!=0) {
-                this->dashAccel.x=FIXED_MUL(this->dashAccel.x, FLOAT_TO_FIXED(0.70710678118f+0.1f));
+                this->dashAccel.x = FIXED_MUL_DASH_DIAG(this->dashAccel.x); // ~0.807
             }
         } else if (btnDash && (this->dashesLeft == 0)) {
             playSoundEffect(SOUND_EFFECT_DASH_MISFIRE);
@@ -1840,9 +1876,17 @@ void playerUpdate(struct sPlayerData* this) {
     spdYStepInt = FIXED_TO_INT(this->posF.y) - this->objData.pos.y;
 
     // 3. Do collision/movement using deltaX/deltaY (update objData.pos.x/y as needed)
-    //Move X
+    //Move X — only per-pixel step when destination is blocked
     if (spdXstepInt != 0) {
         if (OBJ_isSolidAt(this, spdXstepInt, 0)) {
+            // Blocked at full speed — binary search for max safe distance
+            // Try half the distance first to reduce collision checks
+            int16_t half = spdXstepInt >> 1;
+            if (half != 0 && !OBJ_isSolidAt(this, half, 0)) {
+                this->objData.pos.x += half;
+                spdXstepInt -= half;
+            }
+            // Per-pixel step the remaining distance
             step = (spdXstepInt < 0) ? -1 : 1;
             int16_t absStep = (spdXstepInt < 0) ? -spdXstepInt : spdXstepInt;
             for (i = 0; i < absStep; i++) {
@@ -1865,6 +1909,12 @@ void playerUpdate(struct sPlayerData* this) {
     
     if (spdYStepInt != 0) {
         if (OBJ_isSolidAt(this, 0, spdYStepInt)) {
+            // Binary search shortcut: try half distance first
+            int16_t half = spdYStepInt >> 1;
+            if (half != 0 && !OBJ_isSolidAt(this, 0, half)) {
+                this->objData.pos.y += half;
+                spdYStepInt -= half;
+            }
             step = (spdYStepInt < 0) ? -1 : 1;
             int16_t absStep = (spdYStepInt < 0) ? -spdYStepInt : spdYStepInt;
             for (i = 0; i < absStep; i++) {
@@ -1891,22 +1941,18 @@ void playerUpdate(struct sPlayerData* this) {
         playSoundEffect(SOUND_EFFECT_DEATH);
         this->objData.pos.y = 240; //offscreen
         GLOBAL_ActiveLevel.shakeFrames = 10 * 2;
-        port_prg_bank_switch(6);  // Switch to bank 6 for playerInit (code is in bank 6)
+        port_prg_bank_switch(6);
         playerInit(this);
-        port_prg_bank_switch(0);  // Switch back to fixed bank
+        port_prg_bank_switch(0);
         return;
     }
 
     }
 
     // next level
-    if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) { 
-        // We're currently in bank 6, but we need to switch back to fixed bank before calling LoadNextRoom
-        // LoadNextRoom will handle its own bank switching
-        port_prg_bank_switch(0);  // Switch back to fixed bank before calling LoadNextRoom
+    if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) {
+        port_prg_bank_switch(0);
         LoadNextRoom();
-        // LoadNextRoom already handled all bank switching, and we're back in fixed bank
-        // Don't switch back to bank 6 - playerUpdate should end in fixed bank
         return;
      }
 
@@ -1990,9 +2036,20 @@ int16_t randint16(int16_t min, int16_t max) {
     return (int16_t)((randomValue % range) + min);
 }
 
+// FamiStudio update — called from fixed bank, switches to bank 7 internally
+extern void famistudio_update(void);
+static void music_update(void) {
+    port_prg_bank_switch(7);
+    famistudio_update();
+    port_prg_bank_switch(0);
+}
+
 void onVblank(void) {
     //Start of vblank critical code
     port_vblank();
+
+    // Music update — APU writes don't need vblank timing, safe to run after PPU scroll
+    music_update();
 
 
     //Display FPS
