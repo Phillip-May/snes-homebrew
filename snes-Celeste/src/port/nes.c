@@ -74,6 +74,7 @@ static void fs_play(uint8_t song) {
 #include "../../python/tilemap_level29_nes.h"
 #include "../../python/tilemap_level30_nes.h"
 #include "../../python/tilemap_level31_nes.h"
+#include "../../python/title_screen_data.h"
 
 #ifndef _WIN32 //Fix linter
 #include <neslib.h>
@@ -127,6 +128,11 @@ typedef struct {
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
 extern struct sPlayerData GLOBAL_PlayerData;
 extern OBJ_DATA GLOBAL_OBJList[];
+
+// Palette data stored in RAM (for background and sprite palettes)
+// Lower 16 bytes (0-15): 4 background palettes * 4 colors
+// Upper 16 bytes (16-31): 4 sprite palettes * 4 colors
+static uint8_t palette_ram[32];
 
 // Fixed level dimensions (all levels are 16x16 = 256 tiles)
 #define LEVEL_WIDTH 16
@@ -401,7 +407,7 @@ static const LevelData level_data[] = {
 // Shared GID mapping (used by all levels)
 #define GID_TO_TILE_MAP gid_to_tile_shared
 #define GID_TO_TILE_MAP_COUNT GID_TO_TILE_SHARED_COUNT
-#define GID_TO_COLLISION_COUNT 72
+// GID_TO_COLLISION_COUNT is defined in gid_to_tile_shared.h as GID_TO_TILE_SHARED_COUNT
 
 // decompress_tilemap must be in fixed bank (no section attribute) so it can be called from any bank
 // Caller must have level data bank active to read compressed_data
@@ -494,6 +500,291 @@ static void render_object_sprite(OBJ_DATA *obj) {
 // Music data (assembled into bank 7)
 extern const unsigned char music_data_untitled[];
 
+// --- Title Screen ---
+
+#define TITLE_BANK_A 2
+#define TITLE_BANK_B 3
+#define TITLE_ANIM_SPEED 10  // Game frames per animation frame (~6 fps)
+
+// Palette 3, color 3 text fade: NES color values per animation frame
+// Frames 0-6: original, 7-9: step down, 10-14: black, 15-17: step up, 18+: original
+static const uint8_t title_text_fade[TITLE_FRAME_COUNT] = {
+    // 0-6: original color ($00 = dark gray)
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    // 7-9: stepping down to black
+    0x2D, 0x0D, 0x0F,
+    // 10-14: black
+    0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
+    // 15-17: stepping back up
+    0x0D, 0x2D, 0x00,
+    // 18-29: original
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+// Decode RLE nametable data and write to PPU nametable 0
+// Must be called with PPU rendering off and correct PRG bank active
+static void title_decode_rle_to_ppu(const unsigned char *rle_data) {
+    vram_adr(NTADR_A(0, 0));
+    uint16_t tiles_written = 0;
+    uint16_t idx = 0;
+    while (tiles_written < 960) {
+        uint8_t count_minus_1 = rle_data[idx++];
+        if (count_minus_1 == 0xFF) break;  // End marker (safety)
+        uint8_t tile = rle_data[idx++];
+        uint8_t count = count_minus_1 + 1;
+        for (uint8_t i = 0; i < count && tiles_written < 960; i++) {
+            vram_put(tile);
+            tiles_written++;
+        }
+    }
+}
+
+// Write attribute table to PPU nametable 0
+// Must be called with PPU rendering off and correct PRG bank active
+static void title_write_attributes(const unsigned char *attr_data) {
+    vram_adr(0x23C0);
+    for (uint8_t i = 0; i < 64; i++) {
+        vram_put(attr_data[i]);
+    }
+}
+
+// --- Buffered PPU write system ---
+// Decode delta from banked ROM during visible frame (CPU time is free).
+// Blast buffered writes to PPU during vblank using 8-bit indexed arrays
+// so the compiler emits efficient LDA array,X (4 cycles) instead of
+// expensive 16-bit indirect addressing (~20 cycles).
+//
+// Per write: 3x LDA abs,X (12) + 3x STA abs (12) + INX (2) = ~26 cycles.
+// After neslib NMI (~800 cycles), ~1400 cycles remain.
+// 45 writes * 26 = 1170 cycles + attr (280) = 1450. Tight but fits.
+#define TITLE_MAX_WRITES_PER_VBLANK 34
+
+// Three parallel arrays for 8-bit indexed PPU writes (max 82 entries)
+// Overlaid on GLOBAL_OBJList (game isn't running during title screen)
+#define TITLE_PPU_BUF_ADDR_HI  ((uint8_t *)GLOBAL_OBJList)
+#define TITLE_PPU_BUF_ADDR_LO  ((uint8_t *)GLOBAL_OBJList + 82)
+#define TITLE_PPU_BUF_TILE     ((uint8_t *)GLOBAL_OBJList + 164)
+static uint8_t  s_ppu_write_count;   // Number of buffered tile writes
+static uint8_t  s_ppu_write_cursor;  // How many writes sent to PPU so far
+static uint8_t  s_attr_buf[64];      // Buffered attribute data
+static uint8_t  s_delta_active;      // 1 = update in progress
+
+// Decode a delta from banked ROM into the write buffer (call during visible frame).
+// PRG bank must be set before calling.
+static void title_prepare_delta(const unsigned char *delta) {
+    uint16_t idx = 0;
+    uint16_t count = delta[idx] | ((uint16_t)delta[idx + 1] << 8);
+    idx += 2;
+
+    uint8_t *buf_hi = TITLE_PPU_BUF_ADDR_HI;
+    uint8_t *buf_lo = TITLE_PPU_BUF_ADDR_LO;
+    uint8_t *buf_tile = TITLE_PPU_BUF_TILE;
+
+    for (uint8_t n = 0; n < (uint8_t)count; n++) {
+        uint16_t pos = delta[idx] | ((uint16_t)delta[idx + 1] << 8);
+        idx += 3;
+        buf_hi[n] = (uint8_t)((0x2000 + pos) >> 8);
+        buf_lo[n] = (uint8_t)(0x2000 + pos);
+        buf_tile[n] = delta[idx - 1];
+    }
+    s_ppu_write_count = (uint8_t)count;
+    s_ppu_write_cursor = 0;
+
+    // Copy attribute data
+    for (uint8_t i = 0; i < 64; i++) {
+        s_attr_buf[i] = delta[idx++];
+    }
+    s_delta_active = 1;
+}
+
+// Flush buffered writes to PPU during vblank. Returns 1 when complete.
+// No bank switching needed — data is already in RAM.
+// Phase 1: tile writes (up to 34 per vblank). Phase 2: attributes (separate vblank).
+static uint8_t title_flush_ppu_writes(void) {
+    if (!s_delta_active) return 1;
+
+    (void)PPU_STATUS;  // Reset PPU address latch
+
+    if (s_delta_active == 1) {
+        // Phase 1: tile changes from buffer
+        const uint8_t *buf_hi = TITLE_PPU_BUF_ADDR_HI;
+        const uint8_t *buf_lo = TITLE_PPU_BUF_ADDR_LO;
+        const uint8_t *buf_tile = TITLE_PPU_BUF_TILE;
+
+        uint8_t cursor = s_ppu_write_cursor;
+        uint8_t remaining = s_ppu_write_count - cursor;
+        uint8_t batch = (remaining > TITLE_MAX_WRITES_PER_VBLANK)
+                        ? TITLE_MAX_WRITES_PER_VBLANK : remaining;
+        uint8_t end = cursor + batch;
+
+        for (uint8_t i = cursor; i < end; i++) {
+            PPU_ADDR = buf_hi[i];
+            PPU_ADDR = buf_lo[i];
+            PPU_DATA = buf_tile[i];
+        }
+
+        s_ppu_write_cursor = end;
+
+        if (end >= s_ppu_write_count) {
+            s_delta_active = 2;  // Tiles done, attributes next vblank
+        }
+        return 0;
+    } else {
+        // Phase 2: attribute table (always a separate vblank)
+        PPU_ADDR = 0x23;
+        PPU_ADDR = 0xC0;
+        for (uint8_t i = 0; i < 64; i++) {
+            PPU_DATA = s_attr_buf[i];
+        }
+        s_delta_active = 0;
+        return 1;
+    }
+}
+
+// Apply a full delta with PPU off (used for SELECT variant swap replay)
+static void title_apply_delta_full(const unsigned char *delta) {
+    uint16_t idx = 0;
+    uint16_t count = delta[idx] | ((uint16_t)delta[idx + 1] << 8);
+    idx += 2;
+    for (uint16_t i = 0; i < count; i++) {
+        uint16_t pos = delta[idx] | ((uint16_t)delta[idx + 1] << 8);
+        uint8_t tile = delta[idx + 2];
+        idx += 3;
+        uint16_t addr = 0x2000 + pos;
+        PPU_ADDR = (uint8_t)(addr >> 8);
+        PPU_ADDR = (uint8_t)(addr);
+        PPU_DATA = tile;
+    }
+    PPU_ADDR = 0x23;
+    PPU_ADDR = 0xC0;
+    for (uint8_t i = 0; i < 64; i++) {
+        PPU_DATA = delta[idx++];
+    }
+}
+
+// Load frame 0 with PPU off (full nametable + attributes)
+// Sets correct PRG bank internally.
+static void title_load_frame0(uint8_t variant) {
+    if (variant == 0) {
+        set_prg_bank(TITLE_BANK_A);
+        title_decode_rle_to_ppu(title_nt_rle_a);
+        title_write_attributes(title_attr0_a);
+    } else {
+        set_prg_bank(TITLE_BANK_B);
+        title_decode_rle_to_ppu(title_nt_rle_b);
+        title_write_attributes(title_attr0_b);
+    }
+    set_prg_bank(0);
+}
+
+// Run the title screen loop. Returns when player presses START.
+static void title_screen_loop(void) {
+    set_chr_bank(1);  // Switch to title screen CHR tiles
+
+    // Load title palette
+    for (uint8_t i = 0; i < 16; i++) {
+        palette_ram[i] = title_bg_palette[i];
+    }
+    pal_bg(palette_ram);
+
+    // Hide all sprites
+    oam_clear();
+
+    uint8_t variant = 0;  // 0 = nametableA (NES), 1 = nametableB (PICO-8)
+    uint8_t anim_frame = 0;
+    uint8_t frame_timer = 0;
+    uint8_t prev_input = 0xFF;  // Prevent immediate trigger on first frame
+
+    // Load initial frame 0 (full nametable, PPU off)
+    ppu_off();
+    title_load_frame0(variant);
+    PPU_CTRL = 0x80;  // NMI enabled, BG pattern $0000, sprite pattern $0000
+    s_delta_active = 0;
+    ppu_on_all();
+
+    for (;;) {
+        ppu_wait_nmi();
+        // --- Vblank-critical: only raw PPU register writes here ---
+        // Data was already decoded into RAM buffers during the previous visible frame.
+
+        // Flush buffered PPU writes (reads from RAM only, no banked ROM access)
+        if (s_delta_active) {
+            title_flush_ppu_writes();
+        }
+
+        // Update text fade (palette 3, color 3 = palette_ram index 15)
+        uint8_t fade_color = title_text_fade[anim_frame];
+        if (palette_ram[15] != fade_color) {
+            palette_ram[15] = fade_color;
+            pal_bg(palette_ram);
+        }
+
+        // Reset scroll (must happen during vblank after any PPU_ADDR writes)
+        PPU_SCROLL = 0;
+        PPU_SCROLL = 0;
+
+        // --- End vblank-critical section ---
+        // Everything below runs during visible frame (CPU time is free)
+
+        // Update music engine
+        set_prg_bank(BANK_MUSIC);
+        famistudio_update();
+        set_prg_bank(0);
+
+        // Poll input
+        volatile uint8_t raw = (uint8_t)pad_poll(0);
+        __asm__ __volatile__("" ::: "memory");
+        uint8_t pressed = raw & ~prev_input;
+        prev_input = raw;
+
+        // START exits title screen
+        if (pressed & PAD_START) break;
+
+        // SELECT toggles graphic variant: need full reload (PPU off)
+        if (pressed & PAD_SELECT) {
+            variant ^= 1;
+            s_delta_active = 0;
+            ppu_off();
+            title_load_frame0(variant);
+            // Replay deltas to reach current anim_frame (PPU is off, no time limit)
+            for (uint8_t f = 0; f < anim_frame; f++) {
+                if (variant == 0) {
+                    set_prg_bank(TITLE_BANK_A);
+                    title_apply_delta_full(&title_delta_a[title_delta_offsets_a[f]]);
+                } else {
+                    set_prg_bank(TITLE_BANK_B);
+                    title_apply_delta_full(&title_delta_b[title_delta_offsets_b[f]]);
+                }
+            }
+            set_prg_bank(0);
+            ppu_on_all();
+        }
+
+        // Advance animation: decode next delta into RAM buffer (CPU work, not vblank)
+        if (!s_delta_active) {
+            frame_timer++;
+            if (frame_timer >= TITLE_ANIM_SPEED) {
+                frame_timer = 0;
+                // Decode delta from banked ROM into RAM buffer (runs during visible frame)
+                if (variant == 0) {
+                    set_prg_bank(TITLE_BANK_A);
+                    title_prepare_delta(&title_delta_a[title_delta_offsets_a[anim_frame]]);
+                } else {
+                    set_prg_bank(TITLE_BANK_B);
+                    title_prepare_delta(&title_delta_b[title_delta_offsets_b[anim_frame]]);
+                }
+                set_prg_bank(0);
+                anim_frame++;
+                if (anim_frame >= TITLE_FRAME_COUNT) anim_frame = 0;
+            }
+        }
+    }
+
+    // Transition to game: restore game CHR and PPU settings
+    set_chr_bank(0);  // Switch back to game CHR tiles
+    PPU_CTRL = 0x88;  // NMI enabled, sprite pattern $1000, nametable $2000
+}
+
 void port_init(void) {
     memset(&GLOBAL_ActiveLevel, 0, sizeof(GLOBAL_ActiveLevel));
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
@@ -505,12 +796,14 @@ void port_init(void) {
     PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
     ppu_wait_nmi();  // First NMI sets NTSC_MODE — must happen before music init
 
-    // Init FamiTone2 after NTSC_MODE is set
     // Init FamiStudio engine (engine + data both in bank 7)
     set_prg_bank(BANK_MUSIC);
     fs_init(music_data_untitled);
     fs_play(0);
     set_prg_bank(0);
+
+    // Show title screen (blocks until START is pressed)
+    title_screen_loop();
 }
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj) {
@@ -1232,11 +1525,6 @@ uint8_t port_getInputs(void) {
 static uint8_t nes_6bit_to_palette_index(uint8_t nes_6bit) {
     return nes_6bit;
 }
-
-// Palette data stored in RAM (for background and sprite palettes)
-// Lower 16 bytes (0-15): 4 background palettes * 4 colors
-// Upper 16 bytes (16-31): 4 sprite palettes * 4 colors
-static uint8_t palette_ram[32];
 
 static inline uint8_t get_level_bank(uint16_t level_idx) {
     (void)level_idx;
