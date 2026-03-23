@@ -478,8 +478,8 @@ static void render_object_sprite(OBJ_DATA *obj) {
     if (obj->eType == OBJ_UNUSED) {
         return;
     }
-    uint8_t baseX = (uint8_t)obj->pos.x;
-    uint8_t spriteY = (uint8_t)obj->pos.y;
+    uint8_t baseX = (uint8_t)(obj->pos.x << 1);
+    uint8_t spriteY = (uint8_t)(obj->pos.y << 1);
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
     uint8_t tile_index = obj->oamTile;
     const unsigned char *sprite_data = get_object_sprite_data(tile_index);
@@ -539,8 +539,8 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj) {
     }
 
     const struct sOBJ_DATA *playerData = &playerObj->objData;
-    uint8_t baseX = (uint8_t)playerData->pos.x;
-    uint8_t spriteY = (uint8_t)playerData->pos.y;
+    uint8_t baseX = (uint8_t)(playerData->pos.x << 1);
+    uint8_t spriteY = (uint8_t)(playerData->pos.y << 1);
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
     const unsigned char *sd = get_object_sprite_data(playerData->oamTile);
     if (sd == NULL) {
@@ -588,9 +588,9 @@ void port_buildBalloon(uint8_t index) {
     }
 
     // Calculate balloon position with Y offset for bob animation
-    uint8_t baseX = (uint8_t)balloon->pos.x;
-    uint8_t spriteY = (uint8_t)balloon->pos.y;
-    int8_t yOffset = balloon->data.balloon.spriteYOffset;
+    uint8_t baseX = (uint8_t)(balloon->pos.x << 1);
+    uint8_t spriteY = (uint8_t)(balloon->pos.y << 1);
+    int8_t yOffset = balloon->data.balloon.spriteYOffset << 1;
     uint8_t balloonY = (spriteY < 240) ? ((uint8_t)((int16_t)spriteY - (int16_t)s_scrollY + (int16_t)yOffset)) : ((uint8_t)((int16_t)spriteY + (int16_t)yOffset));
 
     // Render balloon sprite (top 16x16 sprite)
@@ -737,8 +737,8 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
         uint8_t index = s_pendingBgTileUpdates[processed_count];
         OBJ_DATA *bgTileObj = &GLOBAL_OBJList[index];
         
-        uint8_t tileX = bgTileObj->pos.x / 16;
-        uint8_t tileY = (bgTileObj->pos.y + 1) / 16;
+        uint8_t tileX = bgTileObj->pos.x / 8;
+        uint8_t tileY = (bgTileObj->pos.y + 1) / 8;
         const unsigned char *tile_entry = NULL;
         
         // Handle collapse tiles
@@ -1012,8 +1012,8 @@ void port_buildPlatMov(uint8_t index) {
         return;
     }
 
-    uint8_t baseX = (uint8_t)platMov->pos.x;
-    uint8_t spriteY = (uint8_t)platMov->pos.y;
+    uint8_t baseX = (uint8_t)(platMov->pos.x << 1);
+    uint8_t spriteY = (uint8_t)(platMov->pos.y << 1);
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
     uint8_t oamProps = platMov->oamProps;
 
@@ -1051,8 +1051,8 @@ void port_buildFlyingBerry(uint8_t index) {
     render_object_sprite(berry);
 
     // Calculate wing position and animation
-    uint8_t baseX = (uint8_t)berry->pos.x;
-    uint8_t spriteY = (uint8_t)berry->pos.y;
+    uint8_t baseX = (uint8_t)(berry->pos.x << 1);
+    uint8_t spriteY = (uint8_t)(berry->pos.y << 1);
     uint8_t baseY = (spriteY < 240) ? (spriteY - s_scrollY) : spriteY;
 
     // Determine wing tile based on vertical movement (comparing current Y to startY)
@@ -1190,7 +1190,7 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
 static void execute_bg_tiles_nametable_writes(const BgTileWrite *writes, uint8_t write_count);
 
 __attribute__((noinline)) void port_vblank(void) {
-    int16_t playerY = (int16_t)GLOBAL_PlayerData.objData.pos.y;
+    int16_t playerY = (int16_t)(GLOBAL_PlayerData.objData.pos.y << 1);
     int16_t scrollCalc = playerY - 16 - (int16_t)GLOBAL_ActiveLevel.scrollPointY;
     s_scrollY = (uint8_t)CLAMP(scrollCalc, 0, 16);
     BgTileWrite bgTileWrites[MAX_BG_TILE_WRITES];

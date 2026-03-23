@@ -1,0 +1,30 @@
+Modules list:
+-------------
+famistudio_engine.o:
+    CODE              Offs=000000  Size=0005CA  Align=00001  Fill=0000
+    BSS               Offs=000000  Size=00007D  Align=00001  Fill=0000
+    ZEROPAGE          Offs=000000  Size=000008  Align=00001  Fill=0000
+
+
+Segment list:
+-------------
+Name                   Start     End    Size  Align
+----------------------------------------------------
+ZEROPAGE              000000  000007  000008  00001
+BSS                   000300  00037C  00007D  00001
+CODE                  008000  0085C9  0005CA  00001
+
+
+Exports list by name:
+---------------------
+
+
+
+Exports list by value:
+----------------------
+
+
+
+Imports list:
+-------------
+

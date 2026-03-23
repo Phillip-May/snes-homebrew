@@ -109,6 +109,7 @@ typedef struct sOBJ_DATA {
             uint8_t acc;
             uint8_t hitboxIndex;
             bool isMovingLeft;
+            int8_t lastDelta; // per-frame movement for player carry
         } platMov;
         struct sKeyData{
             uint8_t linkedChestIndex;
@@ -177,8 +178,8 @@ struct sActiveLevelData
     uint8_t collisionFlagsArr[256];
 
     uint8_t movingPlatformCount;
-    uint8_t movingPlatformDir[8];
-    uint8_t movingPlatformHitboxes[8 * 4];
+    uint8_t movingPlatformDir[12];
+    uint8_t movingPlatformHitboxes[12 * 4];
 
     uint8_t shakeFrames;
     uint8_t textScrollOffsetX;

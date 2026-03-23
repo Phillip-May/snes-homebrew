@@ -279,9 +279,9 @@ static void writeStandardSprite(uint8_t index, const OBJ_DATA *obj)
 {
     uint8_t table2Index = (uint8_t)(index / 4u);
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
-    int16_t screenY = (int16_t)(obj->pos.y - (int16_t)GLOBAL_ScrollBG2Y);
+    int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
     GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(index, 1u, 0u, currentByte);
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = (uint8_t)obj->pos.x;
+    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = (uint8_t)(obj->pos.x << 1);
     GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = (uint8_t)screenY;
     GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = obj->oamTile;
     GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = obj->oamProps;
@@ -292,11 +292,11 @@ static void writeConditionalSprite(uint8_t index, const OBJ_DATA *obj, bool hide
     uint8_t table2Index = (uint8_t)(index / 4u);
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
     GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(index, 1u, 0u, currentByte);
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = (uint8_t)obj->pos.x;
+    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = (uint8_t)(obj->pos.x << 1);
     if (hide) {
         GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
     } else {
-        int16_t screenY = (int16_t)(obj->pos.y - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
         GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = (uint8_t)screenY;
     }
     GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = obj->oamTile;
@@ -326,8 +326,8 @@ static bool writeBreakableWallSprite(uint8_t index, OBJ_DATA *obj)
         uint8_t propMask = (offsetX != 0u ? 0x40u : 0u) | (offsetY != 0u ? 0x80u : 0u);
         GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = obj->oamTile;
         GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = (uint8_t)(obj->oamProps | propMask);
-        GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)((uint16_t)obj->pos.x + offsetX);
-        int16_t extraScreenY = (int16_t)((int16_t)obj->pos.y + offsetY - (int16_t)GLOBAL_ScrollBG2Y);
+        GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)((uint16_t)(obj->pos.x << 1) + offsetX);
+        int16_t extraScreenY = (int16_t)((int16_t)(obj->pos.y << 1) + offsetY - (int16_t)GLOBAL_ScrollBG2Y);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)extraScreenY;
     }
 
@@ -374,8 +374,8 @@ static bool writeMonumentSprite(uint8_t index, OBJ_DATA *obj)
         uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
         GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(slot, 1u, 0u, currentByte);
 
-        int16_t spriteX = (int16_t)obj->pos.x + kOffsetsX[extra];
-        int16_t spriteY = (int16_t)obj->pos.y + kOffsetsY[extra] - (int16_t)GLOBAL_ScrollBG2Y;
+        int16_t spriteX = (int16_t)(obj->pos.x << 1) + kOffsetsX[extra];
+        int16_t spriteY = (int16_t)(obj->pos.y << 1) + kOffsetsY[extra] - (int16_t)GLOBAL_ScrollBG2Y;
         GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = kTiles[extra];
         GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = kProps[extra];
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)spriteX;
@@ -400,7 +400,7 @@ static bool writeBigChestSprite(uint8_t index, OBJ_DATA *obj)
     uint8_t slot = obj->extraSpriteBase;
     uint8_t table2Index = (uint8_t)(slot / 4u);
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
-    uint16_t rightXFull = (uint16_t)((uint16_t)obj->pos.x + PORT_BIG_CHEST_OFFSET_RIGHT);
+    uint16_t rightXFull = (uint16_t)((uint16_t)(obj->pos.x << 1) + PORT_BIG_CHEST_OFFSET_RIGHT);
     uint8_t xBit = (rightXFull >= 256u) ? 1u : 0u;
     GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(slot, 1u, xBit, currentByte);
 
@@ -410,7 +410,7 @@ static bool writeBigChestSprite(uint8_t index, OBJ_DATA *obj)
     if (hide) {
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = 240;
     } else {
-        int16_t screenY = (int16_t)(obj->pos.y - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)screenY;
     }
 
@@ -432,11 +432,11 @@ static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
     uint8_t table2Index = (uint8_t)(slot / 4u);
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
     GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(slot, 1u, 0u, currentByte);
-    GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)obj->pos.x;
+    GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)(obj->pos.x << 1);
     if (hideMain) {
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = 240;
     } else {
-        int16_t stringY = (int16_t)((int16_t)obj->pos.y + 14 + (int16_t)obj->data.balloon.spriteYOffset - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t stringY = (int16_t)((int16_t)(obj->pos.y << 1) + 14 + (int16_t)(obj->data.balloon.spriteYOffset << 1) - (int16_t)GLOBAL_ScrollBG2Y);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)stringY;
     }
     GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = obj->data.balloon.stringTile;
@@ -448,7 +448,7 @@ static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
 
 static bool computePlatMovWrap(const OBJ_DATA *obj, int16_t *outX, uint8_t *outTile, bool *outHide)
 {
-    int16_t baseX = (int16_t)((uint8_t)obj->pos.x);
+    int16_t baseX = (int16_t)((uint8_t)(obj->pos.x << 1));
 
     if (!obj->data.platMov.isMovingLeft) {
         if (baseX > 240) {
@@ -495,9 +495,9 @@ static bool writePlatMovSprite(uint8_t index, OBJ_DATA *obj)
     uint8_t rightSlot = obj->extraSpriteBase;
     uint8_t wrapSlot = (uint8_t)(rightSlot + 1u);
 
-    int16_t screenY = (int16_t)(obj->pos.y - (int16_t)GLOBAL_ScrollBG2Y);
+    int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
 
-    uint16_t rightXFull = (uint16_t)((uint16_t)(uint8_t)obj->pos.x + PORT_PLATMOV_RIGHT_OFFSET);
+    uint16_t rightXFull = (uint16_t)((uint16_t)(uint8_t)(obj->pos.x << 1) + PORT_PLATMOV_RIGHT_OFFSET);
     uint8_t rightXBit = 0u;
     uint8_t rightX = (uint8_t)rightXFull;
     uint8_t rightTable2Index = (uint8_t)(rightSlot / 4u);
@@ -562,8 +562,8 @@ static bool writeFlyingBerrySprite(uint8_t index, OBJ_DATA *obj)
                                             : PORT_FLYING_BERRY_WING_PROPERTIES_RIGHT;
         int16_t xOffset = (offset == 0u) ? PORT_FLYING_BERRY_WING_OFFSET_X
                                          : -(int16_t)PORT_FLYING_BERRY_WING_OFFSET_X;
-        int16_t wingX = (int16_t)obj->pos.x + xOffset;
-        int16_t wingY = (int16_t)obj->pos.y - PORT_FLYING_BERRY_WING_OFFSET_Y - (int16_t)GLOBAL_ScrollBG2Y;
+        int16_t wingX = (int16_t)(obj->pos.x << 1) + xOffset;
+        int16_t wingY = (int16_t)(obj->pos.y << 1) - PORT_FLYING_BERRY_WING_OFFSET_Y - (int16_t)GLOBAL_ScrollBG2Y;
 
         GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = wingTile;
         GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = properties;
@@ -1083,15 +1083,16 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj)
         return;
     }
     const struct sOBJ_DATA *playerData = &playerObj->objData;
-    int16_t screenY = (int16_t)(playerData->pos.y - (int16_t)GLOBAL_ScrollBG2Y);
+    int16_t screenY = (int16_t)((playerData->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
     uint8_t table2Index = 0u; // Sprite 0 is at index 0
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
     // Calculate X high bit (bit 8 of X coordinate)
-    uint8_t xBit = (uint8_t)((playerData->pos.x >= 256u) ? 1u : 0u);
+    uint16_t renderX = (uint16_t)(playerData->pos.x << 1);
+    uint8_t xBit = (uint8_t)((renderX >= 256u) ? 1u : 0u);
     GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(0u, 1u, xBit, currentByte);
     // Write directly to bytes array to avoid vbcc65816 struct layout issues
     // SNES OAM format: byte 0 = X, byte 1 = Y, byte 2 = Tile, byte 3 = Properties
-    GLOBAL_OAMCopy.Bytes[0] = (uint8_t)playerData->pos.x;  // X position (low 8 bits)
+    GLOBAL_OAMCopy.Bytes[0] = (uint8_t)renderX;  // X position (low 8 bits)
     GLOBAL_OAMCopy.Bytes[1] = (uint8_t)screenY;           // Y position
     GLOBAL_OAMCopy.Bytes[2] = playerData->oamTile;        // Tile number
     GLOBAL_OAMCopy.Bytes[3] = playerData->oamProps;      // Properties
@@ -1264,8 +1265,8 @@ void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
 
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y)
 {
-    uint16_t tileX = (uint16_t)(x / 8u);
-    uint16_t tileY = (uint16_t)(y / 8u);
+    uint16_t tileX = (uint16_t)(x / 4u);
+    uint16_t tileY = (uint16_t)(y / 4u);
     uint16_t bufferOffset = (tileY * 32u) + tileX;
     size_t textLength;
     size_t i;
@@ -1512,9 +1513,10 @@ void port_vblank(void)
     //End of vblank critical code
     //Calculate hardware scrolls, do so before objects as they may rely on these values being correct
     int16_t shakeAmount = GLOBAL_ActiveLevel.shakeFrames > 0 ? ((GLOBAL_FrameCount & 1) ? 2 : -2) : 0;
-    int16_t smoothScrollY = ((int16_t)GLOBAL_PlayerData.objData.pos.y - GLOBAL_ActiveLevel.scrollPointY) >> 2;
+    int16_t playerRenderY = (int16_t)(GLOBAL_PlayerData.objData.pos.y << 1);
+    int16_t smoothScrollY = (playerRenderY - GLOBAL_ActiveLevel.scrollPointY) >> 2;
 
-    GLOBAL_ScrollBG2Y = CLAMP(GLOBAL_PlayerData.objData.pos.y - 16 - GLOBAL_ActiveLevel.scrollPointY, 0, 31);
+    GLOBAL_ScrollBG2Y = CLAMP(playerRenderY - 16 - GLOBAL_ActiveLevel.scrollPointY, 0, 31);
     GLOBAL_ScrollBG2X = 0;
 
     GLOBAL_ScrollBG3X = GLOBAL_ScrollBG2X + (shakeAmount);

@@ -101,9 +101,9 @@ void smokeUpdate(uint8_t index) {
     OBJ_DATA *smoke = &GLOBAL_OBJList[index];
     smoke->data.smoke.frameCount++;
     // 1/3 of it's time per state
-    smoke->data.smoke.smokeSpriteState = SMOKE_SPRITE_1 + ((smoke->data.smoke.frameCount / 10) * 2);
-    // 0.5 seconds
-    if (smoke->data.smoke.frameCount >= 30) {
+    smoke->data.smoke.smokeSpriteState = SMOKE_SPRITE_1 + ((smoke->data.smoke.frameCount / 5) * 2);
+    // 0.5 seconds at 30fps
+    if (smoke->data.smoke.frameCount >= 15) {
         //Destroy self
         smoke->eType = OBJ_UNUSED;
         smoke->flags |= OBJ_FLAG_DIRTY;
@@ -120,8 +120,8 @@ PORT_FUNC_BANK6
 void breakableWallInit(uint8_t index) {
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
-    uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
-    uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
+    uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
+    uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 8;
     GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     |= 0x01; //Set the solid flag
     GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)]   |= 0x01; //Set the solid flag
     GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY+1)]   |= 0x01; //Set the solid flag
@@ -149,23 +149,23 @@ void breakableWallUpdate(uint8_t index) {
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
 
     //Fixed collision detection to properly detect hits from above
-    bool isPlayerTouching = playerX > thisX-8 && playerX < thisX+40 && playerY > thisY-20 && playerY < thisY+40;
+    bool isPlayerTouching = playerX > thisX-4 && playerX < thisX+20 && playerY > thisY-10 && playerY < thisY+20;
     if (isPlayerTouching && (GLOBAL_PlayerData.dashCounter > 0)) {
-        uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
-        uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
+        uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
+        uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 8;
         //Player collision with wall
         {
             int16_t knockDir = -sign(FIXED_TO_INT(GLOBAL_PlayerData.spd.x));
-            GLOBAL_PlayerData.spd.x = (knockDir > 0) ? FLOAT_TO_FIXED(3.0f) : ((knockDir < 0) ? FLOAT_TO_FIXED(-3.0f) : 0);
+            GLOBAL_PlayerData.spd.x = (knockDir > 0) ? FLOAT_TO_FIXED(1.5f) : ((knockDir < 0) ? FLOAT_TO_FIXED(-1.5f) : 0);
         }
-        GLOBAL_PlayerData.spd.y = FLOAT_TO_FIXED(-3.0f);
+        GLOBAL_PlayerData.spd.y = FLOAT_TO_FIXED(-1.5f);
         GLOBAL_PlayerData.dashCounter = -1;
         playSoundEffect(SOUND_EFFECT_BREAKABLE_WALL_HIT);
         initObject(OBJ_SMOKE, thisX, thisY);
-        initObject(OBJ_SMOKE, thisX + 16, thisY);
-        initObject(OBJ_SMOKE, thisX, thisY + 16);
-        initObject(OBJ_SMOKE, thisX + 16, thisY + 16);
-        initObject(OBJ_STRAWBERRY, thisX + 8, thisY + 8);
+        initObject(OBJ_SMOKE, thisX + 8, thisY);
+        initObject(OBJ_SMOKE, thisX, thisY + 8);
+        initObject(OBJ_SMOKE, thisX + 8, thisY + 8);
+        initObject(OBJ_STRAWBERRY, thisX + 4, thisY + 4);
 
         // Update nametable to clear the breakable wall tile (queue before destroying)
         port_updateCollapseTileNametable(index);
@@ -215,8 +215,8 @@ enum eCollapseTileState {
 PORT_FUNC_BANK6
 void collapseTileInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
-    uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
+    uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
+    uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 8;
     uint8_t i;
     GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     |= 0x01; //Set the solid flag
     this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
@@ -230,8 +230,8 @@ void collapseTileInit(uint8_t index) {
     // This ensures bidirectional linking works regardless of initialization order
     for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_SPRING) {
-            uint8_t springTileX = GLOBAL_OBJList[i].pos.x / 16;
-            uint8_t springTileY = (GLOBAL_OBJList[i].pos.y + 1) / 16;
+            uint8_t springTileX = GLOBAL_OBJList[i].pos.x / 8;
+            uint8_t springTileY = (GLOBAL_OBJList[i].pos.y + 1) / 8;
             
             // Check if spring is adjacent to this collapse tile
             if ((springTileX == tileX && (springTileY == tileY - 1 || springTileY == tileY + 1)) ||
@@ -256,8 +256,8 @@ void collapseTileUpdate(uint8_t index) {
     uint16_t thisY = this->pos.y;
     uint16_t playerX = GLOBAL_PlayerData.objData.pos.x;
     uint16_t playerY = GLOBAL_PlayerData.objData.pos.y;
-    bool isPlayerTouching = (thisX <= playerX + 20 && thisX + 20 >= playerX && 
-                            thisY <= playerY + 20 && thisY + 20 >= playerY);
+    bool isPlayerTouching = (thisX <= playerX + 10 && thisX + 10 >= playerX &&
+                            thisY <= playerY + 10 && thisY + 10 >= playerY);
 
     this->oamProps = 0x32; //Ensure consistent properties
 
@@ -270,21 +270,21 @@ void collapseTileUpdate(uint8_t index) {
             }
             if (isPlayerTouching) {
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_COLLAPSING;
-                this->data.collapseTile.frameCount = 30;
+                this->data.collapseTile.frameCount = 15;
                 port_updateCollapseTileNametable(index);
             }
             this->oamTile = COLLAPSE_TILE_SPRITE_1;
             this->flags |= OBJ_FLAG_DIRTY;
             break;
-            
+
         case COLLAPSE_TILE_STATE_COLLAPSING:
             this->data.collapseTile.frameCount -= 1;
             if (this->data.collapseTile.frameCount == 0) {
-                uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
-                uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
+                uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
+                uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 8;
                 GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)] &= ~0x01; //Unset the solid flag
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_HIDDEN;
-                this->data.collapseTile.frameCount = 120;
+                this->data.collapseTile.frameCount = 60;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
                 port_updateCollapseTileNametable(index);
                 this->flags |= OBJ_FLAG_DIRTY;
@@ -293,7 +293,7 @@ void collapseTileUpdate(uint8_t index) {
             // Animation frame: 0->SPRITE_3, 10->SPRITE_2, 20->SPRITE_1
             // On NES: values are consecutive (23, 24, 25), so add 1 per frame
             // On SNES: values are 2 apart (0x48, 0x4A, 0x4C), so add 2 per frame
-            uint8_t frame_offset = (uint8_t)(2 - (this->data.collapseTile.frameCount / 10));
+            uint8_t frame_offset = (uint8_t)(2 - (this->data.collapseTile.frameCount / 5));
             uint8_t newOamTile;
 #ifdef __NES__
             newOamTile = (uint8_t)COLLAPSE_TILE_SPRITE_1 + frame_offset;
@@ -316,8 +316,8 @@ void collapseTileUpdate(uint8_t index) {
                 this->data.collapseTile.frameCount -= 1;
             }
             if (this->data.collapseTile.frameCount == 0 && !isPlayerTouching) {
-                uint8_t tileX = GLOBAL_OBJList[index].pos.x / 16;
-                uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 16;
+                uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
+                uint8_t tileY = (GLOBAL_OBJList[index].pos.y+1) / 8;
                 GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)] |= 0x01; //Set the solid flag
                 this->data.collapseTile.state = COLLAPSE_TILE_STATE_IDLE;
                 this->oamTile = COLLAPSE_TILE_SPRITE_1;
@@ -364,8 +364,8 @@ void springUpdate(uint8_t index) {
 
     // Check if the block underneath the spring is broken
     // Spring is at (thisX, thisY) in pixels, block underneath is one tile row below
-    uint8_t tileX = thisX / 16;
-    uint8_t tileY = (thisY + 1) / 16;
+    uint8_t tileX = thisX / 8;
+    uint8_t tileY = (thisY + 1) / 8;
     uint8_t tileBelowY = tileY + 1;
     
     // Check if there's a solid block underneath the spring
@@ -395,21 +395,23 @@ void springUpdate(uint8_t index) {
         return;
     }
 
-    //Check if player is touching and moving downward
-    isPlayerTouching = (playerX > thisX-8) && 
-                       (playerX < thisX+24) && 
-                       (playerY > thisY-6) && 
-                       (playerY < thisY+20) &&
-                       (GLOBAL_PlayerData.spd.y >= 0); //Only trigger when player is moving downward
+    //Check AABB overlap: spring hitbox {0,0,8,8} vs player hitbox {1,3,6,5}
+    // player.x+1+6 > spring.x  &&  player.x+1 < spring.x+8
+    // player.y+3+5 > spring.y  &&  player.y+3 < spring.y+8
+    isPlayerTouching = (playerX + 7 > thisX) &&
+                       (playerX + 1 < thisX + 8) &&
+                       (playerY + 8 > thisY) &&
+                       (playerY + 3 < thisY + 8) &&
+                       (GLOBAL_PlayerData.spd.y >= 0);
 
     if (isPlayerTouching) {
         //Set player position to spring top
         GLOBAL_PlayerData.objData.pos.y = thisY - 4;
-        GLOBAL_PlayerData.posF.y = INT_TO_FIXED(GLOBAL_PlayerData.objData.pos.y);
+        GLOBAL_PlayerData.posF.y = 0; // reset remainder after position snap
         
         //Apply spring physics
         GLOBAL_PlayerData.spd.x = FIXED_MUL_1_5(GLOBAL_PlayerData.spd.x); //Reduce horizontal speed (~0.2)
-        GLOBAL_PlayerData.spd.y = INT_TO_FIXED(-3*2); //Set upward velocity (scaled for 60fps/256x256)
+        GLOBAL_PlayerData.spd.y = INT_TO_FIXED(-3); //Set upward velocity (original)
         GLOBAL_PlayerData.dashesLeft = player->doubleDashUnlocked ? 2 : 1; //Restore dashes
         
         //Spring animation and effects
@@ -422,7 +424,7 @@ void springUpdate(uint8_t index) {
             OBJ_DATA *linkedCollapseTile = &GLOBAL_OBJList[this->data.spring.linkedCollapseTileIndex];
             if (linkedCollapseTile->data.collapseTile.state == COLLAPSE_TILE_STATE_IDLE) {
                 linkedCollapseTile->data.collapseTile.state = COLLAPSE_TILE_STATE_COLLAPSING;
-                linkedCollapseTile->data.collapseTile.frameCount = 30;
+                linkedCollapseTile->data.collapseTile.frameCount = 15;
             }
         }
     }
@@ -501,14 +503,14 @@ void balloonUpdate(uint8_t index) {
         this->data.balloon.yTableIndex = 0;
     }
 
-    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x-16) &&
-                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) &&
-                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y-8) &&
-                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y+18);
+    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x-8) &&
+                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+8) &&
+                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y-4) &&
+                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y+9);
 
     if (isPlayerTouching && this->data.balloon.state == BALLOON_STATE_IDLE) {
         this->data.balloon.state = BALLOON_STATE_POPPED;
-        this->data.balloon.hideFrameCount = 60 * 2;
+        this->data.balloon.hideFrameCount = 60;
         GLOBAL_PlayerData.dashesLeft = GLOBAL_PlayerData.doubleDashUnlocked ? 2 : 1;
         playSoundEffect(SOUND_EFFECT_BALLOON_POP);
         this->flags |= OBJ_FLAG_DIRTY;
@@ -534,8 +536,9 @@ void balloonUpdate(uint8_t index) {
 PORT_FUNC_BANK6
 void platMovInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    this->pos.y -= 2;
-    uint8_t hitboxIndex;    
+    // ccleste: this->x -= 4 (center the 16px sprite on spawn tile)
+    this->pos.x -= 4;
+    uint8_t hitboxIndex;
     if (this->eType == OBJ_PLATMOV_L) {
         this->data.platMov.isMovingLeft = false;
         GLOBAL_ActiveLevel.movingPlatformDir[GLOBAL_ActiveLevel.movingPlatformCount] = MOVING_PLATFORM_DIR_RIGHT;
@@ -543,16 +546,17 @@ void platMovInit(uint8_t index) {
     else {
         this->data.platMov.isMovingLeft = true;
         GLOBAL_ActiveLevel.movingPlatformDir[GLOBAL_ActiveLevel.movingPlatformCount] = MOVING_PLATFORM_DIR_LEFT;
-        this->pos.x -= 16;
     }
     
     this->oamTile = PLATMOV_SPRITE_1;
     this->oamProps = 0x34; // priority 3, palette 2
-    //Add the hitbox to the list
+    //Add the hitbox to the list (max 12 platforms)
+    if (GLOBAL_ActiveLevel.movingPlatformCount >= 12) return;
     hitboxIndex = GLOBAL_ActiveLevel.movingPlatformCount * 4;
     this->data.platMov.hitboxIndex = hitboxIndex;
     GLOBAL_ActiveLevel.movingPlatformCount++;
     this->data.platMov.acc = 0;
+    this->data.platMov.lastDelta = 0;
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
@@ -562,34 +566,42 @@ void platMovUpdate(uint8_t index) {
     uint8_t hitboxIndex = this->data.platMov.hitboxIndex;
 
     //Fixed point math too expensive, trickery ensues, 0.65f speed is cursed
-    this->data.platMov.acc += 65; // numerator
-    if (this->data.platMov.acc >= 100) { // denominator
+    // Platform has solids=false in ccleste, so OBJ_move applies amount directly (no <=loop).
+    // Speed 0.65: accumulator triggers ~65% of frames, moving 1px each = 0.65 px/frame.
+    {
+    int8_t platDelta = 0;
+    this->data.platMov.acc += 65;
+    if (this->data.platMov.acc >= 100) {
         this->data.platMov.acc -= 100;
-        // Trigger event
         if (this->data.platMov.isMovingLeft) {
             this->pos.x -= 1;
+            platDelta = -1;
         }
         else {
             this->pos.x += 1;
+            platDelta = 1;
         }
+    }
+    // Store delta for player carry (ccleste carries player by platform delta, not spd.x)
+    this->data.platMov.lastDelta = platDelta;
     }
 
 
 
-    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex] = GLOBAL_OBJList[index].pos.x - 12;
-    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 1] = GLOBAL_OBJList[index].pos.y - 7;
-    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 2] = GLOBAL_OBJList[index].pos.x + 28;
-    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 3] = GLOBAL_OBJList[index].pos.y - 7;
+    // Platform hitbox: {0, 0, 16, 4} in game space
+    // ccleste uses {0,0,16,8} at 128px with 8px-tall sprites.
+    // NES renders platform via render_16x8_sprite = 8 screen px = 4 game px tall.
+    // Hitbox height matches the visual: 4 game pixels.
+    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex]     = GLOBAL_OBJList[index].pos.x;
+    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 1] = GLOBAL_OBJList[index].pos.y;
+    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 2] = GLOBAL_OBJList[index].pos.x + 16;
+    GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 3] = GLOBAL_OBJList[index].pos.y + 4;
 
-    if (this->data.platMov.isMovingLeft) {
-        if (GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 0] > 224) {
-            GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 0] = 0;
-        }
-    }
-    else {
-        if (GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 2] < 16) {
-            GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 2] = 255;
-        }
+    // Wrap around (ccleste: if x<-16 then x=128, if x>128 then x=-16)
+    if (this->pos.x < -16) {
+        this->pos.x = 128;
+    } else if (this->pos.x > 128) {
+        this->pos.x = -16;
     }
 
 
@@ -627,10 +639,10 @@ void keyUpdate(uint8_t index) {
     bool isPlayerTouching = false;
     this->data.key.frameCount += 1;
 
-    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 16) &&
-                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 16) &&
-                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 18) &&
-                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y + 2);
+    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) &&
+                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 8) &&
+                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 9) &&
+                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y + 1);
 
     if (isPlayerTouching) {
         OBJ_DATA *chest = &GLOBAL_OBJList[this->data.key.linkedChestIndex];
@@ -691,7 +703,7 @@ PORT_FUNC_BANK6
 void chestInit(uint8_t index) {   
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    this->pos.x -= 8;
+    this->pos.x -= 4;
 
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_KEY) {
@@ -729,7 +741,7 @@ void chestUpdate(uint8_t index) {
             }
             break;
         case CHEST_STATE_OPEN:
-            initObject(OBJ_STRAWBERRY, this->pos.x, this->pos.y - 8);
+            initObject(OBJ_STRAWBERRY, this->pos.x, this->pos.y - 4);
             this->eType = OBJ_UNUSED;
             this->flags |= OBJ_FLAG_DIRTY;
             return;
@@ -772,10 +784,10 @@ void monumentUpdate(uint8_t index) {
 
     this->flags |= OBJ_FLAG_DIRTY;
 
-    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) && 
-                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+32) && 
-                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y) && 
-                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y+32);
+    isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 4) &&
+                       (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) &&
+                       (GLOBAL_PlayerData.objData.pos.y > this->pos.y) &&
+                       (GLOBAL_PlayerData.objData.pos.y < this->pos.y+16);
 
     if (isPlayerTouching) {
         if (GLOBAL_FrameCount % 4 > 0) {        
@@ -796,15 +808,15 @@ void monumentUpdate(uint8_t index) {
             }
             strncpy(outputText, curLineStr, curLineCharCount);
             outputText[curLineCharCount] = '\0';
-            port_drawText((const unsigned char *)outputText, 40, (uint8_t)(184 + (curLineNum * 8)));
+            port_drawText((const unsigned char *)outputText, 20, (uint8_t)(92 + (curLineNum * 4)));
         }
     }
     else if (isTextDisplayed) {
         isTextDisplayed = false;
         curLineNum = 0;
-        port_drawText((const unsigned char *)"                      ", 40, 184);
-        port_drawText((const unsigned char *)"                      ", 40, 192);
-        port_drawText((const unsigned char *)"                      ", 40, 200);
+        port_drawText((const unsigned char *)"                      ", 20, 92);
+        port_drawText((const unsigned char *)"                      ", 20, 96);
+        port_drawText((const unsigned char *)"                      ", 20, 100);
     }
 }
 
@@ -828,10 +840,10 @@ void bigChestInit(uint8_t index) {
 PORT_FUNC_BANK6
 void bigChestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) && 
-                            (GLOBAL_PlayerData.objData.pos.x < this->pos.x+32) && 
-                            (GLOBAL_PlayerData.objData.pos.y > this->pos.y) && 
-                            (GLOBAL_PlayerData.objData.pos.y < this->pos.y+32);
+    bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 4) &&
+                            (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) &&
+                            (GLOBAL_PlayerData.objData.pos.y > this->pos.y) &&
+                            (GLOBAL_PlayerData.objData.pos.y < this->pos.y+16);
 
     this->oamTile = BIG_CHEST_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
@@ -842,24 +854,24 @@ void bigChestUpdate(uint8_t index) {
             if (isPlayerTouching) {
                 playSoundEffect(SOUND_EFFECT_BIG_CHEST);
                 initObject(OBJ_SMOKE,this->pos.x,this->pos.y);
-                initObject(OBJ_SMOKE,this->pos.x+16,this->pos.y);
+                initObject(OBJ_SMOKE,this->pos.x+8,this->pos.y);
                 this->data.bigChest.state = BIG_CHEST_STATE_OPEN_ANIM;
                 this->data.bigChest.frameCount = 0;
-                GLOBAL_ActiveLevel.shakeFrames = 120;
-                GLOBAL_PausePlayerFrames = 120;
+                GLOBAL_ActiveLevel.shakeFrames = 60;
+                GLOBAL_PausePlayerFrames = 60;
                 // Queue nametable update to clear top tiles when opening starts
                 port_updateCollapseTileNametable(index);
             }
             break;
         case BIG_CHEST_STATE_OPEN_ANIM:
             this->data.bigChest.frameCount += 1;
-            if (this->data.bigChest.frameCount > 120) {
+            if (this->data.bigChest.frameCount > 60) {
                 this->data.bigChest.state = BIG_CHEST_STATE_OPENED;
                 // Queue nametable update to show open state (top tiles cleared)
                 port_updateCollapseTileNametable(index);
                 // Spawn the double dash orb only once when transitioning to OPENED state
                 GLOBAL_ActiveLevel.swapCloudPal = true;
-                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+8,this->pos.y+16);
+                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+4,this->pos.y+8);
             }
             break;
         case BIG_CHEST_STATE_OPENED:
@@ -878,7 +890,7 @@ void doubleDashOrbInit(uint8_t index) {
     this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->data.doubleJumpOrb.frameCount = 0;
-    this->data.doubleJumpOrb.speedY = -4;  // -2 * 2 (initial speed)
+    this->data.doubleJumpOrb.speedY = -2;  // original speed
     this->data.doubleJumpOrb.accelAccumulator = 0;
     this->flags |= OBJ_FLAG_DIRTY;
 }
@@ -895,20 +907,20 @@ void doubleDashOrbUpdate(uint8_t index) {
     this->oamProps = 0x38; // priority 3, palette 4
     this->flags |= OBJ_FLAG_DIRTY;
 
-    // Every frame:
-    *accelAccumulator += 1;  // 0.5 * 2
-    if (*accelAccumulator >= 4) {  // 2 * 2
+    // Every frame at 30fps: accumulate 2x to match original deceleration curve
+    *accelAccumulator += 2;
+    if (*accelAccumulator >= 4) {
         *speedY += *accelAccumulator / 4;
         *accelAccumulator %= 4;
     }
 
     if (*speedY >= 0) {
-        bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 16) && 
-                                (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 16) && 
-                                (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 16) && 
-                                (GLOBAL_PlayerData.objData.pos.y < this->pos.y+16);
+        bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) &&
+                                (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 8) &&
+                                (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 8) &&
+                                (GLOBAL_PlayerData.objData.pos.y < this->pos.y+8);
         if (isPlayerTouching) {
-            GLOBAL_FreezeFrames = 20;
+            GLOBAL_FreezeFrames = 10;
             GLOBAL_DoubleDashUnlocked = true;
             GLOBAL_PlayerData.dashesLeft = 2;
             GLOBAL_PlayerData.doubleDashUnlocked = true;
@@ -966,10 +978,10 @@ void strawberryUpdate(uint8_t index) {
     uint8_t thisY = this->pos.y;
     uint8_t playerX = GLOBAL_PlayerData.objData.pos.x;
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
-    bool isPlayerTouching = (playerX > thisX-16) && 
-                            (playerX < thisX+16) && 
-                            (playerY > thisY-10) && 
-                            (playerY < thisY+16);
+    bool isPlayerTouching = (playerX > thisX-8) &&
+                            (playerX < thisX+8) &&
+                            (playerY > thisY-5) &&
+                            (playerY < thisY+8);
 
     if (this->data.strawberry.isCollected) {
         //Do the text display animation
@@ -984,7 +996,7 @@ void strawberryUpdate(uint8_t index) {
             }
         }
 
-        if (this->data.strawberry.frameCount > (30*2)) {
+        if (this->data.strawberry.frameCount > 30) {
             GLOBAL_ActiveLevel.textFlashActive = false;
             GLOBAL_ActiveLevel.swapActivePalette = true;
             GLOBAL_ActiveLevel.textScrollActive = false;
@@ -1015,9 +1027,9 @@ void strawberryUpdate(uint8_t index) {
         this->data.strawberry.bgTextY = this->pos.y;
         port_drawText((const unsigned char *)"1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
         GLOBAL_ActiveLevel.textScrollActive = true;
-        GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - remainderX);
-        GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - remainderY);
-        this->pos.y = 240;
+        GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - ((remainderX * 2u) % 8u));
+        GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - ((remainderY * 2u) % 8u));
+        this->pos.y = 128;
         this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
@@ -1055,10 +1067,10 @@ void flyingBerryUpdate(uint8_t index) {
     uint8_t thisY = this->pos.y;
     uint8_t playerX = GLOBAL_PlayerData.objData.pos.x;
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
-    bool isPlayerTouching = (playerX > thisX-16) && 
-                            (playerX < thisX+16) && 
-                            (playerY > thisY) && 
-                            (playerY < thisY+16);
+    bool isPlayerTouching = (playerX > thisX-8) &&
+                            (playerX < thisX+8) &&
+                            (playerY > thisY) &&
+                            (playerY < thisY+8);
 
     if (this->data.strawberry.isCollected) {
         //Do the text display animation
@@ -1073,7 +1085,7 @@ void flyingBerryUpdate(uint8_t index) {
             }
         }
 
-        if (this->data.strawberry.frameCount > (30*2)) {
+        if (this->data.strawberry.frameCount > 30) {
             GLOBAL_ActiveLevel.textFlashActive = false;
             GLOBAL_ActiveLevel.swapActivePalette = true;
             GLOBAL_ActiveLevel.textScrollActive = false;
@@ -1106,9 +1118,9 @@ void flyingBerryUpdate(uint8_t index) {
         this->data.strawberry.bgTextY = this->pos.y;
         port_drawText((const unsigned char *)"1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
         GLOBAL_ActiveLevel.textScrollActive = true;
-        GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - remainderX);
-        GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - remainderY);
-        this->pos.y = 240;
+        GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - ((remainderX * 2u) % 8u));
+        GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - ((remainderY * 2u) % 8u));
+        this->pos.y = 128;
         this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
@@ -1193,7 +1205,7 @@ static void processObject(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
 #ifdef __NES__
-    uint8_t frameSlot = (uint8_t)(GLOBAL_FrameCount & 0x01); // alternating frames
+    uint8_t frameSlot = (uint8_t)((GLOBAL_FrameCount >> 1) & 0x01); // alternating game frames
 #endif
     // Use if-else instead of switch to avoid jump table issues with banking
     // Ordered: UNUSED first (most slots empty), then gameplay-critical, then cosmetic
@@ -1303,6 +1315,28 @@ void updateAllObjects(void) {
     port_finishSpriteBuild();
 }
 
+// Sprite-only rebuild: no game logic, just push existing positions to OAM
+// with fresh flicker rotation. Keeps OAM rotation at 60Hz.
+void rebuildAllSprites(void) {
+    uint8_t i;
+    port_beginSpriteBuild(&GLOBAL_PlayerData);
+    port_prg_bank_switch(6);
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
+        OBJ_DATA *obj = &GLOBAL_OBJList[i];
+        if (obj->eType == OBJ_UNUSED) {
+            if (obj->flags & OBJ_FLAG_DIRTY) {
+                if (i != 0U) port_buildUnused(i);
+                else obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
+            }
+        } else {
+            obj->flags |= OBJ_FLAG_DIRTY; // force rebuild for rotation
+            port_buildSpriteIfDirty(i, obj->eType);
+        }
+    }
+    port_prg_bank_switch(0);
+    port_finishSpriteBuild();
+}
+
 
 PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this);
@@ -1371,8 +1405,8 @@ PORT_FUNC_BANK6
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;
-    this->objData.pos.x = GLOBAL_ActiveLevel.playerSpawnX * 16;
-    this->objData.pos.y = GLOBAL_ActiveLevel.playerSpawnY * 16 - 1;
+    this->objData.pos.x = GLOBAL_ActiveLevel.playerSpawnX * 8;
+    this->objData.pos.y = GLOBAL_ActiveLevel.playerSpawnY * 8;
     this->objData.flags = OBJ_FLAG_DIRTY;
     this->objData.oamTile = PLAYER_SPRITE_IDLE;
     this->objData.oamProps = 0x38;
@@ -1380,8 +1414,8 @@ void playerInit(struct sPlayerData* this){
     this->objData.extraSpriteCount = 0;
     this->objData.flags |= OBJ_FLAG_DIRTY;
 
-    this->posF.x = INT_TO_FIXED(this->objData.pos.x);
-    this->posF.y = INT_TO_FIXED(this->objData.pos.y);
+    this->posF.x = 0; // remainder accumulator (ccleste rem.x)
+    this->posF.y = 0; // remainder accumulator (ccleste rem.y)
 
     this->movingPlatformIndex = -1;
 
@@ -1423,7 +1457,7 @@ void playerInit(struct sPlayerData* this){
             if (GLOBAL_ActiveLevel.objectData[i] == 1) {
                 continue;
             }
-            initObject(GLOBAL_ActiveLevel.objectData[i], GLOBAL_ActiveLevel.objectData[i+1]*16, GLOBAL_ActiveLevel.objectData[i+2]*16-1);
+            initObject(GLOBAL_ActiveLevel.objectData[i], GLOBAL_ActiveLevel.objectData[i+1]*8, GLOBAL_ActiveLevel.objectData[i+2]*8);
         }
     }
     // Don't switch banks here - let the caller handle it. Switching banks while executing from bank 6 causes a crash.
@@ -1432,82 +1466,74 @@ void playerInit(struct sPlayerData* this){
 
 PORT_FUNC_BANK6
 bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, int16_t yspd) {
-    int i, j;
-    int collisionIndex;
-    
-    // Optimized: use >> 4 and & 0x0F instead of / 16 and % 16
-    // Coordinates are clamped to -15..271 by player physics, safe for uint16_t cast
+    // Optimized: hitbox is 6x5, always fits in one tile row/col.
+    // Direct tile lookups instead of loops.
+    uint8_t tX, tY, idx;
 
     // Floor spikes (moving down)
     if (yspd >= 0) {
-        uint16_t bottomY = (uint16_t)(y + h - 1);
-        uint8_t tileY = (uint8_t)(bottomY >> 4);
-        uint8_t localY = (uint8_t)(bottomY & 0x0F);
-
-        if (localY >= 10) {
-            uint8_t startX = (uint8_t)((uint16_t)(x + 4) >> 4);
-            uint8_t endX = (uint8_t)((uint16_t)(x + w - 5) >> 4);
-            for (i = startX; i <= endX; i++) {
-                if (i >= 16 || tileY >= 16) continue;
-                collisionIndex = (tileY << 4) + i;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x04)
-                    return true;
+        uint8_t bottomY = (uint8_t)(y + h - 1);
+        if ((bottomY & 0x07) >= 6) {
+            tY = bottomY >> 3;
+            if (tY < 16) {
+                tX = (uint8_t)((uint16_t)x >> 3);
+                idx = (tY << 4) + tX;
+                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x04)) return true;
+                tX = (uint8_t)((uint16_t)(x + w - 1) >> 3);
+                idx = (tY << 4) + tX;
+                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x04)) return true;
             }
         }
     }
 
     // Ceiling spikes (moving up)
     if (yspd <= 0) {
-        uint8_t tileY = (uint8_t)((uint16_t)y >> 4);
-        uint8_t localY = (uint8_t)((uint16_t)y & 0x0F);
-
-        if (localY <= 2) {
-            uint8_t startX = (uint8_t)((uint16_t)(x + 4) >> 4);
-            uint8_t endX = (uint8_t)((uint16_t)(x + w + 5) >> 4);
-            for (i = startX; i <= endX; i++) {
-                if (i >= 16 || tileY >= 16) continue;
-                collisionIndex = (tileY << 4) + i;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x08)
-                    return true;
+        uint8_t topY = (uint8_t)((uint16_t)y);
+        if ((topY & 0x07) <= 2) {
+            tY = topY >> 3;
+            if (tY < 16) {
+                tX = (uint8_t)((uint16_t)x >> 3);
+                idx = (tY << 4) + tX;
+                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x08)) return true;
+                tX = (uint8_t)((uint16_t)(x + w - 1) >> 3);
+                idx = (tY << 4) + tX;
+                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x08)) return true;
             }
         }
     }
 
     // Left wall spikes (moving left)
     if (xspd <= 0) {
-        uint8_t tileX = (uint8_t)((uint16_t)x >> 4);
-        uint8_t localX = (uint8_t)((uint16_t)x & 0x0F);
-
-        if (localX <= 4) {
-            uint8_t startY = (uint8_t)((uint16_t)y >> 4);
-            uint8_t endY = (uint8_t)((uint16_t)(y + h - 1) >> 4);
-            for (j = startY; j <= endY; j++) {
-                if (tileX >= 16 || j >= 16) continue;
-                collisionIndex = (j << 4) + tileX;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x10)
-                    return true;
+        uint8_t leftX = (uint8_t)((uint16_t)x);
+        if ((leftX & 0x07) <= 2) {
+            tX = leftX >> 3;
+            if (tX < 16) {
+                tY = (uint8_t)((uint16_t)y >> 3);
+                idx = (tY << 4) + tX;
+                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x10)) return true;
+                tY = (uint8_t)((uint16_t)(y + h - 1) >> 3);
+                idx = (tY << 4) + tX;
+                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x10)) return true;
             }
         }
     }
 
     // Right wall spikes (moving right)
     if (xspd >= 0) {
-        uint16_t rightX = (uint16_t)(x + w - 6);
-        uint8_t tileX = (uint8_t)(rightX >> 4);
-        uint8_t localX = (uint8_t)(rightX & 0x0F);
-
-        if (localX >= 10) {
-            uint8_t startY = (uint8_t)((uint16_t)y >> 4);
-            uint8_t endY = (uint8_t)((uint16_t)(y + h - 1) >> 4);
-            for (j = startY; j <= endY; j++) {
-                if (tileX >= 16 || j >= 16) continue;
-                collisionIndex = (j << 4) + tileX;
-                if (GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x20)
-                    return true;
+        uint8_t rightX = (uint8_t)(x + w - 1);
+        if ((rightX & 0x07) >= 6) {
+            tX = rightX >> 3;
+            if (tX < 16) {
+                tY = (uint8_t)((uint16_t)y >> 3);
+                idx = (tY << 4) + tX;
+                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x20)) return true;
+                tY = (uint8_t)((uint16_t)(y + h - 1) >> 3);
+                idx = (tY << 4) + tX;
+                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x20)) return true;
             }
         }
     }
-    
+
     return false;
 }
 
@@ -1515,33 +1541,24 @@ PORT_FUNC_BANK6
 static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x + xOffset;
     int16_t y = this->objData.pos.y + yOffset;
-    int16_t w = 16; // Player width
-    int16_t h = 16; // Player height
-    
-    // Check tile collision using the object bounds and current speed
-    return isDeathAtPoint(x, y, w, h, FIXED_TO_INT(this->spd.x), FIXED_TO_INT(this->spd.y));
+
+    // Pass hitbox bounds {1,3,6,5} instead of full sprite bounds
+    return isDeathAtPoint(x + 1, y + 3, 6, 5, FIXED_TO_INT(this->spd.x), FIXED_TO_INT(this->spd.y));
 }
 
 PORT_FUNC_BANK6
 static bool isTileSolidAtPoint(int16_t x, int16_t y) {
-    int tileX;
-    int tileY;
-    int collisionIndex;
+    // Convert to unsigned for shift (avoids sign extension issues)
+    // and use uint8_t to keep computation in 8-bit where possible
+    uint8_t tileX = (uint8_t)((uint16_t)x >> 3);
+    uint8_t tileY = (uint8_t)((uint16_t)y >> 3);
 
-    // Convert world coordinates to tile coordinates
-    tileX = (int)((uint16_t)x >> 4);
-    tileY = (int)((uint16_t)y >> 4);
-    
-    // Check bounds for tile coordinates
-    if (tileX < 0 || tileX >= 16 || tileY < 0 || tileY >= 16) {
+    // Bounds check: uint8_t so only need >= 16
+    if (tileX >= 16 || tileY >= 16) {
         return false;
     }
 
-    // Get collision flag from collision_test array
-    // Each row is 16 tiles, so multiply Y by 16 and add X
-    collisionIndex = (tileY << 4) + tileX;
-    //Bit 1 contains the collision flag
-    return GLOBAL_ActiveLevel.collisionFlagsArr[collisionIndex] & 0x01;
+    return GLOBAL_ActiveLevel.collisionFlagsArr[(tileY << 4) + tileX] & 0x01;
 }
 
 PORT_FUNC_BANK6
@@ -1556,19 +1573,41 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     checkY = y + yOffset;
 
 
-    if (GLOBAL_PlayerData.movingPlatformIndex >= 0) {
-        uint8_t i = GLOBAL_PlayerData.movingPlatformIndex;
-        if (checkX >= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4] && checkX <= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4+2] &&
-            checkY >= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4+1] && checkY <= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4+3]) {
-                return true;
+    // One-way platform check using AABB overlap (matches ccleste OBJ_is_solid)
+    // ccleste: platform only solid when oy>0, player hitbox overlaps at (ox,oy) but NOT at (ox,0)
+    // Player hitbox: {1, 3, 6, 5} → left=x+1, right=x+7, top=y+3, bottom=y+8
+    // Platform hitbox stored as: [left, top, right, bottom]
+    if (GLOBAL_ActiveLevel.movingPlatformCount > 0 && yOffset > 0) {
+        uint8_t pi;
+        // Player hitbox at offset position
+        int16_t pLeft  = checkX + 1;
+        int16_t pRight = checkX + 7;
+        int16_t pTop   = checkY + 3;
+        int16_t pBot   = checkY + 8;
+        // Player hitbox at current position (for one-way check)
+        int16_t cTop   = y + 3;
+        int16_t cBot   = y + 8;
+        for (pi = 0; pi < GLOBAL_ActiveLevel.movingPlatformCount; pi++) {
+            uint8_t base = pi * 4;
+            int16_t platL = GLOBAL_ActiveLevel.movingPlatformHitboxes[base];
+            int16_t platT = GLOBAL_ActiveLevel.movingPlatformHitboxes[base+1];
+            int16_t platR = GLOBAL_ActiveLevel.movingPlatformHitboxes[base+2];
+            int16_t platB = GLOBAL_ActiveLevel.movingPlatformHitboxes[base+3];
+            // AABB overlap at offset: player hitbox overlaps platform?
+            if (pRight > platL && pLeft < platR && pBot > platT && pTop < platB) {
+                // One-way: NOT already overlapping at current Y (can jump through from below)
+                if (!(cBot > platT && cTop < platB)) {
+                    return true;
+                }
+            }
         }
     }
-    
-    // Check tile collision
-    if (isTileSolidAtPoint(checkX, checkY + 8) ||
-        isTileSolidAtPoint(checkX + 14, checkY + 8) ||
-        isTileSolidAtPoint(checkX, checkY + 16) ||
-        isTileSolidAtPoint(checkX + 14, checkY + 16)) {
+
+    // Check tile collision (original hitbox {1,3,6,5} corners)
+    if (isTileSolidAtPoint(checkX + 1, checkY + 3) ||
+        isTileSolidAtPoint(checkX + 6, checkY + 3) ||
+        isTileSolidAtPoint(checkX + 1, checkY + 7) ||
+        isTileSolidAtPoint(checkX + 6, checkY + 7)) {
         return true;
     }
     
@@ -1589,11 +1628,11 @@ void playerUpdate(struct sPlayerData* this) {
     #define FP_ACCEL       0x00009999   // 0.6
     #define FP_DECCEL      0x00002666   // 0.15
     #define FP_ACCEL_AIR   0x00006666   // 0.4
-    #define FP_MAXRUN      0x00020000   // 2.0 (1.0 * 2)
-    #define FP_MAXFALL     0x00040000   // 4.0 (2.0 * 2)
-    #define FP_MAXFALL_WALL 0x0000CCCC  // 0.8 (0.4 * 2)
+    #define FP_MAXRUN      0x00010000   // 1.0 (original)
+    #define FP_MAXFALL     0x00020000   // 2.0 (original)
+    #define FP_MAXFALL_WALL 0x00006666  // 0.4 (original)
     #define FP_GRAVITY     0x000035C2   // 0.21
-    #define FP_SPD_THRESH  0x00004CCC   // 0.30
+    #define FP_SPD_THRESH  0x00004400   // ~0.266 (original 0.15, extended for +1 frame hover at peak)
     #define FP_ZERO        0x00000000
     fixed_t accel = FP_ACCEL;
     fixed_t deccel = FP_DECCEL;
@@ -1665,7 +1704,7 @@ void playerUpdate(struct sPlayerData* this) {
     wasOnGround = onGround;
 
     if (onGround) {
-        this->graceTimer=6*2;
+        this->graceTimer=6;
         if (this->dashesLeft< (this->doubleDashUnlocked ? 2 : 1)) {
             playSoundEffect(SOUND_EFFECT_DASH_RESTORED);
             this->dashesLeft=this->doubleDashUnlocked ? 2 : 1;
@@ -1705,22 +1744,17 @@ void playerUpdate(struct sPlayerData* this) {
             maxfall=FP_MAXFALL_WALL;
             onWall = true;
             if (randint16(0,10)<2) {
-                initObject(OBJ_SMOKE,this->objData.pos.x+inputX*6*2,this->objData.pos.y);
+                initObject(OBJ_SMOKE,this->objData.pos.x+inputX*6,this->objData.pos.y);
             }
         }
 
         //Gravity
         if (onGround) {
             this->spd.y = FP_ZERO;
-            this->graceTimer = 10;
+            this->graceTimer = 6;
         }
         else {
-            //Compensation for 60 fps, slowing it down more breaks other things
-            //Like a spring would push you too high into death when before it did not
-            if (this->spd.y > 0) {
-                gravity = FIXED_MUL_3_4(gravity);
-            }
-            this->spd.y = approachFixed(this->spd.y, maxfall, gravity); 
+            this->spd.y = approachFixed(this->spd.y, maxfall, gravity);
         }
 
         //Jump handling with buffer
@@ -1737,7 +1771,7 @@ void playerUpdate(struct sPlayerData* this) {
                 playSoundEffect(SOUND_EFFECT_JUMP);
                 jumpBuffer = 0;
                 this->graceTimer = 0;
-                this->spd.y = INT_TO_FIXED(-2*2);
+                this->spd.y = INT_TO_FIXED(-2);
                 initObject(OBJ_SMOKE,this->objData.pos.x,this->objData.pos.y+4);
             } else {
                 //Wall jump
@@ -1745,10 +1779,10 @@ void playerUpdate(struct sPlayerData* this) {
                 if (wall_dir!=0) {
                     playSoundEffect(SOUND_EFFECT_JUMP);
                     jumpBuffer = 0;
-                    this->spd.y = INT_TO_FIXED(-2*2);
-                    { fixed_t wallSpd = FIXED_ADD(maxrun, INT_TO_FIXED(2));
+                    this->spd.y = INT_TO_FIXED(-2);
+                    { fixed_t wallSpd = FIXED_ADD(maxrun, INT_TO_FIXED(1));
                     this->spd.x = (wall_dir < 0) ? wallSpd : -wallSpd; }
-                        initObject(OBJ_SMOKE,this->objData.pos.x+wall_dir*6*2,this->objData.pos.y);
+                        initObject(OBJ_SMOKE,this->objData.pos.x+wall_dir*6,this->objData.pos.y);
                 }
             }
         }
@@ -1757,8 +1791,8 @@ void playerUpdate(struct sPlayerData* this) {
         if (btnDash && this->dashesLeft > 0) {
             //Dash code
             // Dash speeds as constants (avoids runtime multiply)
-            #define DASH_FULL_SPEED (FLOAT_TO_FIXED(5.0f*2))
-            #define DASH_HALF_SPEED (FLOAT_TO_FIXED(5.0f*2*0.70710678118f))
+            #define DASH_FULL_SPEED (FLOAT_TO_FIXED(5.0f))
+            #define DASH_HALF_SPEED (FLOAT_TO_FIXED(5.0f * 0.70710678118f))
 
             VEC_I vInput;
 
@@ -1789,13 +1823,12 @@ void playerUpdate(struct sPlayerData* this) {
             }
 
             playSoundEffect(SOUND_EFFECT_DASH_START);
-            GLOBAL_FreezeFrames = 2 * 2;
-            GLOBAL_ActiveLevel.shakeFrames = 6 * 2;
-            // INT_TO_FIXED(4) * INT_TO_FIXED(vInput) = just sign-flip INT_TO_FIXED(4)
-            this->dashTarget.x = (vInput.x > 0) ? INT_TO_FIXED(4) : ((vInput.x < 0) ? INT_TO_FIXED(-4) : 0);
-            this->dashTarget.y = (vInput.y > 0) ? INT_TO_FIXED(4) : ((vInput.y < 0) ? INT_TO_FIXED(-4) : 0);
-            this->dashAccel.x=0x00030000; // 3.0 (1.5*2)
-            this->dashAccel.y=0x00030000;
+            GLOBAL_FreezeFrames = 2;
+            GLOBAL_ActiveLevel.shakeFrames = 6;
+            this->dashTarget.x = (vInput.x > 0) ? INT_TO_FIXED(2) : ((vInput.x < 0) ? INT_TO_FIXED(-2) : 0);
+            this->dashTarget.y = (vInput.y > 0) ? INT_TO_FIXED(2) : ((vInput.y < 0) ? INT_TO_FIXED(-2) : 0);
+            this->dashAccel.x=0x00018000; // 1.5 (original)
+            this->dashAccel.y=0x00018000;
 
             if (this->spd.y<0) {
                 this->dashTarget.y = FIXED_MUL_DASH_DIAG(this->dashTarget.y); // ~0.9
@@ -1833,128 +1866,132 @@ void playerUpdate(struct sPlayerData* this) {
     uint8_t i;
     bool playerOnMovingPlatform = false;
 
-    spdXstepInt = FIXED_TO_INT(FIXED_ADD(this->posF.x, this->spd.x)) - this->objData.pos.x;
-    spdYStepInt = FIXED_TO_INT(FIXED_ADD(this->posF.y, this->spd.y)) - this->objData.pos.y;
+    // ccleste-style OBJ_move: remainder accumulation
+    // posF.x/y are used as remainder accumulators (like ccleste's rem.x/y)
+    // P8flr(rem + 0.5) in fix16 = (rem + 32768) >> 16 (arithmetic shift = floor)
+    #define P8FLR_ROUND(rem) ((int16_t)(((rem) + 32768) >> 16))
 
-    //Handle moving platforms    
+    // [X] accumulate remainder and compute integer movement
+    this->posF.x += this->spd.x;
+    spdXstepInt = P8FLR_ROUND(this->posF.x);
+    this->posF.x -= INT_TO_FIXED(spdXstepInt);
+
+    // [Y] accumulate remainder and compute integer movement
+    this->posF.y += this->spd.y;
+    spdYStepInt = P8FLR_ROUND(this->posF.y);
+    this->posF.y -= INT_TO_FIXED(spdYStepInt);
+
+    //Handle moving platforms — detect if player is standing ON TOP of one
+    // ccleste: !OBJ_check(plat, player, 0, 0) && OBJ_collide(plat, player, 0, -1)
+    // = player NOT overlapping platform now, but WOULD overlap if platform shifted up 1px
+    // Equivalent: player hitbox at current pos doesn't overlap, but at (0,+1) does
     this->movingPlatformIndex = -1;
-    if ((GLOBAL_PlayerData.spd.y >= 0)) {
-        uint8_t i;
-        int16_t stepY;
-        uint16_t checkX = this->objData.pos.x;
-        uint16_t checkY = this->objData.pos.y + 1;
-        for (i = 0; i < GLOBAL_ActiveLevel.movingPlatformCount; i++) {
-            // Check each step of the Y movement
-            for (stepY = 0; stepY <= spdYStepInt; stepY++) {
-                uint16_t currentCheckY = checkY + stepY;
-                if (checkX >= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4] && checkX <= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4+2] &&
-                    currentCheckY >= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4+1] && currentCheckY <= GLOBAL_ActiveLevel.movingPlatformHitboxes[i*4+3]) {                
-                    playerOnMovingPlatform = true;
-                    this->movingPlatformIndex = i;
-                    if (inputX == 0) { //Only when the player isn't moving
-                        if (GLOBAL_ActiveLevel.movingPlatformDir[i] == MOVING_PLATFORM_DIR_LEFT) {
-                            this->spd.x = FLOAT_TO_FIXED(-0.65f);
-                        }
-                        else {
-                            this->spd.x = FLOAT_TO_FIXED(0.65f);
-                        }
-                    }
-                    spdYStepInt = stepY;
-                    break; // Found a platform, no need to check further steps
-                }
+    if ((GLOBAL_PlayerData.spd.y >= 0) && GLOBAL_ActiveLevel.movingPlatformCount > 0) {
+        uint8_t pi;
+        // Player hitbox at current position: {x+1, y+3} to {x+7, y+8}
+        int16_t cLeft  = this->objData.pos.x + 1;
+        int16_t cRight = this->objData.pos.x + 7;
+        int16_t cTop   = this->objData.pos.y + 3;
+        int16_t cBot   = this->objData.pos.y + 8;
+        // Player hitbox shifted down by 1 (ground probe)
+        int16_t gTop   = cTop + 1;
+        int16_t gBot   = cBot + 1;
+        for (pi = 0; pi < GLOBAL_ActiveLevel.movingPlatformCount; pi++) {
+            uint8_t base = pi * 4;
+            int16_t platL = GLOBAL_ActiveLevel.movingPlatformHitboxes[base];
+            int16_t platT = GLOBAL_ActiveLevel.movingPlatformHitboxes[base+1];
+            int16_t platR = GLOBAL_ActiveLevel.movingPlatformHitboxes[base+2];
+            int16_t platB = GLOBAL_ActiveLevel.movingPlatformHitboxes[base+3];
+            // One-way: overlaps at ground probe but NOT at current position
+            bool overlapsNow   = (cRight > platL && cLeft < platR && cBot > platT && cTop < platB);
+            bool overlapsBelow = (cRight > platL && cLeft < platR && gBot > platT && gTop < platB);
+            if (!overlapsNow && overlapsBelow) {
+                playerOnMovingPlatform = true;
+                this->movingPlatformIndex = pi;
+                // Don't zero spdYStepInt here — let the per-pixel Y loop
+                // land the player on the surface naturally via OBJ_isSolidAt
+                break;
             }
-            if (playerOnMovingPlatform) break; // Found a platform, no need to check other platforms
         }
     }
 
-    // 1. Accumulate speed into posF
-    this->posF.x = FIXED_ADD(this->posF.x, this->spd.x);
-    this->posF.y = FIXED_ADD(this->posF.y, this->spd.y);
+    // Per-pixel movement with collision (matches ccleste OBJ_move_x/OBJ_move_y)
+    // PICO-8 "for i=0,abs(amount) do" is inclusive → |amount|+1 iterations via <=
 
-    // 2. Calculate integer movement delta
-    spdXstepInt = FIXED_TO_INT(this->posF.x) - this->objData.pos.x;
-    spdYStepInt = FIXED_TO_INT(this->posF.y) - this->objData.pos.y;
-
-    // 3. Do collision/movement using deltaX/deltaY (update objData.pos.x/y as needed)
-    //Move X — only per-pixel step when destination is blocked
+    //Move X
     if (spdXstepInt != 0) {
-        if (OBJ_isSolidAt(this, spdXstepInt, 0)) {
-            // Blocked at full speed — binary search for max safe distance
-            // Try half the distance first to reduce collision checks
-            int16_t half = spdXstepInt >> 1;
-            if (half != 0 && !OBJ_isSolidAt(this, half, 0)) {
-                this->objData.pos.x += half;
-                spdXstepInt -= half;
+        step = (spdXstepInt < 0) ? -1 : 1;
+        int16_t absStep = (spdXstepInt < 0) ? -spdXstepInt : spdXstepInt;
+        for (i = 0; i <= absStep; i++) {
+            if (!OBJ_isSolidAt(this, step, 0)) {
+                this->objData.pos.x += step;
+            } else {
+                this->spd.x = 0;
+                this->posF.x = 0; // zero remainder on collision (ccleste behavior)
+                break;
             }
-            // Per-pixel step the remaining distance
-            step = (spdXstepInt < 0) ? -1 : 1;
-            int16_t absStep = (spdXstepInt < 0) ? -spdXstepInt : spdXstepInt;
-            for (i = 0; i < absStep; i++) {
-                if (!OBJ_isSolidAt(this, step, 0)) {
-                    this->objData.pos.x += step;
-                } else {
-                    spdXstepInt = 0;
-                    break;
-                }
-            }
-        } else {
-            this->objData.pos.x += spdXstepInt;
         }
     }
 
     //Move Y
-    if ((this->movingPlatformIndex >= 0) && (spdYStepInt > 0)) {
-        spdYStepInt = 1;
-    }
-    
+
     if (spdYStepInt != 0) {
-        if (OBJ_isSolidAt(this, 0, spdYStepInt)) {
-            // Binary search shortcut: try half distance first
-            int16_t half = spdYStepInt >> 1;
-            if (half != 0 && !OBJ_isSolidAt(this, 0, half)) {
-                this->objData.pos.y += half;
-                spdYStepInt -= half;
+        step = (spdYStepInt < 0) ? -1 : 1;
+        int16_t absStep = (spdYStepInt < 0) ? -spdYStepInt : spdYStepInt;
+        for (i = 0; i <= absStep; i++) {
+            if (!OBJ_isSolidAt(this, 0, step)) {
+                this->objData.pos.y += step;
+            } else {
+                this->spd.y = 0;
+                this->posF.y = 0; // zero remainder on collision (ccleste behavior)
+                break;
             }
-            step = (spdYStepInt < 0) ? -1 : 1;
-            int16_t absStep = (spdYStepInt < 0) ? -spdYStepInt : spdYStepInt;
-            for (i = 0; i < absStep; i++) {
-                if (!OBJ_isSolidAt(this, 0, step)) {
-                    this->objData.pos.y += step;
-                } else {
-                    break;
-                }
-            }
-        } else {
-            this->objData.pos.y += spdYStepInt;
         }
     }
 
-    // 4. At the end, update posF to match the new integer position, preserving the fractional part
-    //Clamp pos.x and pos.y to be between 0 and 255
-    this->objData.pos.x = FIXED_CLAMP(this->objData.pos.x, 0, 256-16);
-    this->objData.pos.y = FIXED_CLAMP(this->objData.pos.y, -15, 255);
-    this->posF.x = FIXED_ADD(INT_TO_FIXED(this->objData.pos.x), FIXED_SUB(this->posF.x, INT_TO_FIXED(FIXED_TO_INT(this->posF.x))));
-    this->posF.y = FIXED_ADD(INT_TO_FIXED(this->objData.pos.y), FIXED_SUB(this->posF.y, INT_TO_FIXED(FIXED_TO_INT(this->posF.y))));
+    // Platform carry: move player by platform's per-frame delta (ccleste OBJ_move_x(hit, delta, 1))
+    if (playerOnMovingPlatform && this->movingPlatformIndex >= 0) {
+        uint8_t pi;
+        int8_t platDelta = 0;
+        // Find the platform object to get its lastDelta
+        for (pi = 1; pi < GLOBAL_OBJ_LIST_SIZE; pi++) {
+            if ((GLOBAL_OBJList[pi].eType == OBJ_PLATMOV_L || GLOBAL_OBJList[pi].eType == OBJ_PLATMOV_R) &&
+                GLOBAL_OBJList[pi].data.platMov.hitboxIndex == (uint8_t)(this->movingPlatformIndex * 4)) {
+                platDelta = GLOBAL_OBJList[pi].data.platMov.lastDelta;
+                break;
+            }
+        }
+        if (platDelta != 0) {
+            // Carry player by platform delta (with collision check)
+            if (!OBJ_isSolidAt(this, platDelta, 0)) {
+                this->objData.pos.x += platDelta;
+            }
+        }
+    }
 
-    // Death logic
-    if (OBJ_isDeathAt(this, 0, 0) || this->objData.pos.y >= (255)) {
+    // Death logic (before clamping — original has no position clamp)
+    if (OBJ_isDeathAt(this, 0, 0) || this->objData.pos.y > 128) {
         playSoundEffect(SOUND_EFFECT_DEATH);
-        this->objData.pos.y = 240; //offscreen
-        GLOBAL_ActiveLevel.shakeFrames = 10 * 2;
+        this->objData.pos.y = 128; //offscreen
+        GLOBAL_ActiveLevel.shakeFrames = 10;
         port_prg_bank_switch(6);
         playerInit(this);
         port_prg_bank_switch(0);
         return;
     }
 
-    }
-
-    // next level
-    if (this->objData.pos.y <= -14 && GLOBAL_ActiveLevel.currentRoomID < 31) {
+    // next level (before clamping — player must be able to reach y < -4)
+    if (this->objData.pos.y < -4 && GLOBAL_ActiveLevel.currentRoomID < 31) {
         port_prg_bank_switch(0);
         LoadNextRoom();
         return;
-     }
+    }
+
+    // Clamp position (original clamps X in draw, not physics, but needed for NES)
+    this->objData.pos.x = FIXED_CLAMP(this->objData.pos.x, -1, 121);
+    this->objData.pos.y = FIXED_CLAMP(this->objData.pos.y, -4, 128);
+
+    }
 
     //Animation
     if (!onGround) {
@@ -2045,42 +2082,45 @@ static void music_update(void) {
 }
 
 void onVblank(void) {
+    static bool gameFrameToggle = false;
+
     //Start of vblank critical code
     port_vblank();
 
-    // Music update — APU writes don't need vblank timing, safe to run after PPU scroll
+    // Music update — runs at 60Hz regardless of game logic rate
     music_update();
 
-
-    //Display FPS
-    /*
-    if ((GLOBAL_FrameCount % (60*4)) == 0) {
-        static uint16_t lastVBlankAmount = 0;
-        static uint16_t lastFrameCount = 0;
-        lastVBlankAmount = 0;  // GLOBAL_FrameCountVBLANK removed
-        lastFrameCount = GLOBAL_FrameCount;
-        GLOBAL_FrameCount = 0;
-        //sprintf(testStringRam, "FPS: %02d", (uint16_t)((lastFrameCount * 60) / lastVBlankAmount));
-        port_drawText((const unsigned char *)testStringRam, 0, 0);
-    }
-    */
-    //End of vblank critical code
-
-    //Calculate next frame (globals)
+    // Frame counter at 60Hz for animation timing
     GLOBAL_FrameCount += 1;
-    if (GLOBAL_FreezeFrames > 0) {
-        GLOBAL_FreezeFrames--;
-        return;
-    }
-    if (GLOBAL_ActiveLevel.shakeFrames > 0) {
-        GLOBAL_ActiveLevel.shakeFrames--;
-    }
 
-    GLOBAL_InputState = port_getInputs();
+    // 30fps: spread compute across 2 VBlank frames
+    // Frame A (game):    player physics + player sprite (latency-sensitive)
+    // Frame B (display): object updates + object sprite builds
+    gameFrameToggle = !gameFrameToggle;
 
-    updateAllObjects();
-    playerUpdate(&GLOBAL_PlayerData);
-    port_updatePlayerSprite(&GLOBAL_PlayerData);
+    if (gameFrameToggle) {
+        // --- GAME FRAME: player physics + sprite-only OAM rebuild ---
+        if (GLOBAL_FreezeFrames > 0) {
+            GLOBAL_FreezeFrames--;
+            return;
+        }
+        if (GLOBAL_ActiveLevel.shakeFrames > 0) {
+            GLOBAL_ActiveLevel.shakeFrames--;
+        }
+
+        GLOBAL_InputState = port_getInputs();
+        playerUpdate(&GLOBAL_PlayerData);
+        port_updatePlayerSprite(&GLOBAL_PlayerData);
+        // Rebuild object sprites with fresh flicker rotation (no game logic)
+        rebuildAllSprites();
+    } else {
+        // --- DISPLAY FRAME: object updates + sprite builds ---
+        if (GLOBAL_FreezeFrames > 0) {
+            return; // freeze blocks objects too
+        }
+
+        updateAllObjects();
+    }
 }
 
 
