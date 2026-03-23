@@ -1380,7 +1380,7 @@ void LoadNextRoom(void) {
 
 int main(void){
     port_init();
-    GLOBAL_ActiveLevel.currentRoomID = 17;
+    GLOBAL_ActiveLevel.currentRoomID = 1;
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID);
 
     for (;;) { 

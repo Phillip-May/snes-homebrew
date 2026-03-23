@@ -506,19 +506,20 @@ extern const unsigned char music_data_untitled[];
 #define TITLE_BANK_B 3
 #define TITLE_ANIM_SPEED 10  // Game frames per animation frame (~6 fps)
 
-// Palette 3, color 3 text fade: NES color values per animation frame
+// Palette 3, color 2 text fade: NES color values per animation frame
+// Text "press select to change gfx" uses pixel value 14 = palette 3, color 2 ($3F0E)
 // Frames 0-6: original, 7-9: step down, 10-14: black, 15-17: step up, 18+: original
 static const uint8_t title_text_fade[TITLE_FRAME_COUNT] = {
-    // 0-6: original color ($00 = dark gray)
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    // 0-6: original color ($20 = white)
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
     // 7-9: stepping down to black
-    0x2D, 0x0D, 0x0F,
+    0x10, 0x00, 0x0F,
     // 10-14: black
     0x0F, 0x0F, 0x0F, 0x0F, 0x0F,
     // 15-17: stepping back up
-    0x0D, 0x2D, 0x00,
+    0x00, 0x10, 0x20,
     // 18-29: original
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
 };
 
 // Decode RLE nametable data and write to PPU nametable 0
@@ -555,9 +556,11 @@ static void title_write_attributes(const unsigned char *attr_data) {
 // expensive 16-bit indirect addressing (~20 cycles).
 //
 // Per write: 3x LDA abs,X (12) + 3x STA abs (12) + INX (2) = ~26 cycles.
-// After neslib NMI (~800 cycles), ~1400 cycles remain.
-// 45 writes * 26 = 1170 cycles + attr (280) = 1450. Tight but fits.
+// After neslib NMI (~800 cycles), ~1400 cycles remain. 34 tiles proven safe.
+// Attributes cost ~280 cycles. When the last tile batch is small (<=23 tiles,
+// ~600 cycles), attributes are merged into the same vblank to save a frame.
 #define TITLE_MAX_WRITES_PER_VBLANK 34
+#define TITLE_ATTR_MERGE_THRESHOLD 20  // max tiles in last batch to merge attrs
 
 // Three parallel arrays for 8-bit indexed PPU writes (max 82 entries)
 // Overlaid on GLOBAL_OBJList (game isn't running during title screen)
@@ -568,6 +571,7 @@ static uint8_t  s_ppu_write_count;   // Number of buffered tile writes
 static uint8_t  s_ppu_write_cursor;  // How many writes sent to PPU so far
 static uint8_t  s_attr_buf[64];      // Buffered attribute data
 static uint8_t  s_delta_active;      // 1 = update in progress
+static uint8_t  s_flush_rate;        // Tiles per vblank (34 normal, lower for wrap)
 
 // Decode a delta from banked ROM into the write buffer (call during visible frame).
 // PRG bank must be set before calling.
@@ -589,6 +593,7 @@ static void title_prepare_delta(const unsigned char *delta) {
     }
     s_ppu_write_count = (uint8_t)count;
     s_ppu_write_cursor = 0;
+    s_flush_rate = TITLE_MAX_WRITES_PER_VBLANK;
 
     // Copy attribute data
     for (uint8_t i = 0; i < 64; i++) {
@@ -597,24 +602,26 @@ static void title_prepare_delta(const unsigned char *delta) {
     s_delta_active = 1;
 }
 
-// Flush buffered writes to PPU during vblank. Returns 1 when complete.
-// No bank switching needed — data is already in RAM.
-// Phase 1: tile writes (up to 34 per vblank). Phase 2: attributes (separate vblank).
-static uint8_t title_flush_ppu_writes(void) {
-    if (!s_delta_active) return 1;
+// Flush buffered writes to PPU during vblank.
+// Writes up to 45 tiles per vblank. When the last tile batch leaves enough
+// cycles (~280), attributes are merged into the same vblank instead of
+// burning a separate one. This roughly halves flush time vs the old 2-phase approach.
+static void title_flush_ppu_writes(void) {
+    if (!s_delta_active) return;
 
     (void)PPU_STATUS;  // Reset PPU address latch
 
+    uint8_t write_attrs = 0;
+
     if (s_delta_active == 1) {
-        // Phase 1: tile changes from buffer
         const uint8_t *buf_hi = TITLE_PPU_BUF_ADDR_HI;
         const uint8_t *buf_lo = TITLE_PPU_BUF_ADDR_LO;
         const uint8_t *buf_tile = TITLE_PPU_BUF_TILE;
 
         uint8_t cursor = s_ppu_write_cursor;
         uint8_t remaining = s_ppu_write_count - cursor;
-        uint8_t batch = (remaining > TITLE_MAX_WRITES_PER_VBLANK)
-                        ? TITLE_MAX_WRITES_PER_VBLANK : remaining;
+        uint8_t rate = s_flush_rate;
+        uint8_t batch = (remaining > rate) ? rate : remaining;
         uint8_t end = cursor + batch;
 
         for (uint8_t i = cursor; i < end; i++) {
@@ -626,18 +633,27 @@ static uint8_t title_flush_ppu_writes(void) {
         s_ppu_write_cursor = end;
 
         if (end >= s_ppu_write_count) {
-            s_delta_active = 2;  // Tiles done, attributes next vblank
+            // All tiles done. Merge attributes if this batch was small enough.
+            // 23 tiles * 26 = 598 cycles + 280 attrs = 878 — within budget.
+            if (batch <= TITLE_ATTR_MERGE_THRESHOLD) {
+                write_attrs = 1;
+            } else {
+                s_delta_active = 2;  // Defer attrs to next vblank
+                return;
+            }
         }
-        return 0;
     } else {
-        // Phase 2: attribute table (always a separate vblank)
+        // s_delta_active == 2: deferred attribute-only vblank
+        write_attrs = 1;
+    }
+
+    if (write_attrs) {
         PPU_ADDR = 0x23;
         PPU_ADDR = 0xC0;
         for (uint8_t i = 0; i < 64; i++) {
             PPU_DATA = s_attr_buf[i];
         }
         s_delta_active = 0;
-        return 1;
     }
 }
 
@@ -712,14 +728,17 @@ static void title_screen_loop(void) {
             title_flush_ppu_writes();
         }
 
-        // Update text fade (palette 3, color 3 = palette_ram index 15)
-        uint8_t fade_color = title_text_fade[anim_frame];
-        if (palette_ram[15] != fade_color) {
-            palette_ram[15] = fade_color;
-            pal_bg(palette_ram);
-        }
+        // Update text fade: write palette 3 color 2 ($3F0E) directly
+        // Bypasses neslib's deferred pal_bg() which conflicts with raw PPU writes
+        (void)PPU_STATUS;          // Reset address latch
+        PPU_ADDR = 0x3F;
+        PPU_ADDR = 0x0E;
+        PPU_DATA = title_text_fade[anim_frame];
+        palette_ram[14] = title_text_fade[anim_frame];  // Keep in sync for variant switch
 
-        // Reset scroll (must happen during vblank after any PPU_ADDR writes)
+        // Reset scroll. PPU_CTRL re-asserts nametable 0 in t[10:11] — the $3F0F
+        // address write above corrupts those bits, and PPU_SCROLL can't clear them.
+        PPU_CTRL = 0x80;           // NMI on, nametable 0 → fixes t[10:11]
         PPU_SCROLL = 0;
         PPU_SCROLL = 0;
 
@@ -775,7 +794,18 @@ static void title_screen_loop(void) {
                 }
                 set_prg_bank(0);
                 anim_frame++;
-                if (anim_frame >= TITLE_FRAME_COUNT) anim_frame = 0;
+                if (anim_frame >= TITLE_FRAME_COUNT) {
+                    anim_frame = 0;
+                }
+
+                // When showing the last frame, the wrap delta (back to frame 0)
+                // is large (~68 tiles). Drip-feed it across TITLE_ANIM_SPEED
+                // vblanks so changes are nearly invisible (~7 tiles/vblank).
+                if (anim_frame == 0) {
+                    s_flush_rate = (s_ppu_write_count + TITLE_ANIM_SPEED - 1)
+                                   / TITLE_ANIM_SPEED;
+                    if (s_flush_rate < 1) s_flush_rate = 1;
+                }
             }
         }
     }
@@ -1647,16 +1677,17 @@ static void write_nametable(void) {
     }
     
     // Write attributes to nametable 2
+    // NT2 rows 0-1 display game row 15 (the last game tile row), so the
+    // top quadrants (tl/tr) of NT2's first attribute row must use row 15's
+    // palette. Bottom quadrants are beyond the level, left as palette 0.
     if (total_nes_rows > 30) {
         vram_adr(0x2BC0);
-        uint8_t map_attr_row = (LEVEL_HEIGHT / 2) - 1;
+        uint8_t last_game_row = LEVEL_HEIGHT - 1;
         for (uint8_t attr_x = 0; attr_x < LEVEL_WIDTH / 2; attr_x++) {
-            uint16_t base_idx = (map_attr_row * 2) * LEVEL_WIDTH + (attr_x * 2);
+            uint16_t base_idx = last_game_row * LEVEL_WIDTH + (attr_x * 2);
             uint8_t tl_palette = get_palette_from_gid((base_idx < LEVEL_TILE_COUNT) ? tilemap_gids[base_idx] : 0, gid_to_tile_map, gid_map_count);
             uint8_t tr_palette = get_palette_from_gid((base_idx + 1 < LEVEL_TILE_COUNT) ? tilemap_gids[base_idx + 1] : 0, gid_to_tile_map, gid_map_count);
-            uint8_t bl_palette = get_palette_from_gid((base_idx + LEVEL_WIDTH < LEVEL_TILE_COUNT) ? tilemap_gids[base_idx + LEVEL_WIDTH] : 0, gid_to_tile_map, gid_map_count);
-            uint8_t br_palette = get_palette_from_gid((base_idx + LEVEL_WIDTH + 1 < LEVEL_TILE_COUNT) ? tilemap_gids[base_idx + LEVEL_WIDTH + 1] : 0, gid_to_tile_map, gid_map_count);
-            vram_put(tl_palette | (tr_palette << 2) | (bl_palette << 4) | (br_palette << 6));
+            vram_put(tl_palette | (tr_palette << 2));
         }
     }
     set_prg_bank(0);  // Switch back to fixed bank before returning (write_nametable is in fixed bank)
@@ -1669,7 +1700,8 @@ static void fix_collapse_tile_palettes(const uint8_t *decompressed_tilemap) {
             if (gid >= 24 && gid <= 26) {
                 uint8_t attr_x = map_x / 2;
                 uint8_t attr_y = map_y / 2;
-                uint8_t quadrant = ((map_y & 1) << 1) | (map_x & 1);
+                // In NT2, game row 15 is at the top (rows 0-1), so use top quadrants (0/1)
+                uint8_t quadrant = (map_y == 15) ? (map_x & 1) : (((map_y & 1) << 1) | (map_x & 1));
                 uint16_t attr_addr = (map_y == 15) ? (0x2BC0 + attr_x) : (0x23C0 + (attr_y * 8) + attr_x);
                 vram_adr(attr_addr);
                 (void)PPU_STATUS;

@@ -39,7 +39,7 @@
        0        0        0     1 
        0        0        0     1 
        0        0        0     1 
-    c000     c000     397a     1 .text
+    c000     c000     39ca     1 .text
     c000     c000        0     1         _init = .
     c000     c000        0     1         _start = .
     c000     c000        7     1         C:/llvm-mos/bin/../mos-platform/nes-unrom-512/lib\crt0.o:(.init.50)
@@ -104,89 +104,89 @@
     c16b     c16b       13     1                 __zero_zp_bss
     c17e     c17e       17     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libcrt0.a(copy-zp-data.c.obj):(.text.__copy_zp_data)
     c17e     c17e       17     1                 __copy_zp_data
-    c195     c195      905     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.LoadRoomData)
-    c195     c195      905     1                 LoadRoomData
-    ca9a     ca9a     1c7f     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.main)
-    ca9a     ca9a     1c7f     1                 main
-    e719     e719       fd     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.title_load_frame0)
-    e719     e719       fd     1                 title_load_frame0
-    e816     e816      156     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.port_updatePlayerSprite)
-    e816     e816      156     1                 port_updatePlayerSprite
-    e96c     e96c      9b5     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.port_vblank)
-    e96c     e96c      9b5     1                 port_vblank
-    f321     f321      16e     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.decompress_tilemap)
-    f321     f321      16e     1                 decompress_tilemap
-    f48f     f48f       9e     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.port_restoreCollisionFlags)
-    f48f     f48f       9e     1                 port_restoreCollisionFlags
-    f52d     f52d        9     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.ppu_off)
-    f52d     f52d        9     1                 ppu_off
-    f536     f536       17     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.pal_bright)
-    f536     f536       17     1                 pal_bright
-    f54d     f54d        6     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.exit)
-    f54d     f54d        6     1                 exit
-    f553     f553       3a     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.memcpy)
-    f553     f553       3a     1                 memcpy
-    f58d     f58d       a7     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.memmove)
-    f58d     f58d       a7     1                 memmove
-    f634     f634       28     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__memset)
-    f634     f634       28     1                 __memset
-    f65c     f65c       37     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__mulhi3)
-    f65c     f65c       37     1                 __mulhi3
-    f693     f693       64     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__udivqi3)
-    f693     f693       64     1                 __udivqi3
-    f6f7     f6f7       ab     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__umodhi3)
-    f6f7     f6f7       ab     1                 __umodhi3
-    f7a2     f7a2       6f     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__modhi3)
-    f7a2     f7a2       6f     1                 __modhi3
-    f811     f811        b     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__ashlqi3)
-    f811     f811        b     1                 __ashlqi3
-    f81c     f81c       13     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__ashlhi3)
-    f81c     f81c       13     1                 __ashlhi3
-    f82f     f82f        0     1         __init_array_start = .
-    f82f     f82f        0     1         __init_array_end = .
-    f82f     f82f        0     1         __fini_array_start = .
-    f82f     f82f        0     1         __fini_array_end = .
-    f82f     f82f        5     1         C:/llvm-mos/bin/../mos-platform/nes-unrom-512/lib\crt0.o:(.nmi_begin)
-    f82f     f82f        0     1                 __default_nmi
-    f82f     f82f        0     1                 nmi
-    f834     f834        c     1         build-nes/celeste-nes-temp.nes.lto.o:(.nmi.10)
-    f840     f840       14     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(neslib.s.obj):(.nmi.050)
-    f840     f840        0     1                 neslib_nmi_begin
-    f854     f854        5     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(oam_update.s.obj):(.nmi.055)
-    f854     f854        0     1                 oam_update_nmi
-    f859     f859       f1     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(pal_update.s.obj):(.nmi.060)
-    f859     f859        0     1                 pal_update_nmi
-    f94a     f94a       2a     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(neslib.s.obj):(.nmi.075)
-    f94a     f94a        0     1                 neslib_nmi_end
-    f961     f961        0     1                 neslib_nmi_skip
-    f974     f974        6     1         C:/llvm-mos/bin/../mos-platform/nes-unrom-512/lib\crt0.o:(.nmi_end)
-    f97a     f97a      320     1 .rodata
-    f97a     f97a       d2     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(pal_bright.s.obj):(.rodata.bright_table)
-    f97a     f97a        0     1                 __palBrightTableL
-    f983     f983        0     1                 __palBrightTableH
-    f98c     f98c        0     1                 palBrightTable0
-    f99c     f99c        0     1                 palBrightTable1
-    f9ac     f9ac        0     1                 palBrightTable2
-    f9bc     f9bc        0     1                 palBrightTable3
-    f9cc     f9cc        0     1                 palBrightTable4
-    f9dc     f9dc        0     1                 palBrightTable5
-    f9ec     f9ec        0     1                 palBrightTable6
-    f9fc     f9fc        0     1                 palBrightTable7
-    fa0c     fa0c        0     1                 palBrightTable8
-    fa4c     fa4c        1     1         C:/llvm-mos/bin/../mos-platform/common/lib\libcrt.a(const.S.obj):(.rodata)
-    fa4c     fa4c        0     1                 __set_v
-    fa4d     fa4d       36     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.initObject)
-    fa83     fa83       42     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.processObject)
-    fac5     fac5       16     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.port_buildSpriteIfDirty)
-    fadb     fadb       4b     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.monumentText)
-    fadb     fadb       4b     1                 monumentText
-    fb26     fb26       28     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.flyingBerryUpdate.y_positions)
-    fb26     fb26       28     1                 flyingBerryUpdate.y_positions
-    fb4e     fb4e       79     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.object_sprite_lookup_table)
-    fb4e     fb4e       79     1                 object_sprite_lookup_table
-    fbc7     fbc7       c3     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.object_sprite_dict_compact)
-    fbc7     fbc7       c3     1                 object_sprite_dict_compact
-    fc8a     fc8a       10     1         <internal>:(.rodata.cst16)
+    c195     c195      864     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.LoadRoomData)
+    c195     c195      864     1                 LoadRoomData
+    c9f9     c9f9     1cb7     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.main)
+    c9f9     c9f9     1cb7     1                 main
+    e6b0     e6b0       fd     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.title_load_frame0)
+    e6b0     e6b0       fd     1                 title_load_frame0
+    e7ad     e7ad      156     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.port_updatePlayerSprite)
+    e7ad     e7ad      156     1                 port_updatePlayerSprite
+    e903     e903      9b5     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.port_vblank)
+    e903     e903      9b5     1                 port_vblank
+    f2b8     f2b8      16e     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.decompress_tilemap)
+    f2b8     f2b8      16e     1                 decompress_tilemap
+    f426     f426       9e     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.port_restoreCollisionFlags)
+    f426     f426       9e     1                 port_restoreCollisionFlags
+    f4c4     f4c4        9     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.ppu_off)
+    f4c4     f4c4        9     1                 ppu_off
+    f4cd     f4cd       17     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.pal_bright)
+    f4cd     f4cd       17     1                 pal_bright
+    f4e4     f4e4        6     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.exit)
+    f4e4     f4e4        6     1                 exit
+    f4ea     f4ea       3a     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.memcpy)
+    f4ea     f4ea       3a     1                 memcpy
+    f524     f524       a7     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.memmove)
+    f524     f524       a7     1                 memmove
+    f5cb     f5cb       28     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__memset)
+    f5cb     f5cb       28     1                 __memset
+    f5f3     f5f3       37     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__mulhi3)
+    f5f3     f5f3       37     1                 __mulhi3
+    f62a     f62a       64     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__udivqi3)
+    f62a     f62a       64     1                 __udivqi3
+    f68e     f68e       c4     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__udivhi3)
+    f68e     f68e       c4     1                 __udivhi3
+    f752     f752       ab     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__umodhi3)
+    f752     f752       ab     1                 __umodhi3
+    f7fd     f7fd       6f     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__modhi3)
+    f7fd     f7fd       6f     1                 __modhi3
+    f86c     f86c       13     1         build-nes/celeste-nes-temp.nes.lto.o:(.text.__ashlhi3)
+    f86c     f86c       13     1                 __ashlhi3
+    f87f     f87f        0     1         __init_array_start = .
+    f87f     f87f        0     1         __init_array_end = .
+    f87f     f87f        0     1         __fini_array_start = .
+    f87f     f87f        0     1         __fini_array_end = .
+    f87f     f87f        5     1         C:/llvm-mos/bin/../mos-platform/nes-unrom-512/lib\crt0.o:(.nmi_begin)
+    f87f     f87f        0     1                 __default_nmi
+    f87f     f87f        0     1                 nmi
+    f884     f884        c     1         build-nes/celeste-nes-temp.nes.lto.o:(.nmi.10)
+    f890     f890       14     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(neslib.s.obj):(.nmi.050)
+    f890     f890        0     1                 neslib_nmi_begin
+    f8a4     f8a4        5     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(oam_update.s.obj):(.nmi.055)
+    f8a4     f8a4        0     1                 oam_update_nmi
+    f8a9     f8a9       f1     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(pal_update.s.obj):(.nmi.060)
+    f8a9     f8a9        0     1                 pal_update_nmi
+    f99a     f99a       2a     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(neslib.s.obj):(.nmi.075)
+    f99a     f99a        0     1                 neslib_nmi_end
+    f9b1     f9b1        0     1                 neslib_nmi_skip
+    f9c4     f9c4        6     1         C:/llvm-mos/bin/../mos-platform/nes-unrom-512/lib\crt0.o:(.nmi_end)
+    f9ca     f9ca      320     1 .rodata
+    f9ca     f9ca       d2     1         C:/llvm-mos/bin/../mos-platform/nes/lib\libneslib.a(pal_bright.s.obj):(.rodata.bright_table)
+    f9ca     f9ca        0     1                 __palBrightTableL
+    f9d3     f9d3        0     1                 __palBrightTableH
+    f9dc     f9dc        0     1                 palBrightTable0
+    f9ec     f9ec        0     1                 palBrightTable1
+    f9fc     f9fc        0     1                 palBrightTable2
+    fa0c     fa0c        0     1                 palBrightTable3
+    fa1c     fa1c        0     1                 palBrightTable4
+    fa2c     fa2c        0     1                 palBrightTable5
+    fa3c     fa3c        0     1                 palBrightTable6
+    fa4c     fa4c        0     1                 palBrightTable7
+    fa5c     fa5c        0     1                 palBrightTable8
+    fa9c     fa9c        1     1         C:/llvm-mos/bin/../mos-platform/common/lib\libcrt.a(const.S.obj):(.rodata)
+    fa9c     fa9c        0     1                 __set_v
+    fa9d     fa9d       36     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.initObject)
+    fad3     fad3       42     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.processObject)
+    fb15     fb15       16     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.port_buildSpriteIfDirty)
+    fb2b     fb2b       4b     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.monumentText)
+    fb2b     fb2b       4b     1                 monumentText
+    fb76     fb76       28     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.flyingBerryUpdate.y_positions)
+    fb76     fb76       28     1                 flyingBerryUpdate.y_positions
+    fb9e     fb9e       79     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.object_sprite_lookup_table)
+    fb9e     fb9e       79     1                 object_sprite_lookup_table
+    fc17     fc17       c3     1         build-nes/celeste-nes-temp.nes.lto.o:(.rodata.object_sprite_dict_compact)
+    fc17     fc17       c3     1                 object_sprite_dict_compact
+    fcda     fcda       10     1         <internal>:(.rodata.cst16)
      200      200      120   256 .aligned
      200      200      100   256         build-nes/celeste-nes-temp.nes.lto.o:(.aligned.oam_buf)
      200      200      100     1                 OAM_BUF
@@ -197,18 +197,18 @@
      320      320        0     1         __data_end = .
      320      320        0     1 __data_load_start = LOADADDR(.data)
      320      320        0     1 __data_size = SIZEOF(.data)
-      20     fc9a       22     1 .zp.data
-      20     fc9a        0     1         __zp_data_start = .
-      20     fc9a       22     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.data)
-      20     fc9a        1     1                 global_randSeed
-      21     fc9b        1     1                 s_oamCursor
-      22     fc9c        2     1                 pad_poll_fn
-      24     fc9e       1e     1                 title_text_fade
-      42     fcbc        0     1 __zp_data_load_start = LOADADDR(.zp.data)
-      42     fcbc        0     1 __zp_data_size = SIZEOF(.zp.data)
-      42       42       79     1 .zp.bss
+      20     fcea       22     1 .zp.data
+      20     fcea        0     1         __zp_data_start = .
+      20     fcea       22     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.data)
+      20     fcea        1     1                 global_randSeed
+      21     fceb        1     1                 s_oamCursor
+      22     fcec        2     1                 pad_poll_fn
+      24     fcee       1e     1                 title_text_fade
+      42     fd0c        0     1 __zp_data_load_start = LOADADDR(.zp.data)
+      42     fd0c        0     1 __zp_data_size = SIZEOF(.zp.data)
+      42       42       7a     1 .zp.bss
       42       42        0     1         __zp_bss_start = .
-      42       42       79     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.bss)
+      42       42       7a     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.bss)
       42       42        1     1                 GLOBAL_InputState
       43       43        2     1                 GLOBAL_FrameCount
       45       45        1     1                 GLOBAL_FreezeFrames
@@ -232,43 +232,44 @@
       95       95        1     1                 s_frameCounter
       96       96       20     1                 palette_ram
       b6       b6        1     1                 s_delta_active
-      b7       b7        1     1                 s_ppu_write_cursor
-      b8       b8        1     1                 s_ppu_write_count
-      b9       b9        1     1                 _BANK_SHADOW
-      ba       ba        1     1                 _CHR_BANK_NMI_NEXT
-      bb       bb        0     1 __zp_bss_size = SIZEOF(.zp.bss)
-      bb       bb       39     1 .zp
-      bb       bb        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.ppu_mask_var)
-      bb       bb        1     1                 PPUMASK_VAR
-      bc       bc        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pad_statet)
-      bc       bc        2     1                 PAD_STATET
-      be       be        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pad_state)
-      be       be        2     1                 PAD_STATE
-      c0       c0        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.frame_cnt1)
-      c0       c0        1     1                 FRAME_CNT1
-      c1       c1        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.frame_cnt2)
-      c1       c1        1     1                 FRAME_CNT2
-      c2       c2        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.vram_update)
-      c2       c2        1     1                 VRAM_UPDATE
-      c3       c3        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.scroll_x)
-      c3       c3        1     1                 SCROLL_X
-      c4       c4        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.scroll_y)
-      c4       c4        1     1                 SCROLL_Y
-      c5       c5        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pad_statep)
-      c5       c5        2     1                 PAD_STATEP
-      c7       c7        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.ppu_ctrl_var)
-      c7       c7        1     1                 PPUCTRL_VAR
-      c8       c8        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.ntsc_mode)
-      c8       c8        1     1                 NTSC_MODE
-      c9       c9        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.sprid)
-      c9       c9        2     1                 SPRID
-      cb       cb        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pal_spr_ptr)
-      cb       cb        2     1                 PAL_SPR_PTR
-      cd       cd        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pal_update)
-      cd       cd        1     1                 PAL_UPDATE
-      ce       ce        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pal_bg_ptr)
-      ce       ce        2     1                 PAL_BG_PTR
-      d0       d0       24     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.noinit)
+      b7       b7        1     1                 s_ppu_write_count
+      b8       b8        1     1                 s_flush_rate
+      b9       b9        1     1                 s_ppu_write_cursor
+      ba       ba        1     1                 _BANK_SHADOW
+      bb       bb        1     1                 _CHR_BANK_NMI_NEXT
+      bc       bc        0     1 __zp_bss_size = SIZEOF(.zp.bss)
+      bc       bc       3b     1 .zp
+      bc       bc        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.ppu_mask_var)
+      bc       bc        1     1                 PPUMASK_VAR
+      bd       bd        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pad_statet)
+      bd       bd        2     1                 PAD_STATET
+      bf       bf        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pad_state)
+      bf       bf        2     1                 PAD_STATE
+      c1       c1        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.frame_cnt1)
+      c1       c1        1     1                 FRAME_CNT1
+      c2       c2        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.frame_cnt2)
+      c2       c2        1     1                 FRAME_CNT2
+      c3       c3        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.vram_update)
+      c3       c3        1     1                 VRAM_UPDATE
+      c4       c4        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.scroll_x)
+      c4       c4        1     1                 SCROLL_X
+      c5       c5        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.scroll_y)
+      c5       c5        1     1                 SCROLL_Y
+      c6       c6        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pad_statep)
+      c6       c6        2     1                 PAD_STATEP
+      c8       c8        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.ppu_ctrl_var)
+      c8       c8        1     1                 PPUCTRL_VAR
+      c9       c9        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.ntsc_mode)
+      c9       c9        1     1                 NTSC_MODE
+      ca       ca        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.sprid)
+      ca       ca        2     1                 SPRID
+      cc       cc        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pal_spr_ptr)
+      cc       cc        2     1                 PAL_SPR_PTR
+      ce       ce        1     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pal_update)
+      ce       ce        1     1                 PAL_UPDATE
+      cf       cf        2     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.pal_bg_ptr)
+      cf       cf        2     1                 PAL_BG_PTR
+      d1       d1       26     1         build-nes/celeste-nes-temp.nes.lto.o:(.zp.noinit)
      320      320      3ba     1 .bss
      320      320        0     1         __bss_start = .
      320      320      17b     1         build-nes/celeste-nes-temp.nes.lto.o:(.bss.GLOBAL_ActiveLevel)
@@ -537,530 +538,530 @@
  1000000  1000000     2000     1         build-nes/sprite_chr.o:(.chr_rom_0)
  1002000  1002000     2000     1 .chr_rom_1
  1002000  1002000     2000     1         build-nes/title_chr.o:(.chr_rom_1)
-    fcbc     fcbc        1     1 .rom_poke_table_0
-    fcbc     fcbc        0     1         __rom_poke_table = .
-    fcbc     fcbc        1     1         . = . + (__rom_poke_table_size > 0 ? 1 : 0)
-    fcbd     fcbd        1     1 .rom_poke_table_1
-    fcbd     fcbd        1     1         . = . + (__rom_poke_table_size > 1 ? 1 : 0)
-    fcbe     fcbe        1     1 .rom_poke_table_2
-    fcbe     fcbe        1     1         . = . + (__rom_poke_table_size > 2 ? 1 : 0)
-    fcbf     fcbf        1     1 .rom_poke_table_3
-    fcbf     fcbf        1     1         . = . + (__rom_poke_table_size > 3 ? 1 : 0)
-    fcc0     fcc0        1     1 .rom_poke_table_4
-    fcc0     fcc0        1     1         . = . + (__rom_poke_table_size > 4 ? 1 : 0)
-    fcc1     fcc1        1     1 .rom_poke_table_5
-    fcc1     fcc1        1     1         . = . + (__rom_poke_table_size > 5 ? 1 : 0)
-    fcc2     fcc2        1     1 .rom_poke_table_6
-    fcc2     fcc2        1     1         . = . + (__rom_poke_table_size > 6 ? 1 : 0)
-    fcc3     fcc3        1     1 .rom_poke_table_7
-    fcc3     fcc3        1     1         . = . + (__rom_poke_table_size > 7 ? 1 : 0)
-    fcc4     fcc4        1     1 .rom_poke_table_8
-    fcc4     fcc4        1     1         . = . + (__rom_poke_table_size > 8 ? 1 : 0)
-    fcc5     fcc5        1     1 .rom_poke_table_9
-    fcc5     fcc5        1     1         . = . + (__rom_poke_table_size > 9 ? 1 : 0)
-    fcc6     fcc6        1     1 .rom_poke_table_10
-    fcc6     fcc6        1     1         . = . + (__rom_poke_table_size > 10 ? 1 : 0)
-    fcc7     fcc7        1     1 .rom_poke_table_11
-    fcc7     fcc7        1     1         . = . + (__rom_poke_table_size > 11 ? 1 : 0)
-    fcc8     fcc8        1     1 .rom_poke_table_12
-    fcc8     fcc8        1     1         . = . + (__rom_poke_table_size > 12 ? 1 : 0)
-    fcc9     fcc9        1     1 .rom_poke_table_13
-    fcc9     fcc9        1     1         . = . + (__rom_poke_table_size > 13 ? 1 : 0)
-    fcca     fcca        1     1 .rom_poke_table_14
-    fcca     fcca        1     1         . = . + (__rom_poke_table_size > 14 ? 1 : 0)
-    fccb     fccb        1     1 .rom_poke_table_15
-    fccb     fccb        1     1         . = . + (__rom_poke_table_size > 15 ? 1 : 0)
-    fccc     fccc        1     1 .rom_poke_table_16
-    fccc     fccc        1     1         . = . + (__rom_poke_table_size > 16 ? 1 : 0)
-    fccd     fccd        1     1 .rom_poke_table_17
-    fccd     fccd        1     1         . = . + (__rom_poke_table_size > 17 ? 1 : 0)
-    fcce     fcce        1     1 .rom_poke_table_18
-    fcce     fcce        1     1         . = . + (__rom_poke_table_size > 18 ? 1 : 0)
-    fccf     fccf        1     1 .rom_poke_table_19
-    fccf     fccf        1     1         . = . + (__rom_poke_table_size > 19 ? 1 : 0)
-    fcd0     fcd0        1     1 .rom_poke_table_20
-    fcd0     fcd0        1     1         . = . + (__rom_poke_table_size > 20 ? 1 : 0)
-    fcd1     fcd1        1     1 .rom_poke_table_21
-    fcd1     fcd1        1     1         . = . + (__rom_poke_table_size > 21 ? 1 : 0)
-    fcd2     fcd2        1     1 .rom_poke_table_22
-    fcd2     fcd2        1     1         . = . + (__rom_poke_table_size > 22 ? 1 : 0)
-    fcd3     fcd3        1     1 .rom_poke_table_23
-    fcd3     fcd3        1     1         . = . + (__rom_poke_table_size > 23 ? 1 : 0)
-    fcd4     fcd4        1     1 .rom_poke_table_24
-    fcd4     fcd4        1     1         . = . + (__rom_poke_table_size > 24 ? 1 : 0)
-    fcd5     fcd5        1     1 .rom_poke_table_25
-    fcd5     fcd5        1     1         . = . + (__rom_poke_table_size > 25 ? 1 : 0)
-    fcd6     fcd6        1     1 .rom_poke_table_26
-    fcd6     fcd6        1     1         . = . + (__rom_poke_table_size > 26 ? 1 : 0)
-    fcd7     fcd7        1     1 .rom_poke_table_27
-    fcd7     fcd7        1     1         . = . + (__rom_poke_table_size > 27 ? 1 : 0)
-    fcd8     fcd8        1     1 .rom_poke_table_28
-    fcd8     fcd8        1     1         . = . + (__rom_poke_table_size > 28 ? 1 : 0)
-    fcd9     fcd9        1     1 .rom_poke_table_29
-    fcd9     fcd9        1     1         . = . + (__rom_poke_table_size > 29 ? 1 : 0)
-    fcda     fcda        1     1 .rom_poke_table_30
-    fcda     fcda        1     1         . = . + (__rom_poke_table_size > 30 ? 1 : 0)
-    fcdb     fcdb        1     1 .rom_poke_table_31
-    fcdb     fcdb        1     1         . = . + (__rom_poke_table_size > 31 ? 1 : 0)
-    fcdc     fcdc        1     1 .rom_poke_table_32
-    fcdc     fcdc        1     1         . = . + (__rom_poke_table_size > 32 ? 1 : 0)
-    fcdd     fcdd        1     1 .rom_poke_table_33
-    fcdd     fcdd        1     1         . = . + (__rom_poke_table_size > 33 ? 1 : 0)
-    fcde     fcde        1     1 .rom_poke_table_34
-    fcde     fcde        1     1         . = . + (__rom_poke_table_size > 34 ? 1 : 0)
-    fcdf     fcdf        1     1 .rom_poke_table_35
-    fcdf     fcdf        1     1         . = . + (__rom_poke_table_size > 35 ? 1 : 0)
-    fce0     fce0        1     1 .rom_poke_table_36
-    fce0     fce0        1     1         . = . + (__rom_poke_table_size > 36 ? 1 : 0)
-    fce1     fce1        1     1 .rom_poke_table_37
-    fce1     fce1        1     1         . = . + (__rom_poke_table_size > 37 ? 1 : 0)
-    fce2     fce2        1     1 .rom_poke_table_38
-    fce2     fce2        1     1         . = . + (__rom_poke_table_size > 38 ? 1 : 0)
-    fce3     fce3        1     1 .rom_poke_table_39
-    fce3     fce3        1     1         . = . + (__rom_poke_table_size > 39 ? 1 : 0)
-    fce4     fce4        1     1 .rom_poke_table_40
-    fce4     fce4        1     1         . = . + (__rom_poke_table_size > 40 ? 1 : 0)
-    fce5     fce5        1     1 .rom_poke_table_41
-    fce5     fce5        1     1         . = . + (__rom_poke_table_size > 41 ? 1 : 0)
-    fce6     fce6        1     1 .rom_poke_table_42
-    fce6     fce6        1     1         . = . + (__rom_poke_table_size > 42 ? 1 : 0)
-    fce7     fce7        1     1 .rom_poke_table_43
-    fce7     fce7        1     1         . = . + (__rom_poke_table_size > 43 ? 1 : 0)
-    fce8     fce8        1     1 .rom_poke_table_44
-    fce8     fce8        1     1         . = . + (__rom_poke_table_size > 44 ? 1 : 0)
-    fce9     fce9        1     1 .rom_poke_table_45
-    fce9     fce9        1     1         . = . + (__rom_poke_table_size > 45 ? 1 : 0)
-    fcea     fcea        1     1 .rom_poke_table_46
-    fcea     fcea        1     1         . = . + (__rom_poke_table_size > 46 ? 1 : 0)
-    fceb     fceb        1     1 .rom_poke_table_47
-    fceb     fceb        1     1         . = . + (__rom_poke_table_size > 47 ? 1 : 0)
-    fcec     fcec        1     1 .rom_poke_table_48
-    fcec     fcec        1     1         . = . + (__rom_poke_table_size > 48 ? 1 : 0)
-    fced     fced        1     1 .rom_poke_table_49
-    fced     fced        1     1         . = . + (__rom_poke_table_size > 49 ? 1 : 0)
-    fcee     fcee        1     1 .rom_poke_table_50
-    fcee     fcee        1     1         . = . + (__rom_poke_table_size > 50 ? 1 : 0)
-    fcef     fcef        1     1 .rom_poke_table_51
-    fcef     fcef        1     1         . = . + (__rom_poke_table_size > 51 ? 1 : 0)
-    fcf0     fcf0        1     1 .rom_poke_table_52
-    fcf0     fcf0        1     1         . = . + (__rom_poke_table_size > 52 ? 1 : 0)
-    fcf1     fcf1        1     1 .rom_poke_table_53
-    fcf1     fcf1        1     1         . = . + (__rom_poke_table_size > 53 ? 1 : 0)
-    fcf2     fcf2        1     1 .rom_poke_table_54
-    fcf2     fcf2        1     1         . = . + (__rom_poke_table_size > 54 ? 1 : 0)
-    fcf3     fcf3        1     1 .rom_poke_table_55
-    fcf3     fcf3        1     1         . = . + (__rom_poke_table_size > 55 ? 1 : 0)
-    fcf4     fcf4        1     1 .rom_poke_table_56
-    fcf4     fcf4        1     1         . = . + (__rom_poke_table_size > 56 ? 1 : 0)
-    fcf5     fcf5        1     1 .rom_poke_table_57
-    fcf5     fcf5        1     1         . = . + (__rom_poke_table_size > 57 ? 1 : 0)
-    fcf6     fcf6        1     1 .rom_poke_table_58
-    fcf6     fcf6        1     1         . = . + (__rom_poke_table_size > 58 ? 1 : 0)
-    fcf7     fcf7        1     1 .rom_poke_table_59
-    fcf7     fcf7        1     1         . = . + (__rom_poke_table_size > 59 ? 1 : 0)
-    fcf8     fcf8        1     1 .rom_poke_table_60
-    fcf8     fcf8        1     1         . = . + (__rom_poke_table_size > 60 ? 1 : 0)
-    fcf9     fcf9        1     1 .rom_poke_table_61
-    fcf9     fcf9        1     1         . = . + (__rom_poke_table_size > 61 ? 1 : 0)
-    fcfa     fcfa        1     1 .rom_poke_table_62
-    fcfa     fcfa        1     1         . = . + (__rom_poke_table_size > 62 ? 1 : 0)
-    fcfb     fcfb        1     1 .rom_poke_table_63
-    fcfb     fcfb        1     1         . = . + (__rom_poke_table_size > 63 ? 1 : 0)
-    fcfc     fcfc        1     1 .rom_poke_table_64
-    fcfc     fcfc        1     1         . = . + (__rom_poke_table_size > 64 ? 1 : 0)
-    fcfd     fcfd        1     1 .rom_poke_table_65
-    fcfd     fcfd        1     1         . = . + (__rom_poke_table_size > 65 ? 1 : 0)
-    fcfe     fcfe        1     1 .rom_poke_table_66
-    fcfe     fcfe        1     1         . = . + (__rom_poke_table_size > 66 ? 1 : 0)
-    fcff     fcff        1     1 .rom_poke_table_67
-    fcff     fcff        1     1         . = . + (__rom_poke_table_size > 67 ? 1 : 0)
-    fd00     fd00        1     1 .rom_poke_table_68
-    fd00     fd00        1     1         . = . + (__rom_poke_table_size > 68 ? 1 : 0)
-    fd01     fd01        1     1 .rom_poke_table_69
-    fd01     fd01        1     1         . = . + (__rom_poke_table_size > 69 ? 1 : 0)
-    fd02     fd02        1     1 .rom_poke_table_70
-    fd02     fd02        1     1         . = . + (__rom_poke_table_size > 70 ? 1 : 0)
-    fd03     fd03        1     1 .rom_poke_table_71
-    fd03     fd03        1     1         . = . + (__rom_poke_table_size > 71 ? 1 : 0)
-    fd04     fd04        1     1 .rom_poke_table_72
-    fd04     fd04        1     1         . = . + (__rom_poke_table_size > 72 ? 1 : 0)
-    fd05     fd05        1     1 .rom_poke_table_73
-    fd05     fd05        1     1         . = . + (__rom_poke_table_size > 73 ? 1 : 0)
-    fd06     fd06        1     1 .rom_poke_table_74
-    fd06     fd06        1     1         . = . + (__rom_poke_table_size > 74 ? 1 : 0)
-    fd07     fd07        1     1 .rom_poke_table_75
-    fd07     fd07        1     1         . = . + (__rom_poke_table_size > 75 ? 1 : 0)
-    fd08     fd08        1     1 .rom_poke_table_76
-    fd08     fd08        1     1         . = . + (__rom_poke_table_size > 76 ? 1 : 0)
-    fd09     fd09        1     1 .rom_poke_table_77
-    fd09     fd09        1     1         . = . + (__rom_poke_table_size > 77 ? 1 : 0)
-    fd0a     fd0a        1     1 .rom_poke_table_78
-    fd0a     fd0a        1     1         . = . + (__rom_poke_table_size > 78 ? 1 : 0)
-    fd0b     fd0b        1     1 .rom_poke_table_79
-    fd0b     fd0b        1     1         . = . + (__rom_poke_table_size > 79 ? 1 : 0)
-    fd0c     fd0c        1     1 .rom_poke_table_80
-    fd0c     fd0c        1     1         . = . + (__rom_poke_table_size > 80 ? 1 : 0)
-    fd0d     fd0d        1     1 .rom_poke_table_81
-    fd0d     fd0d        1     1         . = . + (__rom_poke_table_size > 81 ? 1 : 0)
-    fd0e     fd0e        1     1 .rom_poke_table_82
-    fd0e     fd0e        1     1         . = . + (__rom_poke_table_size > 82 ? 1 : 0)
-    fd0f     fd0f        1     1 .rom_poke_table_83
-    fd0f     fd0f        1     1         . = . + (__rom_poke_table_size > 83 ? 1 : 0)
-    fd10     fd10        1     1 .rom_poke_table_84
-    fd10     fd10        1     1         . = . + (__rom_poke_table_size > 84 ? 1 : 0)
-    fd11     fd11        1     1 .rom_poke_table_85
-    fd11     fd11        1     1         . = . + (__rom_poke_table_size > 85 ? 1 : 0)
-    fd12     fd12        1     1 .rom_poke_table_86
-    fd12     fd12        1     1         . = . + (__rom_poke_table_size > 86 ? 1 : 0)
-    fd13     fd13        1     1 .rom_poke_table_87
-    fd13     fd13        1     1         . = . + (__rom_poke_table_size > 87 ? 1 : 0)
-    fd14     fd14        1     1 .rom_poke_table_88
-    fd14     fd14        1     1         . = . + (__rom_poke_table_size > 88 ? 1 : 0)
-    fd15     fd15        1     1 .rom_poke_table_89
-    fd15     fd15        1     1         . = . + (__rom_poke_table_size > 89 ? 1 : 0)
-    fd16     fd16        1     1 .rom_poke_table_90
-    fd16     fd16        1     1         . = . + (__rom_poke_table_size > 90 ? 1 : 0)
-    fd17     fd17        1     1 .rom_poke_table_91
-    fd17     fd17        1     1         . = . + (__rom_poke_table_size > 91 ? 1 : 0)
-    fd18     fd18        1     1 .rom_poke_table_92
-    fd18     fd18        1     1         . = . + (__rom_poke_table_size > 92 ? 1 : 0)
-    fd19     fd19        1     1 .rom_poke_table_93
-    fd19     fd19        1     1         . = . + (__rom_poke_table_size > 93 ? 1 : 0)
-    fd1a     fd1a        1     1 .rom_poke_table_94
-    fd1a     fd1a        1     1         . = . + (__rom_poke_table_size > 94 ? 1 : 0)
-    fd1b     fd1b        1     1 .rom_poke_table_95
-    fd1b     fd1b        1     1         . = . + (__rom_poke_table_size > 95 ? 1 : 0)
-    fd1c     fd1c        1     1 .rom_poke_table_96
-    fd1c     fd1c        1     1         . = . + (__rom_poke_table_size > 96 ? 1 : 0)
-    fd1d     fd1d        1     1 .rom_poke_table_97
-    fd1d     fd1d        1     1         . = . + (__rom_poke_table_size > 97 ? 1 : 0)
-    fd1e     fd1e        1     1 .rom_poke_table_98
-    fd1e     fd1e        1     1         . = . + (__rom_poke_table_size > 98 ? 1 : 0)
-    fd1f     fd1f        1     1 .rom_poke_table_99
-    fd1f     fd1f        1     1         . = . + (__rom_poke_table_size > 99 ? 1 : 0)
-    fd20     fd20        1     1 .rom_poke_table_100
-    fd20     fd20        1     1         . = . + (__rom_poke_table_size > 100 ? 1 : 0)
-    fd21     fd21        1     1 .rom_poke_table_101
-    fd21     fd21        1     1         . = . + (__rom_poke_table_size > 101 ? 1 : 0)
-    fd22     fd22        1     1 .rom_poke_table_102
-    fd22     fd22        1     1         . = . + (__rom_poke_table_size > 102 ? 1 : 0)
-    fd23     fd23        1     1 .rom_poke_table_103
-    fd23     fd23        1     1         . = . + (__rom_poke_table_size > 103 ? 1 : 0)
-    fd24     fd24        1     1 .rom_poke_table_104
-    fd24     fd24        1     1         . = . + (__rom_poke_table_size > 104 ? 1 : 0)
-    fd25     fd25        1     1 .rom_poke_table_105
-    fd25     fd25        1     1         . = . + (__rom_poke_table_size > 105 ? 1 : 0)
-    fd26     fd26        1     1 .rom_poke_table_106
-    fd26     fd26        1     1         . = . + (__rom_poke_table_size > 106 ? 1 : 0)
-    fd27     fd27        1     1 .rom_poke_table_107
-    fd27     fd27        1     1         . = . + (__rom_poke_table_size > 107 ? 1 : 0)
-    fd28     fd28        1     1 .rom_poke_table_108
-    fd28     fd28        1     1         . = . + (__rom_poke_table_size > 108 ? 1 : 0)
-    fd29     fd29        1     1 .rom_poke_table_109
-    fd29     fd29        1     1         . = . + (__rom_poke_table_size > 109 ? 1 : 0)
-    fd2a     fd2a        1     1 .rom_poke_table_110
-    fd2a     fd2a        1     1         . = . + (__rom_poke_table_size > 110 ? 1 : 0)
-    fd2b     fd2b        1     1 .rom_poke_table_111
-    fd2b     fd2b        1     1         . = . + (__rom_poke_table_size > 111 ? 1 : 0)
-    fd2c     fd2c        1     1 .rom_poke_table_112
-    fd2c     fd2c        1     1         . = . + (__rom_poke_table_size > 112 ? 1 : 0)
-    fd2d     fd2d        1     1 .rom_poke_table_113
-    fd2d     fd2d        1     1         . = . + (__rom_poke_table_size > 113 ? 1 : 0)
-    fd2e     fd2e        1     1 .rom_poke_table_114
-    fd2e     fd2e        1     1         . = . + (__rom_poke_table_size > 114 ? 1 : 0)
-    fd2f     fd2f        1     1 .rom_poke_table_115
-    fd2f     fd2f        1     1         . = . + (__rom_poke_table_size > 115 ? 1 : 0)
-    fd30     fd30        1     1 .rom_poke_table_116
-    fd30     fd30        1     1         . = . + (__rom_poke_table_size > 116 ? 1 : 0)
-    fd31     fd31        1     1 .rom_poke_table_117
-    fd31     fd31        1     1         . = . + (__rom_poke_table_size > 117 ? 1 : 0)
-    fd32     fd32        1     1 .rom_poke_table_118
-    fd32     fd32        1     1         . = . + (__rom_poke_table_size > 118 ? 1 : 0)
-    fd33     fd33        1     1 .rom_poke_table_119
-    fd33     fd33        1     1         . = . + (__rom_poke_table_size > 119 ? 1 : 0)
-    fd34     fd34        1     1 .rom_poke_table_120
-    fd34     fd34        1     1         . = . + (__rom_poke_table_size > 120 ? 1 : 0)
-    fd35     fd35        1     1 .rom_poke_table_121
-    fd35     fd35        1     1         . = . + (__rom_poke_table_size > 121 ? 1 : 0)
-    fd36     fd36        1     1 .rom_poke_table_122
-    fd36     fd36        1     1         . = . + (__rom_poke_table_size > 122 ? 1 : 0)
-    fd37     fd37        1     1 .rom_poke_table_123
-    fd37     fd37        1     1         . = . + (__rom_poke_table_size > 123 ? 1 : 0)
-    fd38     fd38        1     1 .rom_poke_table_124
-    fd38     fd38        1     1         . = . + (__rom_poke_table_size > 124 ? 1 : 0)
-    fd39     fd39        1     1 .rom_poke_table_125
-    fd39     fd39        1     1         . = . + (__rom_poke_table_size > 125 ? 1 : 0)
-    fd3a     fd3a        1     1 .rom_poke_table_126
-    fd3a     fd3a        1     1         . = . + (__rom_poke_table_size > 126 ? 1 : 0)
-    fd3b     fd3b        1     1 .rom_poke_table_127
-    fd3b     fd3b        1     1         . = . + (__rom_poke_table_size > 127 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_128
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 128 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_129
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 129 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_130
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 130 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_131
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 131 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_132
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 132 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_133
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 133 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_134
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 134 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_135
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 135 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_136
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 136 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_137
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 137 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_138
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 138 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_139
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 139 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_140
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 140 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_141
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 141 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_142
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 142 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_143
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 143 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_144
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 144 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_145
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 145 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_146
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 146 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_147
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 147 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_148
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 148 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_149
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 149 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_150
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 150 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_151
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 151 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_152
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 152 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_153
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 153 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_154
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 154 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_155
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 155 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_156
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 156 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_157
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 157 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_158
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 158 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_159
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 159 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_160
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 160 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_161
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 161 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_162
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 162 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_163
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 163 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_164
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 164 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_165
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 165 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_166
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 166 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_167
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 167 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_168
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 168 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_169
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 169 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_170
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 170 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_171
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 171 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_172
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 172 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_173
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 173 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_174
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 174 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_175
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 175 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_176
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 176 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_177
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 177 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_178
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 178 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_179
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 179 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_180
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 180 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_181
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 181 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_182
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 182 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_183
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 183 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_184
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 184 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_185
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 185 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_186
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 186 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_187
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 187 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_188
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 188 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_189
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 189 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_190
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 190 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_191
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 191 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_192
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 192 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_193
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 193 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_194
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 194 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_195
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 195 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_196
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 196 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_197
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 197 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_198
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 198 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_199
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 199 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_200
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 200 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_201
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 201 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_202
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 202 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_203
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 203 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_204
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 204 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_205
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 205 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_206
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 206 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_207
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 207 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_208
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 208 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_209
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 209 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_210
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 210 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_211
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 211 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_212
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 212 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_213
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 213 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_214
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 214 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_215
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 215 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_216
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 216 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_217
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 217 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_218
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 218 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_219
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 219 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_220
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 220 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_221
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 221 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_222
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 222 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_223
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 223 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_224
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 224 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_225
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 225 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_226
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 226 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_227
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 227 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_228
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 228 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_229
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 229 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_230
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 230 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_231
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 231 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_232
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 232 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_233
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 233 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_234
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 234 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_235
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 235 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_236
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 236 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_237
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 237 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_238
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 238 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_239
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 239 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_240
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 240 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_241
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 241 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_242
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 242 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_243
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 243 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_244
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 244 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_245
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 245 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_246
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 246 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_247
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 247 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_248
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 248 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_249
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 249 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_250
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 250 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_251
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 251 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_252
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 252 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_253
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 253 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_254
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 254 ? 1 : 0)
-    fd3c     fd3c        0     1 .rom_poke_table_255
-    fd3c     fd3c        0     1         . = . + (__rom_poke_table_size > 255 ? 1 : 0)
-    fd40     fd40        0     1 .dpcm
-    fd40     fd40        0     1         __dpcm_start = .
+    fd0c     fd0c        1     1 .rom_poke_table_0
+    fd0c     fd0c        0     1         __rom_poke_table = .
+    fd0c     fd0c        1     1         . = . + (__rom_poke_table_size > 0 ? 1 : 0)
+    fd0d     fd0d        1     1 .rom_poke_table_1
+    fd0d     fd0d        1     1         . = . + (__rom_poke_table_size > 1 ? 1 : 0)
+    fd0e     fd0e        1     1 .rom_poke_table_2
+    fd0e     fd0e        1     1         . = . + (__rom_poke_table_size > 2 ? 1 : 0)
+    fd0f     fd0f        1     1 .rom_poke_table_3
+    fd0f     fd0f        1     1         . = . + (__rom_poke_table_size > 3 ? 1 : 0)
+    fd10     fd10        1     1 .rom_poke_table_4
+    fd10     fd10        1     1         . = . + (__rom_poke_table_size > 4 ? 1 : 0)
+    fd11     fd11        1     1 .rom_poke_table_5
+    fd11     fd11        1     1         . = . + (__rom_poke_table_size > 5 ? 1 : 0)
+    fd12     fd12        1     1 .rom_poke_table_6
+    fd12     fd12        1     1         . = . + (__rom_poke_table_size > 6 ? 1 : 0)
+    fd13     fd13        1     1 .rom_poke_table_7
+    fd13     fd13        1     1         . = . + (__rom_poke_table_size > 7 ? 1 : 0)
+    fd14     fd14        1     1 .rom_poke_table_8
+    fd14     fd14        1     1         . = . + (__rom_poke_table_size > 8 ? 1 : 0)
+    fd15     fd15        1     1 .rom_poke_table_9
+    fd15     fd15        1     1         . = . + (__rom_poke_table_size > 9 ? 1 : 0)
+    fd16     fd16        1     1 .rom_poke_table_10
+    fd16     fd16        1     1         . = . + (__rom_poke_table_size > 10 ? 1 : 0)
+    fd17     fd17        1     1 .rom_poke_table_11
+    fd17     fd17        1     1         . = . + (__rom_poke_table_size > 11 ? 1 : 0)
+    fd18     fd18        1     1 .rom_poke_table_12
+    fd18     fd18        1     1         . = . + (__rom_poke_table_size > 12 ? 1 : 0)
+    fd19     fd19        1     1 .rom_poke_table_13
+    fd19     fd19        1     1         . = . + (__rom_poke_table_size > 13 ? 1 : 0)
+    fd1a     fd1a        1     1 .rom_poke_table_14
+    fd1a     fd1a        1     1         . = . + (__rom_poke_table_size > 14 ? 1 : 0)
+    fd1b     fd1b        1     1 .rom_poke_table_15
+    fd1b     fd1b        1     1         . = . + (__rom_poke_table_size > 15 ? 1 : 0)
+    fd1c     fd1c        1     1 .rom_poke_table_16
+    fd1c     fd1c        1     1         . = . + (__rom_poke_table_size > 16 ? 1 : 0)
+    fd1d     fd1d        1     1 .rom_poke_table_17
+    fd1d     fd1d        1     1         . = . + (__rom_poke_table_size > 17 ? 1 : 0)
+    fd1e     fd1e        1     1 .rom_poke_table_18
+    fd1e     fd1e        1     1         . = . + (__rom_poke_table_size > 18 ? 1 : 0)
+    fd1f     fd1f        1     1 .rom_poke_table_19
+    fd1f     fd1f        1     1         . = . + (__rom_poke_table_size > 19 ? 1 : 0)
+    fd20     fd20        1     1 .rom_poke_table_20
+    fd20     fd20        1     1         . = . + (__rom_poke_table_size > 20 ? 1 : 0)
+    fd21     fd21        1     1 .rom_poke_table_21
+    fd21     fd21        1     1         . = . + (__rom_poke_table_size > 21 ? 1 : 0)
+    fd22     fd22        1     1 .rom_poke_table_22
+    fd22     fd22        1     1         . = . + (__rom_poke_table_size > 22 ? 1 : 0)
+    fd23     fd23        1     1 .rom_poke_table_23
+    fd23     fd23        1     1         . = . + (__rom_poke_table_size > 23 ? 1 : 0)
+    fd24     fd24        1     1 .rom_poke_table_24
+    fd24     fd24        1     1         . = . + (__rom_poke_table_size > 24 ? 1 : 0)
+    fd25     fd25        1     1 .rom_poke_table_25
+    fd25     fd25        1     1         . = . + (__rom_poke_table_size > 25 ? 1 : 0)
+    fd26     fd26        1     1 .rom_poke_table_26
+    fd26     fd26        1     1         . = . + (__rom_poke_table_size > 26 ? 1 : 0)
+    fd27     fd27        1     1 .rom_poke_table_27
+    fd27     fd27        1     1         . = . + (__rom_poke_table_size > 27 ? 1 : 0)
+    fd28     fd28        1     1 .rom_poke_table_28
+    fd28     fd28        1     1         . = . + (__rom_poke_table_size > 28 ? 1 : 0)
+    fd29     fd29        1     1 .rom_poke_table_29
+    fd29     fd29        1     1         . = . + (__rom_poke_table_size > 29 ? 1 : 0)
+    fd2a     fd2a        1     1 .rom_poke_table_30
+    fd2a     fd2a        1     1         . = . + (__rom_poke_table_size > 30 ? 1 : 0)
+    fd2b     fd2b        1     1 .rom_poke_table_31
+    fd2b     fd2b        1     1         . = . + (__rom_poke_table_size > 31 ? 1 : 0)
+    fd2c     fd2c        1     1 .rom_poke_table_32
+    fd2c     fd2c        1     1         . = . + (__rom_poke_table_size > 32 ? 1 : 0)
+    fd2d     fd2d        1     1 .rom_poke_table_33
+    fd2d     fd2d        1     1         . = . + (__rom_poke_table_size > 33 ? 1 : 0)
+    fd2e     fd2e        1     1 .rom_poke_table_34
+    fd2e     fd2e        1     1         . = . + (__rom_poke_table_size > 34 ? 1 : 0)
+    fd2f     fd2f        1     1 .rom_poke_table_35
+    fd2f     fd2f        1     1         . = . + (__rom_poke_table_size > 35 ? 1 : 0)
+    fd30     fd30        1     1 .rom_poke_table_36
+    fd30     fd30        1     1         . = . + (__rom_poke_table_size > 36 ? 1 : 0)
+    fd31     fd31        1     1 .rom_poke_table_37
+    fd31     fd31        1     1         . = . + (__rom_poke_table_size > 37 ? 1 : 0)
+    fd32     fd32        1     1 .rom_poke_table_38
+    fd32     fd32        1     1         . = . + (__rom_poke_table_size > 38 ? 1 : 0)
+    fd33     fd33        1     1 .rom_poke_table_39
+    fd33     fd33        1     1         . = . + (__rom_poke_table_size > 39 ? 1 : 0)
+    fd34     fd34        1     1 .rom_poke_table_40
+    fd34     fd34        1     1         . = . + (__rom_poke_table_size > 40 ? 1 : 0)
+    fd35     fd35        1     1 .rom_poke_table_41
+    fd35     fd35        1     1         . = . + (__rom_poke_table_size > 41 ? 1 : 0)
+    fd36     fd36        1     1 .rom_poke_table_42
+    fd36     fd36        1     1         . = . + (__rom_poke_table_size > 42 ? 1 : 0)
+    fd37     fd37        1     1 .rom_poke_table_43
+    fd37     fd37        1     1         . = . + (__rom_poke_table_size > 43 ? 1 : 0)
+    fd38     fd38        1     1 .rom_poke_table_44
+    fd38     fd38        1     1         . = . + (__rom_poke_table_size > 44 ? 1 : 0)
+    fd39     fd39        1     1 .rom_poke_table_45
+    fd39     fd39        1     1         . = . + (__rom_poke_table_size > 45 ? 1 : 0)
+    fd3a     fd3a        1     1 .rom_poke_table_46
+    fd3a     fd3a        1     1         . = . + (__rom_poke_table_size > 46 ? 1 : 0)
+    fd3b     fd3b        1     1 .rom_poke_table_47
+    fd3b     fd3b        1     1         . = . + (__rom_poke_table_size > 47 ? 1 : 0)
+    fd3c     fd3c        1     1 .rom_poke_table_48
+    fd3c     fd3c        1     1         . = . + (__rom_poke_table_size > 48 ? 1 : 0)
+    fd3d     fd3d        1     1 .rom_poke_table_49
+    fd3d     fd3d        1     1         . = . + (__rom_poke_table_size > 49 ? 1 : 0)
+    fd3e     fd3e        1     1 .rom_poke_table_50
+    fd3e     fd3e        1     1         . = . + (__rom_poke_table_size > 50 ? 1 : 0)
+    fd3f     fd3f        1     1 .rom_poke_table_51
+    fd3f     fd3f        1     1         . = . + (__rom_poke_table_size > 51 ? 1 : 0)
+    fd40     fd40        1     1 .rom_poke_table_52
+    fd40     fd40        1     1         . = . + (__rom_poke_table_size > 52 ? 1 : 0)
+    fd41     fd41        1     1 .rom_poke_table_53
+    fd41     fd41        1     1         . = . + (__rom_poke_table_size > 53 ? 1 : 0)
+    fd42     fd42        1     1 .rom_poke_table_54
+    fd42     fd42        1     1         . = . + (__rom_poke_table_size > 54 ? 1 : 0)
+    fd43     fd43        1     1 .rom_poke_table_55
+    fd43     fd43        1     1         . = . + (__rom_poke_table_size > 55 ? 1 : 0)
+    fd44     fd44        1     1 .rom_poke_table_56
+    fd44     fd44        1     1         . = . + (__rom_poke_table_size > 56 ? 1 : 0)
+    fd45     fd45        1     1 .rom_poke_table_57
+    fd45     fd45        1     1         . = . + (__rom_poke_table_size > 57 ? 1 : 0)
+    fd46     fd46        1     1 .rom_poke_table_58
+    fd46     fd46        1     1         . = . + (__rom_poke_table_size > 58 ? 1 : 0)
+    fd47     fd47        1     1 .rom_poke_table_59
+    fd47     fd47        1     1         . = . + (__rom_poke_table_size > 59 ? 1 : 0)
+    fd48     fd48        1     1 .rom_poke_table_60
+    fd48     fd48        1     1         . = . + (__rom_poke_table_size > 60 ? 1 : 0)
+    fd49     fd49        1     1 .rom_poke_table_61
+    fd49     fd49        1     1         . = . + (__rom_poke_table_size > 61 ? 1 : 0)
+    fd4a     fd4a        1     1 .rom_poke_table_62
+    fd4a     fd4a        1     1         . = . + (__rom_poke_table_size > 62 ? 1 : 0)
+    fd4b     fd4b        1     1 .rom_poke_table_63
+    fd4b     fd4b        1     1         . = . + (__rom_poke_table_size > 63 ? 1 : 0)
+    fd4c     fd4c        1     1 .rom_poke_table_64
+    fd4c     fd4c        1     1         . = . + (__rom_poke_table_size > 64 ? 1 : 0)
+    fd4d     fd4d        1     1 .rom_poke_table_65
+    fd4d     fd4d        1     1         . = . + (__rom_poke_table_size > 65 ? 1 : 0)
+    fd4e     fd4e        1     1 .rom_poke_table_66
+    fd4e     fd4e        1     1         . = . + (__rom_poke_table_size > 66 ? 1 : 0)
+    fd4f     fd4f        1     1 .rom_poke_table_67
+    fd4f     fd4f        1     1         . = . + (__rom_poke_table_size > 67 ? 1 : 0)
+    fd50     fd50        1     1 .rom_poke_table_68
+    fd50     fd50        1     1         . = . + (__rom_poke_table_size > 68 ? 1 : 0)
+    fd51     fd51        1     1 .rom_poke_table_69
+    fd51     fd51        1     1         . = . + (__rom_poke_table_size > 69 ? 1 : 0)
+    fd52     fd52        1     1 .rom_poke_table_70
+    fd52     fd52        1     1         . = . + (__rom_poke_table_size > 70 ? 1 : 0)
+    fd53     fd53        1     1 .rom_poke_table_71
+    fd53     fd53        1     1         . = . + (__rom_poke_table_size > 71 ? 1 : 0)
+    fd54     fd54        1     1 .rom_poke_table_72
+    fd54     fd54        1     1         . = . + (__rom_poke_table_size > 72 ? 1 : 0)
+    fd55     fd55        1     1 .rom_poke_table_73
+    fd55     fd55        1     1         . = . + (__rom_poke_table_size > 73 ? 1 : 0)
+    fd56     fd56        1     1 .rom_poke_table_74
+    fd56     fd56        1     1         . = . + (__rom_poke_table_size > 74 ? 1 : 0)
+    fd57     fd57        1     1 .rom_poke_table_75
+    fd57     fd57        1     1         . = . + (__rom_poke_table_size > 75 ? 1 : 0)
+    fd58     fd58        1     1 .rom_poke_table_76
+    fd58     fd58        1     1         . = . + (__rom_poke_table_size > 76 ? 1 : 0)
+    fd59     fd59        1     1 .rom_poke_table_77
+    fd59     fd59        1     1         . = . + (__rom_poke_table_size > 77 ? 1 : 0)
+    fd5a     fd5a        1     1 .rom_poke_table_78
+    fd5a     fd5a        1     1         . = . + (__rom_poke_table_size > 78 ? 1 : 0)
+    fd5b     fd5b        1     1 .rom_poke_table_79
+    fd5b     fd5b        1     1         . = . + (__rom_poke_table_size > 79 ? 1 : 0)
+    fd5c     fd5c        1     1 .rom_poke_table_80
+    fd5c     fd5c        1     1         . = . + (__rom_poke_table_size > 80 ? 1 : 0)
+    fd5d     fd5d        1     1 .rom_poke_table_81
+    fd5d     fd5d        1     1         . = . + (__rom_poke_table_size > 81 ? 1 : 0)
+    fd5e     fd5e        1     1 .rom_poke_table_82
+    fd5e     fd5e        1     1         . = . + (__rom_poke_table_size > 82 ? 1 : 0)
+    fd5f     fd5f        1     1 .rom_poke_table_83
+    fd5f     fd5f        1     1         . = . + (__rom_poke_table_size > 83 ? 1 : 0)
+    fd60     fd60        1     1 .rom_poke_table_84
+    fd60     fd60        1     1         . = . + (__rom_poke_table_size > 84 ? 1 : 0)
+    fd61     fd61        1     1 .rom_poke_table_85
+    fd61     fd61        1     1         . = . + (__rom_poke_table_size > 85 ? 1 : 0)
+    fd62     fd62        1     1 .rom_poke_table_86
+    fd62     fd62        1     1         . = . + (__rom_poke_table_size > 86 ? 1 : 0)
+    fd63     fd63        1     1 .rom_poke_table_87
+    fd63     fd63        1     1         . = . + (__rom_poke_table_size > 87 ? 1 : 0)
+    fd64     fd64        1     1 .rom_poke_table_88
+    fd64     fd64        1     1         . = . + (__rom_poke_table_size > 88 ? 1 : 0)
+    fd65     fd65        1     1 .rom_poke_table_89
+    fd65     fd65        1     1         . = . + (__rom_poke_table_size > 89 ? 1 : 0)
+    fd66     fd66        1     1 .rom_poke_table_90
+    fd66     fd66        1     1         . = . + (__rom_poke_table_size > 90 ? 1 : 0)
+    fd67     fd67        1     1 .rom_poke_table_91
+    fd67     fd67        1     1         . = . + (__rom_poke_table_size > 91 ? 1 : 0)
+    fd68     fd68        1     1 .rom_poke_table_92
+    fd68     fd68        1     1         . = . + (__rom_poke_table_size > 92 ? 1 : 0)
+    fd69     fd69        1     1 .rom_poke_table_93
+    fd69     fd69        1     1         . = . + (__rom_poke_table_size > 93 ? 1 : 0)
+    fd6a     fd6a        1     1 .rom_poke_table_94
+    fd6a     fd6a        1     1         . = . + (__rom_poke_table_size > 94 ? 1 : 0)
+    fd6b     fd6b        1     1 .rom_poke_table_95
+    fd6b     fd6b        1     1         . = . + (__rom_poke_table_size > 95 ? 1 : 0)
+    fd6c     fd6c        1     1 .rom_poke_table_96
+    fd6c     fd6c        1     1         . = . + (__rom_poke_table_size > 96 ? 1 : 0)
+    fd6d     fd6d        1     1 .rom_poke_table_97
+    fd6d     fd6d        1     1         . = . + (__rom_poke_table_size > 97 ? 1 : 0)
+    fd6e     fd6e        1     1 .rom_poke_table_98
+    fd6e     fd6e        1     1         . = . + (__rom_poke_table_size > 98 ? 1 : 0)
+    fd6f     fd6f        1     1 .rom_poke_table_99
+    fd6f     fd6f        1     1         . = . + (__rom_poke_table_size > 99 ? 1 : 0)
+    fd70     fd70        1     1 .rom_poke_table_100
+    fd70     fd70        1     1         . = . + (__rom_poke_table_size > 100 ? 1 : 0)
+    fd71     fd71        1     1 .rom_poke_table_101
+    fd71     fd71        1     1         . = . + (__rom_poke_table_size > 101 ? 1 : 0)
+    fd72     fd72        1     1 .rom_poke_table_102
+    fd72     fd72        1     1         . = . + (__rom_poke_table_size > 102 ? 1 : 0)
+    fd73     fd73        1     1 .rom_poke_table_103
+    fd73     fd73        1     1         . = . + (__rom_poke_table_size > 103 ? 1 : 0)
+    fd74     fd74        1     1 .rom_poke_table_104
+    fd74     fd74        1     1         . = . + (__rom_poke_table_size > 104 ? 1 : 0)
+    fd75     fd75        1     1 .rom_poke_table_105
+    fd75     fd75        1     1         . = . + (__rom_poke_table_size > 105 ? 1 : 0)
+    fd76     fd76        1     1 .rom_poke_table_106
+    fd76     fd76        1     1         . = . + (__rom_poke_table_size > 106 ? 1 : 0)
+    fd77     fd77        1     1 .rom_poke_table_107
+    fd77     fd77        1     1         . = . + (__rom_poke_table_size > 107 ? 1 : 0)
+    fd78     fd78        1     1 .rom_poke_table_108
+    fd78     fd78        1     1         . = . + (__rom_poke_table_size > 108 ? 1 : 0)
+    fd79     fd79        1     1 .rom_poke_table_109
+    fd79     fd79        1     1         . = . + (__rom_poke_table_size > 109 ? 1 : 0)
+    fd7a     fd7a        1     1 .rom_poke_table_110
+    fd7a     fd7a        1     1         . = . + (__rom_poke_table_size > 110 ? 1 : 0)
+    fd7b     fd7b        1     1 .rom_poke_table_111
+    fd7b     fd7b        1     1         . = . + (__rom_poke_table_size > 111 ? 1 : 0)
+    fd7c     fd7c        1     1 .rom_poke_table_112
+    fd7c     fd7c        1     1         . = . + (__rom_poke_table_size > 112 ? 1 : 0)
+    fd7d     fd7d        1     1 .rom_poke_table_113
+    fd7d     fd7d        1     1         . = . + (__rom_poke_table_size > 113 ? 1 : 0)
+    fd7e     fd7e        1     1 .rom_poke_table_114
+    fd7e     fd7e        1     1         . = . + (__rom_poke_table_size > 114 ? 1 : 0)
+    fd7f     fd7f        1     1 .rom_poke_table_115
+    fd7f     fd7f        1     1         . = . + (__rom_poke_table_size > 115 ? 1 : 0)
+    fd80     fd80        1     1 .rom_poke_table_116
+    fd80     fd80        1     1         . = . + (__rom_poke_table_size > 116 ? 1 : 0)
+    fd81     fd81        1     1 .rom_poke_table_117
+    fd81     fd81        1     1         . = . + (__rom_poke_table_size > 117 ? 1 : 0)
+    fd82     fd82        1     1 .rom_poke_table_118
+    fd82     fd82        1     1         . = . + (__rom_poke_table_size > 118 ? 1 : 0)
+    fd83     fd83        1     1 .rom_poke_table_119
+    fd83     fd83        1     1         . = . + (__rom_poke_table_size > 119 ? 1 : 0)
+    fd84     fd84        1     1 .rom_poke_table_120
+    fd84     fd84        1     1         . = . + (__rom_poke_table_size > 120 ? 1 : 0)
+    fd85     fd85        1     1 .rom_poke_table_121
+    fd85     fd85        1     1         . = . + (__rom_poke_table_size > 121 ? 1 : 0)
+    fd86     fd86        1     1 .rom_poke_table_122
+    fd86     fd86        1     1         . = . + (__rom_poke_table_size > 122 ? 1 : 0)
+    fd87     fd87        1     1 .rom_poke_table_123
+    fd87     fd87        1     1         . = . + (__rom_poke_table_size > 123 ? 1 : 0)
+    fd88     fd88        1     1 .rom_poke_table_124
+    fd88     fd88        1     1         . = . + (__rom_poke_table_size > 124 ? 1 : 0)
+    fd89     fd89        1     1 .rom_poke_table_125
+    fd89     fd89        1     1         . = . + (__rom_poke_table_size > 125 ? 1 : 0)
+    fd8a     fd8a        1     1 .rom_poke_table_126
+    fd8a     fd8a        1     1         . = . + (__rom_poke_table_size > 126 ? 1 : 0)
+    fd8b     fd8b        1     1 .rom_poke_table_127
+    fd8b     fd8b        1     1         . = . + (__rom_poke_table_size > 127 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_128
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 128 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_129
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 129 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_130
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 130 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_131
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 131 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_132
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 132 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_133
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 133 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_134
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 134 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_135
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 135 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_136
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 136 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_137
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 137 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_138
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 138 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_139
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 139 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_140
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 140 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_141
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 141 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_142
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 142 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_143
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 143 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_144
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 144 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_145
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 145 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_146
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 146 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_147
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 147 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_148
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 148 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_149
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 149 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_150
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 150 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_151
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 151 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_152
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 152 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_153
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 153 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_154
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 154 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_155
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 155 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_156
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 156 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_157
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 157 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_158
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 158 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_159
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 159 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_160
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 160 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_161
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 161 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_162
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 162 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_163
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 163 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_164
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 164 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_165
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 165 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_166
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 166 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_167
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 167 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_168
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 168 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_169
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 169 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_170
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 170 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_171
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 171 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_172
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 172 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_173
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 173 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_174
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 174 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_175
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 175 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_176
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 176 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_177
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 177 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_178
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 178 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_179
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 179 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_180
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 180 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_181
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 181 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_182
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 182 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_183
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 183 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_184
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 184 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_185
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 185 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_186
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 186 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_187
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 187 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_188
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 188 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_189
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 189 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_190
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 190 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_191
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 191 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_192
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 192 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_193
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 193 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_194
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 194 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_195
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 195 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_196
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 196 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_197
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 197 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_198
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 198 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_199
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 199 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_200
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 200 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_201
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 201 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_202
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 202 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_203
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 203 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_204
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 204 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_205
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 205 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_206
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 206 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_207
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 207 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_208
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 208 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_209
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 209 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_210
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 210 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_211
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 211 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_212
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 212 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_213
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 213 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_214
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 214 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_215
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 215 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_216
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 216 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_217
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 217 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_218
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 218 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_219
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 219 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_220
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 220 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_221
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 221 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_222
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 222 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_223
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 223 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_224
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 224 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_225
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 225 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_226
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 226 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_227
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 227 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_228
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 228 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_229
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 229 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_230
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 230 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_231
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 231 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_232
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 232 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_233
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 233 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_234
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 234 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_235
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 235 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_236
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 236 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_237
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 237 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_238
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 238 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_239
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 239 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_240
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 240 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_241
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 241 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_242
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 242 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_243
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 243 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_244
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 244 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_245
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 245 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_246
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 246 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_247
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 247 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_248
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 248 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_249
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 249 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_250
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 250 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_251
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 251 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_252
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 252 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_253
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 253 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_254
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 254 ? 1 : 0)
+    fd8c     fd8c        0     1 .rom_poke_table_255
+    fd8c     fd8c        0     1         . = . + (__rom_poke_table_size > 255 ? 1 : 0)
+    fdc0     fdc0        0     1 .dpcm
+    fdc0     fdc0        0     1         __dpcm_start = .
     fffa     fffa        6     1 .vectors
     fffa     fffa        6     1         C:/llvm-mos/bin/../mos-platform/nes-unrom-512/lib\reset.o:(.vectors)
    10000    10000        0     1 PROVIDE(__prg_rom_size = 512)
    10000    10000        0     1 __stack = 0x0800
        0        0       cc     1 .comment
        0        0       cc     1         <internal>:(.comment)
-       0        0     2360     4 .symtab
-       0        0     2360     4         <internal>:(.symtab)
+       0        0     2370     4 .symtab
+       0        0     2370     4         <internal>:(.symtab)
        0        0     145c     1 .shstrtab
        0        0     145c     1         <internal>:(.shstrtab)
-       0        0     2398     1 .strtab
-       0        0     2398     1         <internal>:(.strtab)
+       0        0     23a5     1 .strtab
+       0        0     23a5     1         <internal>:(.strtab)
