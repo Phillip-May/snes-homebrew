@@ -96,12 +96,40 @@ def rle_encode(data):
         i += run
     return encoded
 
+def get_collapse_tile_positions():
+    """Get nametable positions occupied by collapse tiles (type 23) on level 4.
+    Returns set of NT positions (0-959 for NT0, 960+ for NT2)."""
+    # Level 4 objects: (type, game_x, game_y)
+    objects = [
+        (28, 2, 4), (23, 12, 6), (23, 13, 6), (23, 11, 9), (23, 12, 9),
+        (23, 14, 11), (23, 15, 11), (23, 12, 13), (23, 13, 13),
+        (23, 8, 14), (23, 9, 14), (23, 4, 15), (23, 5, 15),
+    ]
+    positions = set()
+    for otype, gx, gy in objects:
+        if otype != 23:
+            continue
+        nx, ny = gx * 2, gy * 2  # Game tile -> NES tile coords
+        for dy in range(2):
+            for dx in range(2):
+                row = ny + dy
+                col = nx + dx
+                if row < NT0_ROWS:
+                    positions.add(row * TILES_X + col)
+                else:
+                    positions.add(960 + (row - NT0_ROWS) * TILES_X + col)
+    return positions
+
+# Nametable positions reserved for collapse tiles (animation must not touch these)
+COLLAPSE_TILE_POSITIONS = get_collapse_tile_positions()
+
 def process_image(img, tile_dict):
     """Process one level animation image using the tile dictionary.
 
     Extracts the 32-row game area (starting at GAME_START_ROW in the image)
     and maps it to NT0 rows 0-29 + NT2 rows 0-1, matching the normal
     write_nametable() layout. Empty tile (index 0, black) fills unused rows.
+    Collapse tile positions are set to tile 0 (game BG system fills them in).
     """
     data = np.array(img)
     # Find the empty tile index (all-zero pixels)
@@ -169,6 +197,15 @@ def process_image(img, tile_dict):
                     attrs.append((tl & 3) | ((tr & 3) << 2) | ((bl & 3) << 4) | ((br & 3) << 6))
             return attrs
 
+        # Clear collapse tile positions — the game's BG tile system draws them.
+        for pos in COLLAPSE_TILE_POSITIONS:
+            if pos < 960:
+                nt0[pos] = empty_idx
+            else:
+                nt2_pos = pos - 960
+                if nt2_pos < len(nt2):
+                    nt2[nt2_pos] = empty_idx
+
         nt0_attrs = build_attributes(nt0_pals)
         nt2_attrs = build_attributes(nt2_pals)
         frames.append((nt0, nt2, nt0_attrs, nt2_attrs))
@@ -179,9 +216,24 @@ def main():
     img_b = Image.open(os.path.join(LEVEL_DIR, "Level4B.png"))
     print(f"Level4A: {img_a.size}, Level4B: {img_b.size}")
 
-    # Build combined tile dictionary from both images (like convert_title_screen.py)
+    # Reserve CHR tile indices used by game objects (collapse tiles, breakable walls)
+    # so they can coexist with animation tiles at $1000.
+    # The game copies these tile patterns from game CHR to $1000 at load time.
+    RESERVED_INDICES = set(range(73, 85))  # Collapse tile CHR indices 73-84
+    print(f"Reserved CHR indices for game objects: {sorted(RESERVED_INDICES)}")
+
+    # Build combined tile dictionary from both images, skipping reserved indices
     tile_dict = {}   # key: tile.tobytes() -> index
-    tile_list = []   # list of numpy 8x8 tiles
+    tile_list = []   # list of (index, numpy 8x8 tile) - index may skip reserved slots
+    next_index = 0
+
+    def alloc_index():
+        nonlocal next_index
+        while next_index in RESERVED_INDICES:
+            next_index += 1
+        idx = next_index
+        next_index += 1
+        return idx
 
     for img in [img_a, img_b]:
         data = np.array(img)
@@ -192,21 +244,21 @@ def main():
                     tile = frame[ty * 8:(ty + 1) * 8, tx * 8:(tx + 1) * 8]
                     key = tile.tobytes()
                     if key not in tile_dict:
-                        tile_dict[key] = len(tile_list)
-                        tile_list.append(tile)
+                        idx = alloc_index()
+                        tile_dict[key] = idx
+                        tile_list.append((idx, tile))
 
-    print(f"Total unique tiles: {len(tile_list)}")
-    assert len(tile_list) <= 256, f"Too many unique tiles: {len(tile_list)} > 256"
+    max_index = max(idx for idx, _ in tile_list) if tile_list else 0
+    print(f"Total unique tiles: {len(tile_list)}, max index: {max_index}")
+    assert max_index <= 255, f"Tile index overflow: {max_index} > 255"
 
-    # Generate CHR tile data (2bpp planar format)
-    chr_bin = bytearray()
-    for tile in tile_list:
-        tile_2bit = tile & 3  # Keep only low 2 bits (color within palette)
-        chr_bin.extend(tile_to_chr(tile_2bit))
-
-    # Pad BG pattern table to 4KB (256 tiles)
-    while len(chr_bin) < 4096:
-        chr_bin.extend(b'\x00' * 16)
+    # Generate CHR tile data (2bpp planar format) with tiles at their assigned indices.
+    # Reserved indices are left as zeros (game tiles will be copied at runtime).
+    chr_bin = bytearray(4096)  # 256 tiles × 16 bytes, initialized to zero
+    for idx, tile in tile_list:
+        tile_2bit = tile & 3
+        chr_bytes = tile_to_chr(tile_2bit)
+        chr_bin[idx * 16:(idx + 1) * 16] = chr_bytes
 
     # Sprite pattern table: copy from sprite_chr_combined.bin second half
     # so game sprites still work when CHR bank 2 is active
@@ -253,13 +305,21 @@ def main():
             f.write(f"    {', '.join(colors)},  // Palette {pal}\n")
         f.write("};\n\n")
 
-        # Animation BG tile CHR data (tiles 0..N, 16 bytes each, 2bpp planar)
-        f.write(f"#define LEVEL4_ANIM_CHR_TILE_COUNT {len(tile_list)}\n\n")
+        # Animation BG tile CHR data — full range from tile 0 to max_index.
+        # Reserved indices (collapse tiles etc.) are zero-filled here;
+        # the runtime copies game tile patterns into those slots.
+        chr_tile_count = max_index + 1
+        f.write(f"#define LEVEL4_ANIM_CHR_TILE_COUNT {chr_tile_count}\n\n")
         f.write("__attribute__((section(\".prg_rom_4\")))\n")
-        f.write(f"static const unsigned char level4_anim_chr_tiles[{len(tile_list) * 16}] = {{\n")
-        for tile in tile_list:
-            tile_2bit = tile & 3
-            chr_bytes = tile_to_chr(tile_2bit)
+        f.write(f"static const unsigned char level4_anim_chr_tiles[{chr_tile_count * 16}] = {{\n")
+        # Build index -> tile mapping
+        idx_to_tile = {idx: tile for idx, tile in tile_list}
+        for i in range(chr_tile_count):
+            if i in idx_to_tile:
+                tile_2bit = idx_to_tile[i] & 3
+                chr_bytes = tile_to_chr(tile_2bit)
+            else:
+                chr_bytes = bytes(16)  # Reserved or unused — zero fill
             f.write("    " + ", ".join(f"0x{b:02X}" for b in chr_bytes) + ",\n")
         f.write("};\n\n")
 
@@ -305,10 +365,10 @@ def main():
                 delta_offsets.append(len(delta_data_all))
                 changes = []
                 for pos in range(960):
-                    if cur_nt0[pos] != next_nt0[pos]:
+                    if pos not in COLLAPSE_TILE_POSITIONS and cur_nt0[pos] != next_nt0[pos]:
                         changes.append((pos, next_nt0[pos]))
                 for pos in range(960):
-                    if cur_nt2[pos] != next_nt2[pos]:
+                    if (pos + 960) not in COLLAPSE_TILE_POSITIONS and cur_nt2[pos] != next_nt2[pos]:
                         changes.append((pos + 960, next_nt2[pos]))
                 max_changes = max(max_changes, len(changes))
                 count = len(changes)

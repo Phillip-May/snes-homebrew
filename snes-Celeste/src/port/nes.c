@@ -109,10 +109,9 @@ static uint8_t s_oamCursor = OAM_PLAYER_END;
 static int8_t  s_oamDirection = 4;  // +4 = forward, -4 = backward
 static uint8_t s_rotateOffset = 0;
 
-// Queue of pending background tile object updates (collapse tiles, breakable walls, etc.)
-#define MAX_PENDING_BG_TILE_UPDATES 8
-static uint8_t s_pendingBgTileUpdates[MAX_PENDING_BG_TILE_UPDATES];
-static uint8_t s_pendingBgTileCount = 0;
+// Bitmask of pending background tile object updates (collapse tiles, breakable walls, etc.)
+// One bit per object slot (supports all 29 objects in 4 bytes, saves RAM vs array)
+static uint32_t s_pendingBgTileMask = 0;
 
 // Pre-calculated VRAM write operations for background tile objects
 // Only 1 processed per frame, static buffer replaces 390-byte stack allocation
@@ -1078,31 +1077,25 @@ void port_buildSpring(uint8_t index) {
 // Queue a background tile object update (called from mainBankZero.c when state changes)
 // Handles collapse tiles, breakable walls, and other background tile objects
 void port_updateCollapseTileNametable(uint8_t index) {
-    // Check if already in queue (avoid duplicates)
-    for (uint8_t i = 0; i < s_pendingBgTileCount; i++) {
-        if (s_pendingBgTileUpdates[i] == index) {
-            return; // Already queued
-        }
-    }
-    // Add to queue if there's space
-    if (s_pendingBgTileCount < MAX_PENDING_BG_TILE_UPDATES) {
-        s_pendingBgTileUpdates[s_pendingBgTileCount++] = index;
+    if (index < 29) {
+        s_pendingBgTileMask |= (1UL << index);
     }
 }
 
 static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
-    if (s_levelAnimActive) return;  // Animation handles its own visuals
-    if (s_pendingBgTileCount == 0) return;
-    
-    // Limit to 1 update per frame
-    const uint8_t MAX_UPDATES_PER_FRAME = 1;
-    uint8_t updates_this_frame = 0;
-    uint8_t processed_count = 0;
-    
-    // Process pending updates (up to MAX_UPDATES_PER_FRAME per frame)
-    while (processed_count < s_pendingBgTileCount && updates_this_frame < MAX_UPDATES_PER_FRAME) {
-        uint8_t index = s_pendingBgTileUpdates[processed_count];
+    if (s_pendingBgTileMask == 0) return;
+
+    // Process 1 pending update per frame (find lowest set bit)
+    uint8_t index;
+    {
+        uint32_t mask = s_pendingBgTileMask;
+        for (index = 0; index < 29; index++) {
+            if (mask & (1UL << index)) break;
+        }
+        if (index >= 29) { s_pendingBgTileMask = 0; return; }
+    }
+    {
         OBJ_DATA *bgTileObj = &GLOBAL_OBJList[index];
         
         uint8_t tileX = bgTileObj->pos.x / 8;
@@ -1251,17 +1244,9 @@ static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count
         }
         
         write->tile_data = tile_entry;
-        updates_this_frame++;
-        processed_count++;
     }
-    
-    // Remove processed updates from queue (shift remaining items)
-    if (processed_count > 0) {
-        for (uint8_t i = 0; i < s_pendingBgTileCount - processed_count; i++) {
-            s_pendingBgTileUpdates[i] = s_pendingBgTileUpdates[i + processed_count];
-        }
-        s_pendingBgTileCount -= processed_count;
-    }
+    // Clear the processed bit
+    s_pendingBgTileMask &= ~(1UL << index);
 }
 
 static void execute_bg_tiles_nametable_writes(const BgTileWrite *writes, uint8_t write_count) {
@@ -1775,7 +1760,7 @@ void port_LoadRoomData(uint16_t roomID) {
     set_prg_bank(1);  // Switch to bank 1 to access level_data array (all levels are in bank 1)
     const LevelData *level = &level_data[level_idx];
     uint8_t level_bank = get_level_bank(level_idx);  // Always returns 1
-    s_pendingBgTileCount = 0;
+    s_pendingBgTileMask = 0;
     GLOBAL_ActiveLevel.currentRoomID = roomID;
     GLOBAL_ActiveLevel.roomSizeX = LEVEL_WIDTH;
     GLOBAL_ActiveLevel.roomSizeY = LEVEL_HEIGHT;
@@ -1814,6 +1799,15 @@ void port_LoadRoomData(uint16_t roomID) {
         s_delta_active = 0;
         set_prg_bank(LEVEL4_ANIM_BANK);
         la_init_bank4();
+        // Copy collapse tile CHR patterns (indices 73-84) from game CHR to $1000
+        // so they render correctly when the game updates nametable during animation.
+        {
+            extern const unsigned char game_chr_data[];
+            set_prg_bank(5);  // game_chr_data is in bank 5
+            for (uint8_t tile = 73; tile <= 84; tile++) {
+                copy_to_ppu(0x1000 + (uint16_t)tile * 16, &game_chr_data[tile * 16], 16);
+            }
+        }
     } else {
         write_nametable();
         fix_collapse_tile_palettes(decompressed_tilemap);

@@ -48,8 +48,13 @@ static uint8_t s_laBufTile[LA_MAX_BUF];
 
 #define LEVEL4_ANIM_BANK 4
 #define LEVEL4_ANIM_SPEED 5
-#define LA_MAX_WRITES_PER_VBLANK 34
-#define LA_ATTR_MERGE_THRESHOLD 20
+// During gameplay, vblank budget is shared with BG tile writes, input, scroll, etc.
+// Title screen uses 34/vblank but has no other work. Gameplay needs a lower limit.
+// 14 tiles × ~26 cycles = ~364 cycles, attrs = ~280 cycles. Safe within remaining budget.
+// ~10 scanlines over at 14. Each tile write ≈ 1 scanline (113 cycles).
+// 10 fewer = 4 writes per vblank. Attrs always deferred to separate vblank.
+#define LA_MAX_WRITES_PER_VBLANK 4
+#define LA_ATTR_MERGE_THRESHOLD 0
 
 // --- Bank 4 functions ---
 
@@ -88,24 +93,54 @@ static void la_load_frame0(uint8_t v) {
 }
 
 // Prepare all tile changes from a delta into the PPU buffer (single shot, buffer is large enough)
+// Prepare delta with even spatial distribution when changes exceed buffer.
+// Instead of taking the first N changes (biased to top of screen),
+// stride across all changes so updates are spread evenly across the screen.
 __attribute__((section(".prg_rom_4.text"), noinline))
 static void la_prepare_delta(const unsigned char *delta) {
-    uint16_t idx = 0;
-    uint16_t count = delta[idx] | ((uint16_t)delta[idx+1] << 8);
-    idx += 2;
+    uint16_t count = delta[0] | ((uint16_t)delta[1] << 8);
+    const unsigned char *changes_start = delta + 2;
     uint8_t *bh = LA_BUF_HI, *bl = LA_BUF_LO, *bt = LA_BUF_TILE;
-    uint8_t n = (count > LA_MAX_BUF) ? LA_MAX_BUF : (uint8_t)count;
-    for (uint8_t i = 0; i < n; i++) {
-        uint16_t pos = delta[idx] | ((uint16_t)delta[idx+1] << 8);
-        uint8_t tile = delta[idx+2]; idx += 3;
-        uint16_t a = (pos < 960) ? (0x2000 + pos) : (0x2800 + pos - 960);
-        bh[i] = (uint8_t)(a >> 8); bl[i] = (uint8_t)a; bt[i] = tile;
+
+    if (count <= LA_MAX_BUF) {
+        // All changes fit — copy directly
+        const unsigned char *p = changes_start;
+        for (uint8_t i = 0; i < (uint8_t)count; i++) {
+            uint16_t pos = p[0] | ((uint16_t)p[1] << 8);
+            uint8_t tile = p[2]; p += 3;
+            uint16_t a = (pos < 960) ? (0x2000 + pos) : (0x2800 + pos - 960);
+            bh[i] = (uint8_t)(a >> 8); bl[i] = (uint8_t)a; bt[i] = tile;
+        }
+        s_ppu_write_count = (uint8_t)count;
+    } else {
+        // More changes than buffer — evenly sample with rotating phase.
+        // Each call shifts the starting offset so different tiles are picked,
+        // ensuring all tiles get updated over multiple animation cycles.
+        static uint8_t s_samplePhase = 0;
+        uint8_t phase = s_samplePhase++;
+        // Simple rotating window: start at (phase * count / 2) mod count,
+        // then stride evenly across all changes.
+        uint16_t stride_fp = (count << 8) / LA_MAX_BUF;  // 8.8 fixed point
+        // Offset the start by half a stride step each phase to pick different samples
+        uint16_t accum = (uint16_t)(phase & 1) * (stride_fp >> 1);
+        for (uint8_t i = 0; i < LA_MAX_BUF; i++) {
+            uint8_t src_idx = (uint8_t)(accum >> 8);
+            if (src_idx >= (uint8_t)count) src_idx -= (uint8_t)count;
+            const unsigned char *p = changes_start + (uint16_t)src_idx * 3;
+            uint16_t pos = p[0] | ((uint16_t)p[1] << 8);
+            uint8_t tile = p[2];
+            uint16_t a = (pos < 960) ? (0x2000 + pos) : (0x2800 + pos - 960);
+            bh[i] = (uint8_t)(a >> 8); bl[i] = (uint8_t)a; bt[i] = tile;
+            accum += stride_fp;
+        }
+        s_ppu_write_count = LA_MAX_BUF;
     }
-    if (count > n) idx += (count - n) * 3;
-    s_ppu_write_count = n;
+
     s_ppu_write_cursor = 0;
     s_flush_rate = LA_MAX_WRITES_PER_VBLANK;
-    for (uint8_t i = 0; i < 64; i++) s_attr_buf[i] = delta[idx++];
+    // Attributes are after all tile changes in the delta data
+    const unsigned char *attr_ptr = changes_start + count * 3;
+    for (uint8_t i = 0; i < 64; i++) s_attr_buf[i] = attr_ptr[i];
     s_delta_active = 1;
 }
 
@@ -127,16 +162,22 @@ static void la_apply_delta_full(const unsigned char *delta) {
 
 __attribute__((section(".prg_rom_4.text"), noinline))
 void la_init_bank4(void) {
+    extern const unsigned char game_chr_data[];
+
     s_levelAnimVariant = 0;
     s_levelAnimFrame = 0;
     s_levelAnimTimer = 0;
+
     // Write animation BG tiles to $1000 (sprite pattern table area).
     // During level 4, PPU_CTRL bit 4 is set so BG reads from $1000.
     // Game sprites continue reading from $0000 (untouched).
-    vram_adr(0x1000);  // Write to second pattern table
+    vram_adr(0x1000);
     for (uint16_t i = 0; i < sizeof(level4_anim_chr_tiles); i++) {
         vram_put(level4_anim_chr_tiles[i]);
     }
+
+    // Collapse tile CHR patterns are copied by port_LoadRoomData (fixed bank)
+    // before this function is called, since we can't switch PRG banks from bank 4.
 
     la_load_frame0(0);
     for (uint8_t i = 0; i < 16; i++) palette_ram[i] = level4_anim_bg_palette[i];
