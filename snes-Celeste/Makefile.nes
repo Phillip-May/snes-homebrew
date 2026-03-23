@@ -21,7 +21,7 @@ NES_CONFIG_POSIX    := $(LLVM_MOS_PATH_POSIX)/bin/mos-nes-unrom-512.cfg
 NES_CFLAGS   := -Os -flto -ffunction-sections -fdata-sections -fomit-frame-pointer -fno-common -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signaling-nans -Wall -Wextra -Wno-unused-parameter -std=c17
 NES_PORT_CFLAGS := -Os -flto -ffunction-sections -fdata-sections -fomit-frame-pointer -funroll-loops -finline-functions -fno-strict-aliasing -fno-common -fno-stack-protector -fno-math-errno -fno-trapping-math -fno-signaling-nans -fno-signed-zeros -fno-rounding-math -Wall -Wextra -Wno-unused-parameter -std=c17
 NES_INCLUDES := -I$(SRC_DIR) -I$(PORT_DIR) -I$(SHARED_DIR) -I$(LIBFIX_DIR) -Ipython -I$(LLVM_MOS_PATH_POSIX)/mos-platform/nes/include
-NES_LDFLAGS  := '-Wl,-Map=$(BUILD_DIR)/celeste-nes.map' '-Wl,--gc-sections' '-Wl,--relax' '-Wl,--defsym=__chr_rom_size=16'
+NES_LDFLAGS  := '-Wl,-Map=$(BUILD_DIR)/celeste-nes.map' '-Wl,--gc-sections' '-Wl,--relax' '-Wl,--defsym=__chr_rom_size=0' '-Wl,--defsym=__chr_ram_size=8'
 NES_LIBS     := -lneslib
 # FamiStudio Sound Engine (compiled from CA65 source, placed in bank 7)
 
@@ -29,9 +29,9 @@ NES_ROM      := $(BUILD_DIR)/celeste-nes.nes
 NES_ROM_TEMP := $(BUILD_DIR)/celeste-nes-temp.nes
 NES_OBJECTS  := $(BUILD_DIR)/mainBankZero.o \
                 $(BUILD_DIR)/nes_port.o \
+                $(BUILD_DIR)/nes_level4_anim.o \
+                $(BUILD_DIR)/nes_chr_data.o \
                 $(BUILD_DIR)/fix16.o \
-                $(BUILD_DIR)/sprite_chr.o \
-                $(BUILD_DIR)/title_chr.o \
                 $(BUILD_DIR)/music_data.o \
                 $(BUILD_DIR)/famistudio_engine.o
 
@@ -48,17 +48,18 @@ $(BUILD_DIR)/mainBankZero.o: $(SRC_DIR)/mainBankZero.c
 $(BUILD_DIR)/nes_port.o: $(PORT_DIR)/nes.c
 	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_PORT_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes.c' -o '$(BUILD_DIR)/nes_port.o' }"
 
+# Level 4 animation: separate TU, no LTO, so bank section attributes are respected
+NES_NOLTO_CFLAGS := $(subst -flto,,$(NES_PORT_CFLAGS))
+$(BUILD_DIR)/nes_level4_anim.o: $(PORT_DIR)/nes_level4_anim.c
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_NOLTO_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes_level4_anim.c' -o '$(BUILD_DIR)/nes_level4_anim.o' }"
+
 $(BUILD_DIR)/fix16.o: $(LIBFIX_DIR)/fix16.c
 	@echo [NES] Compiling $<
 	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_CFLAGS) $(NES_INCLUDES) -c '$(LIBFIX_DIR)/fix16.c' -o '$(BUILD_DIR)/fix16.o' }"
 
-$(BUILD_DIR)/sprite_chr.o: $(SRC_DIR)/assets/sprite_chr.s python/sprite_chr_combined.bin
-	@echo [NES] Assembling $<
-	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' -c '$(SRC_DIR)/assets/sprite_chr.s' -o '$(BUILD_DIR)/sprite_chr.o' }"
-
-$(BUILD_DIR)/title_chr.o: $(SRC_DIR)/assets/title_chr.s python/title_chr.bin
-	@echo [NES] Assembling title CHR
-	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' -c '$(SRC_DIR)/assets/title_chr.s' -o '$(BUILD_DIR)/title_chr.o' }"
+# CHR data in PRG-ROM: separate TU, no LTO, so bank section attributes are respected
+$(BUILD_DIR)/nes_chr_data.o: $(PORT_DIR)/nes_chr_data.c python/sprite_chr_combined.inc python/title_chr.inc
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_NOLTO_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes_chr_data.c' -o '$(BUILD_DIR)/nes_chr_data.o' }"
 
 # FamiTone2 objects with sections redirected to bank 7
 # Pre-built by: scripts/build_ft2_bank7.sh (run once, or after llvm-mos update)
@@ -75,7 +76,7 @@ $(BUILD_DIR)/music_data.o: $(SRC_DIR)/assets/music_data.s
 
 $(NES_ROM_TEMP): $(NES_OBJECTS)
 	@echo [NES] Linking $(NES_ROM_TEMP)
-	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/sprite_chr.o' '$(BUILD_DIR)/title_chr.o' '$(BUILD_DIR)/famistudio_engine.o' '$(BUILD_DIR)/music_data.o' $(NES_LIBS) -o '$(NES_ROM_TEMP)' }"
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/nes_chr_data.o' '$(BUILD_DIR)/nes_level4_anim.o' '$(BUILD_DIR)/famistudio_engine.o' '$(BUILD_DIR)/music_data.o' $(NES_LIBS) -o '$(NES_ROM_TEMP)' }"
 
 $(NES_ROM): $(NES_ROM_TEMP)
 	@echo [NES] Setting horizontal mirroring in iNES header

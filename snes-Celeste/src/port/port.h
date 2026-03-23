@@ -228,6 +228,7 @@ uint8_t port_getInputs(void);
 void port_vblank(void);
 void port_LoadRoomData(uint16_t roomID);
 void port_restoreCollisionFlags(void); // Re-derive collision from ROM (for future collisionFlagsReset removal)
+void port_levelAnimAdvance(void); // Advance level animation on display frame (level 4)
 
 #define BANK_MUSIC 7 // Reserved for FamiStudio driver + song data
 

@@ -1,0 +1,341 @@
+#!/usr/bin/env python
+"""
+Convert level animation PNGs (Level4A.png, Level4B.png) to NES data.
+
+Each image contains 12 animation frames laid out horizontally (3072x480).
+Each frame is 256x480 (two NES nametables: NT0 + NT2).
+
+Builds its OWN tile dictionary from all frames of both images (like
+convert_title_screen.py). Generates a dedicated CHR bank (level4_chr.bin)
+with the unique BG tiles + the game's sprite pattern table.
+
+Outputs:
+  - level4_chr.bin         : 8KB CHR bank (BG tiles + sprite tiles)
+  - level4_anim_data.h     : C header with RLE nametables, attributes, deltas, palette
+"""
+
+import os
+import numpy as np
+from PIL import Image
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LEVEL_DIR = os.path.join(SCRIPT_DIR, "overrides", "nes", "levels")
+OUTPUT_DIR = SCRIPT_DIR
+
+FRAME_COUNT = 12
+FRAME_WIDTH = 256
+FRAME_HEIGHT = 480
+TILES_X = 32
+TILES_Y = 60
+
+# The game area is 32 tile rows (256px) starting at image tile row 28 (pixel 224).
+# Map these to NT0 rows 0-29 + NT2 rows 0-1 (matching write_nametable layout).
+GAME_START_ROW = 28  # First image tile row with game content
+GAME_ROWS = 32       # 16 game tiles * 2 NES tiles each
+NT0_ROWS = 30        # NES nametable 0 rows
+NT2_GAME_ROWS = 2    # Overflow into NT2
+
+NES_PALETTE = [
+    (84,84,84),    (0,30,116),    (8,16,144),    (48,0,136),
+    (68,0,100),    (92,0,48),     (84,4,0),      (60,24,0),
+    (32,42,0),     (8,58,0),      (0,64,0),      (0,60,0),
+    (0,50,60),     (0,0,0),       (0,0,0),        (0,0,0),
+    (152,150,152), (8,76,196),    (48,50,236),   (92,30,228),
+    (136,20,176),  (160,20,100),  (152,34,32),   (120,60,0),
+    (84,90,0),     (40,114,0),    (8,124,0),     (0,118,40),
+    (0,102,120),   (0,0,0),       (0,0,0),        (0,0,0),
+    (236,238,236), (76,154,236),  (120,124,236), (176,98,236),
+    (228,84,236),  (236,88,180),  (236,106,100), (212,136,32),
+    (160,170,0),   (116,196,0),   (76,208,32),   (56,204,108),
+    (56,180,204),  (60,60,60),    (0,0,0),        (0,0,0),
+    (236,238,236), (168,204,236), (188,188,236), (212,178,236),
+    (236,174,236), (236,174,212), (236,180,176), (228,196,144),
+    (204,210,120), (180,222,120), (168,226,144), (152,226,180),
+    (160,214,228), (160,162,160), (0,0,0),        (0,0,0),
+]
+
+def rgb_to_nes_index(r, g, b):
+    if r == 0 and g == 0 and b == 0:
+        return 0x0F
+    best_idx = 0x0F
+    best_dist = float('inf')
+    for idx, (pr, pg, pb) in enumerate(NES_PALETTE):
+        if idx in (0x0D, 0x0E, 0x0F, 0x1D, 0x1E, 0x1F, 0x2D, 0x2E, 0x2F, 0x3D, 0x3E, 0x3F):
+            if not (r == 0 and g == 0 and b == 0):
+                continue
+        dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
+        if dist < best_dist:
+            best_dist = dist
+            best_idx = idx
+    return best_idx
+
+def tile_to_chr(tile_pixels):
+    """Convert 8x8 tile (2-bit pixel values 0-3) to 16-byte NES CHR format."""
+    chr_data = bytearray(16)
+    for row in range(8):
+        bp0 = 0
+        bp1 = 0
+        for col in range(8):
+            pixel = tile_pixels[row, col] & 3
+            bp0 |= ((pixel >> 0) & 1) << (7 - col)
+            bp1 |= ((pixel >> 1) & 1) << (7 - col)
+        chr_data[row] = bp0
+        chr_data[row + 8] = bp1
+    return bytes(chr_data)
+
+def rle_encode(data):
+    encoded = []
+    i = 0
+    while i < len(data):
+        val = data[i]
+        run = 1
+        while i + run < len(data) and data[i + run] == val and run < 128:
+            run += 1
+        encoded.append(run - 1)
+        encoded.append(val)
+        i += run
+    return encoded
+
+def process_image(img, tile_dict):
+    """Process one level animation image using the tile dictionary.
+
+    Extracts the 32-row game area (starting at GAME_START_ROW in the image)
+    and maps it to NT0 rows 0-29 + NT2 rows 0-1, matching the normal
+    write_nametable() layout. Empty tile (index 0, black) fills unused rows.
+    """
+    data = np.array(img)
+    # Find the empty tile index (all-zero pixels)
+    empty_key = np.zeros((8, 8), dtype=data.dtype).tobytes()
+    empty_idx = tile_dict.get(empty_key, 0)
+
+    frames = []
+    for f in range(FRAME_COUNT):
+        frame = data[:, f * FRAME_WIDTH:(f + 1) * FRAME_WIDTH]
+
+        # Extract game area tiles and palettes (32 rows from GAME_START_ROW)
+        game_tiles = []  # 32 rows of 32 tile indices
+        game_pals = []   # 32 rows of 32 palette values
+        for gy in range(GAME_ROWS):
+            img_row = GAME_START_ROW + gy
+            row_tiles = []
+            row_pal = []
+            for tx in range(TILES_X):
+                tile = frame[img_row * 8:(img_row + 1) * 8, tx * 8:(tx + 1) * 8]
+                key = tile.tobytes()
+                row_tiles.append(tile_dict[key])
+                nonzero = tile[tile > 0]
+                row_pal.append(int(nonzero[0]) // 4 if len(nonzero) > 0 else 0)
+            game_tiles.append(row_tiles)
+            game_pals.append(row_pal)
+
+        # Build NT0: game rows 0-29 (first 30 of 32 game tile rows)
+        nt0 = []
+        nt0_pals = []
+        for row in range(NT0_ROWS):
+            if row < GAME_ROWS:
+                nt0.extend(game_tiles[row])
+                nt0_pals.append(game_pals[row])
+            else:
+                nt0.extend([empty_idx] * TILES_X)
+                nt0_pals.append([0] * TILES_X)
+
+        # Build NT2: game rows 30-31, then empty for the rest
+        nt2 = []
+        nt2_pals = []
+        for row in range(30):  # Full 30-row nametable
+            game_row = NT0_ROWS + row  # Offset from game area
+            if game_row < GAME_ROWS:
+                nt2.extend(game_tiles[game_row])
+                nt2_pals.append(game_pals[game_row])
+            else:
+                nt2.extend([empty_idx] * TILES_X)
+                nt2_pals.append([0] * TILES_X)
+
+        # Build attribute tables
+        def build_attributes(tile_pals):
+            attrs = []
+            for ay in range(8):
+                for ax in range(8):
+                    tx_base = ax * 4
+                    ty_base = ay * 4
+                    def get_pal(tx, ty):
+                        if ty >= len(tile_pals) or tx >= TILES_X:
+                            return 0
+                        return tile_pals[ty][tx]
+                    tl = get_pal(tx_base, ty_base)
+                    tr = get_pal(tx_base + 2, ty_base)
+                    bl = get_pal(tx_base, ty_base + 2)
+                    br = get_pal(tx_base + 2, ty_base + 2)
+                    attrs.append((tl & 3) | ((tr & 3) << 2) | ((bl & 3) << 4) | ((br & 3) << 6))
+            return attrs
+
+        nt0_attrs = build_attributes(nt0_pals)
+        nt2_attrs = build_attributes(nt2_pals)
+        frames.append((nt0, nt2, nt0_attrs, nt2_attrs))
+    return frames
+
+def main():
+    img_a = Image.open(os.path.join(LEVEL_DIR, "Level4A.png"))
+    img_b = Image.open(os.path.join(LEVEL_DIR, "Level4B.png"))
+    print(f"Level4A: {img_a.size}, Level4B: {img_b.size}")
+
+    # Build combined tile dictionary from both images (like convert_title_screen.py)
+    tile_dict = {}   # key: tile.tobytes() -> index
+    tile_list = []   # list of numpy 8x8 tiles
+
+    for img in [img_a, img_b]:
+        data = np.array(img)
+        for f in range(FRAME_COUNT):
+            frame = data[:, f * FRAME_WIDTH:(f + 1) * FRAME_WIDTH]
+            for ty in range(TILES_Y):
+                for tx in range(TILES_X):
+                    tile = frame[ty * 8:(ty + 1) * 8, tx * 8:(tx + 1) * 8]
+                    key = tile.tobytes()
+                    if key not in tile_dict:
+                        tile_dict[key] = len(tile_list)
+                        tile_list.append(tile)
+
+    print(f"Total unique tiles: {len(tile_list)}")
+    assert len(tile_list) <= 256, f"Too many unique tiles: {len(tile_list)} > 256"
+
+    # Generate CHR tile data (2bpp planar format)
+    chr_bin = bytearray()
+    for tile in tile_list:
+        tile_2bit = tile & 3  # Keep only low 2 bits (color within palette)
+        chr_bin.extend(tile_to_chr(tile_2bit))
+
+    # Pad BG pattern table to 4KB (256 tiles)
+    while len(chr_bin) < 4096:
+        chr_bin.extend(b'\x00' * 16)
+
+    # Sprite pattern table: copy from sprite_chr_combined.bin second half
+    # so game sprites still work when CHR bank 2 is active
+    sprite_chr_path = os.path.join(SCRIPT_DIR, "sprite_chr_combined.bin")
+    with open(sprite_chr_path, "rb") as f:
+        sprite_chr_data = f.read()
+    sprite_pattern_table = sprite_chr_data[4096:8192]  # Second 4KB = sprite tiles
+    chr_bin.extend(sprite_pattern_table)
+
+    assert len(chr_bin) == 8192, f"CHR bank should be 8KB, got {len(chr_bin)}"
+
+    chr_path = os.path.join(OUTPUT_DIR, "level4_chr.bin")
+    with open(chr_path, "wb") as f:
+        f.write(chr_bin)
+    print(f"Wrote {chr_path} ({len(chr_bin)} bytes, {len(tile_list)} unique BG tiles)")
+
+    # Process nametable frames using tile dictionary
+    frames_a = process_image(img_a, tile_dict)
+    frames_b = process_image(img_b, tile_dict)
+
+    # Extract palette
+    pal_rgb = img_a.getpalette()
+    nes_palette = []
+    for i in range(16):
+        r, g, b = pal_rgb[i * 3], pal_rgb[i * 3 + 1], pal_rgb[i * 3 + 2]
+        nes_palette.append(rgb_to_nes_index(r, g, b))
+
+    # Generate C header
+    h_path = os.path.join(OUTPUT_DIR, "level4_anim_data.h")
+    with open(h_path, "w") as f:
+        f.write("// Auto-generated by convert_level_anim.py\n")
+        f.write("// Level 4 animation data for NES Celeste\n")
+        f.write("// Uses dedicated CHR bank 2 with custom tiles\n")
+        f.write("#ifndef LEVEL4_ANIM_DATA_H\n")
+        f.write("#define LEVEL4_ANIM_DATA_H\n\n")
+        f.write("#include <stdint.h>\n\n")
+        f.write(f"#define LEVEL4_ANIM_FRAME_COUNT {FRAME_COUNT}\n\n")
+
+        # Palette in bank 4
+        f.write("__attribute__((section(\".prg_rom_4\")))\n")
+        f.write("static const unsigned char level4_anim_bg_palette[16] = {\n")
+        for pal in range(4):
+            colors = [f"0x{nes_palette[pal * 4 + c]:02X}" for c in range(4)]
+            f.write(f"    {', '.join(colors)},  // Palette {pal}\n")
+        f.write("};\n\n")
+
+        # Animation BG tile CHR data (tiles 0..N, 16 bytes each, 2bpp planar)
+        f.write(f"#define LEVEL4_ANIM_CHR_TILE_COUNT {len(tile_list)}\n\n")
+        f.write("__attribute__((section(\".prg_rom_4\")))\n")
+        f.write(f"static const unsigned char level4_anim_chr_tiles[{len(tile_list) * 16}] = {{\n")
+        for tile in tile_list:
+            tile_2bit = tile & 3
+            chr_bytes = tile_to_chr(tile_2bit)
+            f.write("    " + ", ".join(f"0x{b:02X}" for b in chr_bytes) + ",\n")
+        f.write("};\n\n")
+
+        bank = 4
+        section_attr = f'__attribute__((section(".prg_rom_{bank}")))'
+
+        for variant_idx, (variant_name, frames) in enumerate([("a", frames_a), ("b", frames_b)]):
+            nt0_0, nt2_0, attr0_nt0, attr0_nt2 = frames[0]
+
+            rle_nt0 = rle_encode(nt0_0)
+            rle_nt0.append(0xFF)
+            f.write(f"{section_attr}\nstatic const unsigned char level4_anim_nt0_rle_{variant_name}[] = {{\n")
+            for i in range(0, len(rle_nt0), 16):
+                chunk = rle_nt0[i:i + 16]
+                f.write(f"    {', '.join(f'0x{x:02X}' for x in chunk)},\n")
+            f.write("};\n\n")
+
+            rle_nt2 = rle_encode(nt2_0)
+            rle_nt2.append(0xFF)
+            f.write(f"{section_attr}\nstatic const unsigned char level4_anim_nt2_rle_{variant_name}[] = {{\n")
+            for i in range(0, len(rle_nt2), 16):
+                chunk = rle_nt2[i:i + 16]
+                f.write(f"    {', '.join(f'0x{x:02X}' for x in chunk)},\n")
+            f.write("};\n\n")
+
+            f.write(f"{section_attr}\nstatic const unsigned char level4_anim_attr0_nt0_{variant_name}[64] = {{\n")
+            for i in range(0, 64, 8):
+                f.write(f"    {', '.join(f'0x{x:02X}' for x in attr0_nt0[i:i+8])},\n")
+            f.write("};\n\n")
+
+            f.write(f"{section_attr}\nstatic const unsigned char level4_anim_attr0_nt2_{variant_name}[64] = {{\n")
+            for i in range(0, 64, 8):
+                f.write(f"    {', '.join(f'0x{x:02X}' for x in attr0_nt2[i:i+8])},\n")
+            f.write("};\n\n")
+
+            delta_data_all = []
+            delta_offsets = []
+            max_changes = 0
+            for frame_idx in range(FRAME_COUNT):
+                next_idx = (frame_idx + 1) % FRAME_COUNT
+                cur_nt0, cur_nt2, _, _ = frames[frame_idx]
+                next_nt0, next_nt2, next_attr0, next_attr2 = frames[next_idx]
+                delta_offsets.append(len(delta_data_all))
+                changes = []
+                for pos in range(960):
+                    if cur_nt0[pos] != next_nt0[pos]:
+                        changes.append((pos, next_nt0[pos]))
+                for pos in range(960):
+                    if cur_nt2[pos] != next_nt2[pos]:
+                        changes.append((pos + 960, next_nt2[pos]))
+                max_changes = max(max_changes, len(changes))
+                count = len(changes)
+                delta_data_all.append(count & 0xFF)
+                delta_data_all.append((count >> 8) & 0xFF)
+                for pos, tile in changes:
+                    delta_data_all.append(pos & 0xFF)
+                    delta_data_all.append((pos >> 8) & 0xFF)
+                    delta_data_all.append(tile)
+                delta_data_all.extend(next_attr0)
+                delta_data_all.extend(next_attr2)
+
+            print(f"  Variant {variant_name.upper()}: max {max_changes} changes, delta {len(delta_data_all)} bytes")
+
+            f.write(f"{section_attr}\nstatic const uint16_t level4_anim_delta_offsets_{variant_name}[LEVEL4_ANIM_FRAME_COUNT] = {{\n")
+            for i in range(0, FRAME_COUNT, 6):
+                f.write(f"    {', '.join(str(x) for x in delta_offsets[i:i+6])},\n")
+            f.write("};\n\n")
+
+            f.write(f"{section_attr}\nstatic const unsigned char level4_anim_delta_{variant_name}[] = {{\n")
+            for i in range(0, len(delta_data_all), 16):
+                chunk = delta_data_all[i:i + 16]
+                f.write(f"    {', '.join(f'0x{x:02X}' for x in chunk)},\n")
+            f.write("};\n\n")
+
+        f.write("#endif // LEVEL4_ANIM_DATA_H\n")
+    print(f"Wrote {h_path}")
+
+if __name__ == "__main__":
+    main()

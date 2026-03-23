@@ -75,6 +75,7 @@ static void fs_play(uint8_t song) {
 #include "../../python/tilemap_level30_nes.h"
 #include "../../python/tilemap_level31_nes.h"
 #include "../../python/title_screen_data.h"
+// level4_anim_data.h is included only in nes_level4_anim.c (non-LTO TU)
 
 #ifndef _WIN32 //Fix linter
 #include <neslib.h>
@@ -92,7 +93,7 @@ static void fs_play(uint8_t song) {
 
 extern uint8_t OAM_BUF[];
 
-static volatile uint8_t s_inputState = 0;
+volatile uint8_t s_inputState = 0;  // Non-static: shared with nes_level4_anim.c
 static uint8_t s_scrollY = 0; // Vertical scroll position
 static uint8_t s_frameCounter = 0; // For screenshake pattern
 
@@ -132,7 +133,7 @@ extern OBJ_DATA GLOBAL_OBJList[];
 // Palette data stored in RAM (for background and sprite palettes)
 // Lower 16 bytes (0-15): 4 background palettes * 4 colors
 // Upper 16 bytes (16-31): 4 sprite palettes * 4 colors
-static uint8_t palette_ram[32];
+uint8_t palette_ram[32];  // Non-static: shared with nes_level4_anim.c
 
 // Fixed level dimensions (all levels are 16x16 = 256 tiles)
 #define LEVEL_WIDTH 16
@@ -567,11 +568,12 @@ static void title_write_attributes(const unsigned char *attr_data) {
 #define TITLE_PPU_BUF_ADDR_HI  ((uint8_t *)GLOBAL_OBJList)
 #define TITLE_PPU_BUF_ADDR_LO  ((uint8_t *)GLOBAL_OBJList + 82)
 #define TITLE_PPU_BUF_TILE     ((uint8_t *)GLOBAL_OBJList + 164)
-static uint8_t  s_ppu_write_count;   // Number of buffered tile writes
-static uint8_t  s_ppu_write_cursor;  // How many writes sent to PPU so far
-static uint8_t  s_attr_buf[64];      // Buffered attribute data
-static uint8_t  s_delta_active;      // 1 = update in progress
-static uint8_t  s_flush_rate;        // Tiles per vblank (34 normal, lower for wrap)
+// Non-static: shared with nes_level4_anim.c
+uint8_t  s_ppu_write_count;
+uint8_t  s_ppu_write_cursor;
+uint8_t  s_attr_buf[64];
+uint8_t  s_delta_active;
+uint8_t  s_flush_rate;
 
 // Decode a delta from banked ROM into the write buffer (call during visible frame).
 // PRG bank must be set before calling.
@@ -693,9 +695,20 @@ static void title_load_frame0(uint8_t variant) {
     set_prg_bank(0);
 }
 
+// Forward declarations for CHR-RAM helpers (defined after title_screen_loop)
+static void copy_to_ppu(uint16_t ppu_addr, const unsigned char *src, uint16_t count);
+static void load_game_chr(void);
+
 // Run the title screen loop. Returns when player presses START.
 static void title_screen_loop(void) {
-    set_chr_bank(1);  // Switch to title screen CHR tiles
+    // Load title CHR tiles to CHR-RAM (single bank, replaces game tiles)
+    {
+        extern const unsigned char title_chr_data[];
+        ppu_off();
+        set_prg_bank(3);
+        copy_to_ppu(0x0000, title_chr_data, 8192);
+        set_prg_bank(0);
+    }
 
     // Load title palette
     for (uint8_t i = 0; i < 16; i++) {
@@ -810,9 +823,36 @@ static void title_screen_loop(void) {
         }
     }
 
-    // Transition to game: restore game CHR and PPU settings
-    set_chr_bank(0);  // Switch back to game CHR tiles
+    // Transition to game: restore game CHR tiles to CHR-RAM and PPU settings
+    ppu_off();
+    load_game_chr();
     PPU_CTRL = 0x88;  // NMI enabled, sprite pattern $1000, nametable $2000
+}
+
+// --- Level 4 Animation (implemented in nes_level4_anim.c) ---
+// Extern declarations for state shared with the animation module
+extern uint8_t s_levelAnimActive;
+extern void la_init_bank4(void);
+extern void port_levelAnimFlush(void);
+
+#define LEVEL4_ANIM_BANK 4
+
+// Level animation functions are in nes_level4_anim.c (separate TU, no LTO)
+// Remaining old code removed — everything below this line is unrelated to level animation.
+// Copy data to PPU CHR-RAM at a given address (call with PPU off)
+static void copy_to_ppu(uint16_t ppu_addr, const unsigned char *src, uint16_t count) {
+    vram_adr(ppu_addr);
+    for (uint16_t i = 0; i < count; i++) {
+        vram_put(src[i]);
+    }
+}
+
+// Load game CHR tiles to CHR-RAM (single 8KB bank, call with PPU off)
+static void load_game_chr(void) {
+    extern const unsigned char game_chr_data[];
+    set_prg_bank(5);
+    copy_to_ppu(0x0000, game_chr_data, 8192);
+    set_prg_bank(0);
 }
 
 void port_init(void) {
@@ -822,6 +862,10 @@ void port_init(void) {
     ppu_off();
     oam_clear();
     oam_size(0);
+
+    // Initialize CHR-RAM with game tiles (single 8KB bank, no bank switching)
+    load_game_chr();
+
     ppu_on_all();
     PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
     ppu_wait_nmi();  // First NMI sets NTSC_MODE — must happen before music init
@@ -1048,6 +1092,7 @@ void port_updateCollapseTileNametable(uint8_t index) {
 
 static void prepare_bg_tiles_nametable(BgTileWrite *writes, uint8_t *write_count) {
     *write_count = 0;
+    if (s_levelAnimActive) return;  // Animation handles its own visuals
     if (s_pendingBgTileCount == 0) return;
     
     // Limit to 1 update per frame
@@ -1534,6 +1579,7 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
     execute_bg_tiles_nametable_writes(bgTileWrites, bgTileWriteCount);
+    port_levelAnimFlush();  // Flush level animation delta (bank 6 is active)
     set_prg_bank(0);
     update_player_hair_color();
 
@@ -1544,6 +1590,11 @@ __attribute__((noinline)) void port_vblank(void) {
         s_frameCounter++;
     }
     
+    // Level 4 animation: BG pattern table at $1000, sprites stay at $0000
+    // On other levels: BG at $0000 (default after NMI)
+    if (s_levelAnimActive) {
+        PPU_CTRL = 0x90;  // NMI on, BG from $1000, sprites from $0000
+    }
     PPU_SCROLL = 0;
     PPU_SCROLL = (uint8_t)CLAMP((int16_t)s_scrollY + shakeOffset, 0, 255);
 }
@@ -1749,9 +1800,25 @@ void port_LoadRoomData(uint16_t roomID) {
     const LevelData *level_for_objects = &level_data[level_idx];  // Re-get pointer while in bank 1
     memcpy(GLOBAL_ActiveLevel.objectData, level_for_objects->objects, level_for_objects->object_count * 3);
     GLOBAL_ActiveLevel.scrollPointY = 72;
-    write_nametable();
-    fix_collapse_tile_palettes(decompressed_tilemap);
-    load_background_palettes();
+    // Deactivate level animation when leaving level 4
+    // No CHR restore needed — animation tiles are at $1000, game tiles at $0000 are untouched.
+    // PPU_CTRL will revert to default (BG from $0000) on next vblank.
+    if (s_levelAnimActive && roomID != 4) {
+        s_levelAnimActive = 0;
+        s_delta_active = 0;
+    }
+    if (roomID == 4) {
+        // la_init_bank4 writes animation tiles to $1000.
+        // port_vblank sets PPU_CTRL bit 4 so BG reads from $1000 during level 4.
+        s_levelAnimActive = 1;
+        s_delta_active = 0;
+        set_prg_bank(LEVEL4_ANIM_BANK);
+        la_init_bank4();
+    } else {
+        write_nametable();
+        fix_collapse_tile_palettes(decompressed_tilemap);
+        load_background_palettes();
+    }
     load_sprite_palettes();
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
     ppu_on_all();

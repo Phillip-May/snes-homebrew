@@ -2120,6 +2120,7 @@ void onVblank(void) {
         }
 
         updateAllObjects();
+        port_levelAnimAdvance();
     }
 }
 
