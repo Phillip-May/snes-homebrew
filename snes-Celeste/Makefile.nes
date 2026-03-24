@@ -30,6 +30,9 @@ NES_ROM_TEMP := $(BUILD_DIR)/celeste-nes-temp.nes
 NES_OBJECTS  := $(BUILD_DIR)/mainBankZero.o \
                 $(BUILD_DIR)/nes_port.o \
                 $(BUILD_DIR)/nes_level4_anim.o \
+                $(BUILD_DIR)/nes_level4_flush.o \
+                $(BUILD_DIR)/nes_title_flush.o \
+                $(BUILD_DIR)/nes_title_flush_wrap.o \
                 $(BUILD_DIR)/nes_chr_data.o \
                 $(BUILD_DIR)/fix16.o \
                 $(BUILD_DIR)/music_data.o \
@@ -52,6 +55,15 @@ $(BUILD_DIR)/nes_port.o: $(PORT_DIR)/nes.c
 NES_NOLTO_CFLAGS := $(subst -flto,,$(NES_PORT_CFLAGS))
 $(BUILD_DIR)/nes_level4_anim.o: $(PORT_DIR)/nes_level4_anim.c
 	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_NOLTO_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes_level4_anim.c' -o '$(BUILD_DIR)/nes_level4_anim.o' }"
+
+$(BUILD_DIR)/nes_title_flush_wrap.o: $(PORT_DIR)/nes_title_flush_wrap.c
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_NOLTO_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes_title_flush_wrap.c' -o '$(BUILD_DIR)/nes_title_flush_wrap.o' }"
+
+$(BUILD_DIR)/nes_title_flush.o: $(PORT_DIR)/nes_title_flush.c
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_NOLTO_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes_title_flush.c' -o '$(BUILD_DIR)/nes_title_flush.o' }"
+
+$(BUILD_DIR)/nes_level4_flush.o: $(PORT_DIR)/nes_level4_flush.c
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_NOLTO_CFLAGS) $(NES_INCLUDES) -c '$(PORT_DIR)/nes_level4_flush.c' -o '$(BUILD_DIR)/nes_level4_flush.o' }"
 
 $(BUILD_DIR)/fix16.o: $(LIBFIX_DIR)/fix16.c
 	@echo [NES] Compiling $<
@@ -76,7 +88,7 @@ $(BUILD_DIR)/music_data.o: $(SRC_DIR)/assets/music_data.s
 
 $(NES_ROM_TEMP): $(NES_OBJECTS)
 	@echo [NES] Linking $(NES_ROM_TEMP)
-	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/nes_chr_data.o' '$(BUILD_DIR)/nes_level4_anim.o' '$(BUILD_DIR)/famistudio_engine.o' '$(BUILD_DIR)/music_data.o' $(NES_LIBS) -o '$(NES_ROM_TEMP)' }"
+	@powershell -NoLogo -NoProfile -Command "& { if (-not (Test-Path '$(BUILD_DIR)')) { New-Item -ItemType Directory -Path '$(BUILD_DIR)' | Out-Null }; & '$(NES_CLANG_POSIX)' --config '$(NES_CONFIG_POSIX)' $(NES_LDFLAGS) '$(BUILD_DIR)/mainBankZero.o' '$(BUILD_DIR)/nes_port.o' '$(BUILD_DIR)/fix16.o' '$(BUILD_DIR)/nes_chr_data.o' '$(BUILD_DIR)/nes_level4_anim.o' '$(BUILD_DIR)/nes_level4_flush.o' '$(BUILD_DIR)/nes_title_flush.o' '$(BUILD_DIR)/nes_title_flush_wrap.o' '$(BUILD_DIR)/famistudio_engine.o' '$(BUILD_DIR)/music_data.o' $(NES_LIBS) -o '$(NES_ROM_TEMP)' }"
 
 $(NES_ROM): $(NES_ROM_TEMP)
 	@echo [NES] Setting horizontal mirroring in iNES header

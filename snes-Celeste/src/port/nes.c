@@ -504,7 +504,7 @@ extern const unsigned char music_data_untitled[];
 
 #define TITLE_BANK_A 2
 #define TITLE_BANK_B 3
-#define TITLE_ANIM_SPEED 10  // Game frames per animation frame (~6 fps)
+#define TITLE_ANIM_SPEED 6  // 60Hz / 6 = 10fps animation (was 10 = 6fps)
 
 // Palette 3, color 2 text fade: NES color values per animation frame
 // Text "press select to change gfx" uses pixel value 14 = palette 3, color 2 ($3F0E)
@@ -559,104 +559,16 @@ static void title_write_attributes(const unsigned char *attr_data) {
 // After neslib NMI (~800 cycles), ~1400 cycles remain. 34 tiles proven safe.
 // Attributes cost ~280 cycles. When the last tile batch is small (<=23 tiles,
 // ~600 cycles), attributes are merged into the same vblank to save a frame.
-#define TITLE_MAX_WRITES_PER_VBLANK 34
-#define TITLE_ATTR_MERGE_THRESHOLD 20  // max tiles in last batch to merge attrs
-
-// Three parallel arrays for 8-bit indexed PPU writes (max 82 entries)
-// Overlaid on GLOBAL_OBJList (game isn't running during title screen)
-#define TITLE_PPU_BUF_ADDR_HI  ((uint8_t *)GLOBAL_OBJList)
-#define TITLE_PPU_BUF_ADDR_LO  ((uint8_t *)GLOBAL_OBJList + 82)
-#define TITLE_PPU_BUF_TILE     ((uint8_t *)GLOBAL_OBJList + 164)
-// Non-static: shared with nes_level4_anim.c
+// Shared animation state (used by title screen and level 4 animation)
 uint8_t  s_ppu_write_count;
 uint8_t  s_ppu_write_cursor;
 uint8_t  s_attr_buf[64];
 uint8_t  s_delta_active;
 uint8_t  s_flush_rate;
 
-// Decode a delta from banked ROM into the write buffer (call during visible frame).
-// PRG bank must be set before calling.
-static void title_prepare_delta(const unsigned char *delta) {
-    uint16_t idx = 0;
-    uint16_t count = delta[idx] | ((uint16_t)delta[idx + 1] << 8);
-    idx += 2;
-
-    uint8_t *buf_hi = TITLE_PPU_BUF_ADDR_HI;
-    uint8_t *buf_lo = TITLE_PPU_BUF_ADDR_LO;
-    uint8_t *buf_tile = TITLE_PPU_BUF_TILE;
-
-    for (uint8_t n = 0; n < (uint8_t)count; n++) {
-        uint16_t pos = delta[idx] | ((uint16_t)delta[idx + 1] << 8);
-        idx += 3;
-        buf_hi[n] = (uint8_t)((0x2000 + pos) >> 8);
-        buf_lo[n] = (uint8_t)(0x2000 + pos);
-        buf_tile[n] = delta[idx - 1];
-    }
-    s_ppu_write_count = (uint8_t)count;
-    s_ppu_write_cursor = 0;
-    s_flush_rate = TITLE_MAX_WRITES_PER_VBLANK;
-
-    // Copy attribute data
-    for (uint8_t i = 0; i < 64; i++) {
-        s_attr_buf[i] = delta[idx++];
-    }
-    s_delta_active = 1;
-}
-
-// Flush buffered writes to PPU during vblank.
-// Writes up to 45 tiles per vblank. When the last tile batch leaves enough
-// cycles (~280), attributes are merged into the same vblank instead of
-// burning a separate one. This roughly halves flush time vs the old 2-phase approach.
-static void title_flush_ppu_writes(void) {
-    if (!s_delta_active) return;
-
-    (void)PPU_STATUS;  // Reset PPU address latch
-
-    uint8_t write_attrs = 0;
-
-    if (s_delta_active == 1) {
-        const uint8_t *buf_hi = TITLE_PPU_BUF_ADDR_HI;
-        const uint8_t *buf_lo = TITLE_PPU_BUF_ADDR_LO;
-        const uint8_t *buf_tile = TITLE_PPU_BUF_TILE;
-
-        uint8_t cursor = s_ppu_write_cursor;
-        uint8_t remaining = s_ppu_write_count - cursor;
-        uint8_t rate = s_flush_rate;
-        uint8_t batch = (remaining > rate) ? rate : remaining;
-        uint8_t end = cursor + batch;
-
-        for (uint8_t i = cursor; i < end; i++) {
-            PPU_ADDR = buf_hi[i];
-            PPU_ADDR = buf_lo[i];
-            PPU_DATA = buf_tile[i];
-        }
-
-        s_ppu_write_cursor = end;
-
-        if (end >= s_ppu_write_count) {
-            // All tiles done. Merge attributes if this batch was small enough.
-            // 23 tiles * 26 = 598 cycles + 280 attrs = 878 — within budget.
-            if (batch <= TITLE_ATTR_MERGE_THRESHOLD) {
-                write_attrs = 1;
-            } else {
-                s_delta_active = 2;  // Defer attrs to next vblank
-                return;
-            }
-        }
-    } else {
-        // s_delta_active == 2: deferred attribute-only vblank
-        write_attrs = 1;
-    }
-
-    if (write_attrs) {
-        PPU_ADDR = 0x23;
-        PPU_ADDR = 0xC0;
-        for (uint8_t i = 0; i < 64; i++) {
-            PPU_DATA = s_attr_buf[i];
-        }
-        s_delta_active = 0;
-    }
-}
+// Title flush functions in nes_title_flush.c (non-LTO to keep switch tables out of fixed bank)
+extern void title_flush_ppu_writes(uint8_t variant);
+extern void title_prepare_delta(uint8_t anim_frame, uint8_t tile_count);
 
 // Apply a full delta with PPU off (used for SELECT variant swap replay)
 static void title_apply_delta_full(const unsigned char *delta) {
@@ -735,9 +647,9 @@ static void title_screen_loop(void) {
         // --- Vblank-critical: only raw PPU register writes here ---
         // Data was already decoded into RAM buffers during the previous visible frame.
 
-        // Flush buffered PPU writes (reads from RAM only, no banked ROM access)
+        // Flush tile/attr writes using inline constant code (banks 10/11)
         if (s_delta_active) {
-            title_flush_ppu_writes();
+            title_flush_ppu_writes(variant);
         }
 
         // Update text fade: write palette 3 color 2 ($3F0E) directly
@@ -796,28 +708,17 @@ static void title_screen_loop(void) {
             frame_timer++;
             if (frame_timer >= TITLE_ANIM_SPEED) {
                 frame_timer = 0;
-                // Decode delta from banked ROM into RAM buffer (runs during visible frame)
-                if (variant == 0) {
-                    set_prg_bank(TITLE_BANK_A);
-                    title_prepare_delta(&title_delta_a[title_delta_offsets_a[anim_frame]]);
-                } else {
-                    set_prg_bank(TITLE_BANK_B);
-                    title_prepare_delta(&title_delta_b[title_delta_offsets_b[anim_frame]]);
-                }
-                set_prg_bank(0);
+                // Set up inline flush for this delta (no ROM access needed)
+                if (variant == 0)
+                    title_prepare_delta(anim_frame, title_delta_counts_a[anim_frame]);
+                else
+                    title_prepare_delta(anim_frame, title_delta_counts_b[anim_frame]);
                 anim_frame++;
                 if (anim_frame >= TITLE_FRAME_COUNT) {
                     anim_frame = 0;
                 }
 
-                // When showing the last frame, the wrap delta (back to frame 0)
-                // is large (~68 tiles). Drip-feed it across TITLE_ANIM_SPEED
-                // vblanks so changes are nearly invisible (~7 tiles/vblank).
-                if (anim_frame == 0) {
-                    s_flush_rate = (s_ppu_write_count + TITLE_ANIM_SPEED - 1)
-                                   / TITLE_ANIM_SPEED;
-                    if (s_flush_rate < 1) s_flush_rate = 1;
-                }
+                // Inline flush handles chunking automatically via TITLE_WRITES_PER_CHUNK
             }
         }
     }
@@ -1564,7 +1465,9 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
     execute_bg_tiles_nametable_writes(bgTileWrites, bgTileWriteCount);
-    port_levelAnimFlush();  // Flush level animation delta (bank 6 is active)
+    if (s_levelAnimActive && s_delta_active) {
+        port_levelAnimFlush();
+    }
     set_prg_bank(0);
     update_player_hair_color();
 

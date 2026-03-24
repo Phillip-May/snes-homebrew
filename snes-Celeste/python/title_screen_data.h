@@ -64,6 +64,12 @@ static const unsigned char title_attr0_a[64] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
+static const unsigned char title_delta_counts_a[TITLE_FRAME_COUNT] = {
+    81, 80, 78, 71, 77, 68, 59, 50, 42, 40,
+    35, 28, 27, 36, 42, 45, 50, 56, 64, 69,
+    72, 62, 50, 40, 35, 38, 39, 42, 47, 68,
+};
+
 // Delta data for variant A: transitions between consecutive frames
 // delta[i] transitions from frame i to frame (i+1)%%30
 __attribute__((section(".prg_rom_2")))
@@ -540,6 +546,12 @@ static const unsigned char title_attr0_b[64] = {
     0x00, 0x00, 0x04, 0xC5, 0x35, 0x01, 0x00, 0x00,
     0xC0, 0xF0, 0xF0, 0xF0, 0xF0, 0xFF, 0xF0, 0x30,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+static const unsigned char title_delta_counts_b[TITLE_FRAME_COUNT] = {
+    81, 80, 78, 71, 77, 68, 59, 50, 42, 40,
+    34, 28, 27, 36, 42, 45, 50, 56, 64, 69,
+    72, 62, 50, 40, 35, 38, 39, 42, 47, 68,
 };
 
 // Delta data for variant B: transitions between consecutive frames
