@@ -414,7 +414,7 @@ def main():
     # No if/switch chains — avoids LTO pulling switch tables into wrong bank's rodata.
     # Optimizations: consecutive PPU runs merged; attr deltas only.
     # Variant A in bank 8, variant B in bank 9.
-    WRITES_PER_CHUNK = 20
+    WRITES_PER_CHUNK = 30
 
     flush_path = os.path.join(SCRIPT_DIR, "..", "src", "port", "nes_level4_flush.c")
     with open(flush_path, "w") as f:

@@ -13,6 +13,55 @@ void _start() {
 	main();
 }
 
+// Debug log - sequential writes to fixed RAM area.
+// Open Mesen's SPC700 memory viewer at address 0xFE00 to see output.
+// Each debug_print appends a null-terminated string. The write pointer
+// at 0xFEFE:0xFEFF (little-endian) shows current position.
+#define DBG_BASE     0xFE00
+#define DBG_SIZE     0xFE     // 254 bytes for strings
+#define DBG_WPTR     (*(volatile uint16_t*)0xFEFE)
+
+static void debug_init(void) {
+    // Clear buffer and set write pointer to start
+    volatile uint8_t *p = (volatile uint8_t*)DBG_BASE;
+    for (uint16_t i = 0; i < DBG_SIZE; i++)
+        p[i] = 0;
+    DBG_WPTR = 0;
+}
+
+static void debug_putc(char c) {
+    uint16_t wp = DBG_WPTR;
+    if (wp < DBG_SIZE) {
+        ((volatile uint8_t*)DBG_BASE)[wp] = c;
+        DBG_WPTR = wp + 1;
+    }
+}
+
+void debug_print(const char *s) {
+    while (*s)
+        debug_putc(*s++);
+}
+
+void debug_println(const char *s) {
+    debug_print(s);
+    debug_putc('\n');
+}
+
+static char hex_nibble(uint8_t n) {
+    n &= 0xF;
+    return n < 10 ? '0' + n : 'A' + (n - 10);
+}
+
+void debug_hex8(uint8_t val) {
+    debug_putc(hex_nibble(val >> 4));
+    debug_putc(hex_nibble(val & 0xF));
+}
+
+void debug_hex16(uint16_t val) {
+    debug_hex8(val >> 8);
+    debug_hex8(val & 0xFF);
+}
+
 void writeDSPREG(enum DSPRegisters inputReg,uint8_t value) {
 	REG_DSPADDR = inputReg;
 	REG_DSPDATA = value;
@@ -119,9 +168,16 @@ __attribute__((always_inline)) void comms_clear_ports() {
 
 void main() {
   int i = 0;
+
+  debug_init();
+  debug_println("SPC700 boot");
+
   Global_SampleTable.sampleStart = (uint16_t) &sample_1000HzSqaureWave;
   Global_SampleTable.sampleLoop = (uint16_t) &sample_1000HzSqaureWave;
-  
+
+  debug_print("sample@");
+  debug_hex16((uint16_t)&Global_SampleTable);
+  debug_putc('\n');
 
   //DSPInit start
   writeDSPREG(DSP_FLG,0x20); //Unmute
@@ -146,12 +202,15 @@ void main() {
   
   // Clear communication ports to ensure clean state
   comms_clear_ports();
-  
+
+  debug_println("DSP init done");
+  debug_println("main loop");
+
   //Test tone
-  //start_note(0x1000);    
+  //start_note(0x1000);
   //delayTicksT0(8);  //8*(1/8000 HZ) 0.001s = 1000 Hz, frequency of the square wave
-	  
-  
+
+
   // Poll for SFX commands from SNES
 	while(1) {
 		comms_poll();
@@ -203,7 +262,14 @@ __attribute__((always_inline)) void comms_poll(void) {
             comms_command = stable_port1;
             comms_data = stable_port0;
             comms_v = comms_data;
-            
+
+            debug_putc('c'); debug_putc('m'); debug_putc('d'); debug_putc('=');
+            debug_hex8(comms_command);
+            debug_putc(' ');
+            debug_putc('d'); debug_putc('a'); debug_putc('t'); debug_putc('=');
+            debug_hex8(comms_data);
+            debug_putc('\n');
+
             // Process SFX commands directly
             if (comms_command == CMD_PLAY_SFX_ID) {  // Play specific SFX by ID
                 switch (comms_data) {

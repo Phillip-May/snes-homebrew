@@ -504,7 +504,7 @@ extern const unsigned char music_data_untitled[];
 
 #define TITLE_BANK_A 2
 #define TITLE_BANK_B 3
-#define TITLE_ANIM_SPEED 6  // 60Hz / 6 = 10fps animation (was 10 = 6fps)
+#define TITLE_ANIM_SPEED 2  // 60Hz / 2 = 30fps (all tiles fit in 1 chunk + 1 attr = 2 vblanks)
 
 // Palette 3, color 2 text fade: NES color values per animation frame
 // Text "press select to change gfx" uses pixel value 14 = palette 3, color 2 ($3F0E)
@@ -726,7 +726,8 @@ static void title_screen_loop(void) {
     // Transition to game: restore game CHR tiles to CHR-RAM and PPU settings
     ppu_off();
     load_game_chr();
-    PPU_CTRL = 0x88;  // NMI enabled, sprite pattern $1000, nametable $2000
+    bank_bg(0);
+    bank_spr(0);  // Sprites use $0000 (all game sprite tiles are in BG pattern table)
 }
 
 // --- Level 4 Animation (implemented in nes_level4_anim.c) ---
@@ -766,8 +767,9 @@ void port_init(void) {
     // Initialize CHR-RAM with game tiles (single 8KB bank, no bank switching)
     load_game_chr();
 
+    bank_bg(0);
+    bank_spr(0);  // Sprites use $0000 (all game sprite tiles are in BG pattern table)
     ppu_on_all();
-    PPU_CTRL = 0x88; // NMI enabled, sprite pattern $1000, nametable $2000
     ppu_wait_nmi();  // First NMI sets NTSC_MODE — must happen before music init
 
     // Init FamiStudio engine (engine + data both in bank 7)
@@ -1465,26 +1467,21 @@ __attribute__((noinline)) void port_vblank(void) {
     if (raw_state & PAD_RIGHT)  mapped_state |= PORT_INPUT_RIGHT_MASK;
     s_inputState = mapped_state;
     execute_bg_tiles_nametable_writes(bgTileWrites, bgTileWriteCount);
-    if (s_levelAnimActive && s_delta_active) {
-        port_levelAnimFlush();
-    }
+    // Animation tile writes are handled by NMI via set_vram_update — no manual flush needed.
     set_prg_bank(0);
     update_player_hair_color();
 
-    // Apply screenshake to scroll if active
+    // Use neslib's NMI-driven scroll and pattern table select.
+    // These take effect at the START of the next vblank — guaranteed timing
+    // even if game logic overruns the frame.
     int8_t shakeOffset = 0;
     if (GLOBAL_ActiveLevel.shakeFrames > 0) {
         shakeOffset = (s_frameCounter & 1) ? 2 : -2;
         s_frameCounter++;
     }
-    
-    // Level 4 animation: BG pattern table at $1000, sprites stay at $0000
-    // On other levels: BG at $0000 (default after NMI)
-    if (s_levelAnimActive) {
-        PPU_CTRL = 0x90;  // NMI on, BG from $1000, sprites from $0000
-    }
-    PPU_SCROLL = 0;
-    PPU_SCROLL = (uint8_t)CLAMP((int16_t)s_scrollY + shakeOffset, 0, 255);
+    // bank_bg: 0 = BG from $0000 (normal), 1 = BG from $1000 (level 4 animation)
+    bank_bg(s_levelAnimActive ? 1 : 0);
+    scroll(0, (unsigned)(uint8_t)CLAMP((int16_t)s_scrollY + shakeOffset, 0, 255));
 }
 
 uint8_t port_getInputs(void) {
@@ -1691,6 +1688,8 @@ void port_LoadRoomData(uint16_t roomID) {
     // Deactivate level animation when leaving level 4
     // No CHR restore needed — animation tiles are at $1000, game tiles at $0000 are untouched.
     // PPU_CTRL will revert to default (BG from $0000) on next vblank.
+    // Clear any NMI VRAM update buffer immediately (prevents stale writes during load)
+    set_vram_update(0);
     if (s_levelAnimActive && roomID != 4) {
         s_levelAnimActive = 0;
         s_delta_active = 0;

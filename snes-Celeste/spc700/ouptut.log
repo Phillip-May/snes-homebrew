@@ -1,0 +1,10 @@
+[testSPC] Ready
+[SPC] DSP init done
+[SPC] main loop
+[TEST] cmd=04 data=01
+[SPC] cmd=04 dat=01
+[SPC] cmd=00 dat=00
+[TEST] cmd=04 data=02
+[SPC] cmd=04 dat=02
+[SPC] cmd=00 dat=00
+[TEST] === Done ===

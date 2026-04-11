@@ -31,10 +31,6 @@ static void lf_a_d0_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xDE;PPU_DATA=0x04;
     PPU_ADDR=0x20;PPU_ADDR=0xE7;PPU_DATA=0x44;
     PPU_ADDR=0x20;PPU_ADDR=0xF9;PPU_DATA=0x44;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d0_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x00;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x06;PPU_DATA=0x62;
     PPU_ADDR=0x21;PPU_ADDR=0x21;PPU_DATA=0x15;
@@ -45,6 +41,10 @@ static void lf_a_d0_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x44;
     PPU_ADDR=0x21;PPU_ADDR=0xC0;PPU_DATA=0x0F;
     PPU_ADDR=0x21;PPU_ADDR=0xCA;PPU_DATA=0x0F;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d0_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xD4;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xDE;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE1;PPU_DATA=0x1A;
@@ -55,10 +55,6 @@ static void lf_a_d0_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x16;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x1A;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x23;PPU_DATA=0x63;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d0_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x37;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x39;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x44;PPU_DATA=0x22;
@@ -82,7 +78,7 @@ static void lf_a_d0_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d0_c3(void) {
+static void lf_a_d0_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x9C;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0xAD;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0xBB;PPU_DATA=0x00;
@@ -115,10 +111,6 @@ static void lf_a_d1_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xFF;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x02;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x06;PPU_DATA=0x14;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x08;PPU_DATA=0x62;
     PPU_ADDR=0x21;PPU_ADDR=0x1A;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x21;PPU_DATA=0x00;
@@ -129,6 +121,10 @@ static void lf_a_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x2E;
     PPU_ADDR=0x21;PPU_ADDR=0x88;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0x9C;PPU_DATA=0x04;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xC2;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0xD6;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x04;
@@ -139,10 +135,6 @@ static void lf_a_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xFF;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x04;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x18;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d1_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x1A;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x23;PPU_DATA=0x14;
     PPU_ADDR=0x22;PPU_ADDR=0x37;PPU_DATA=0x00;
@@ -166,7 +158,7 @@ static void lf_a_d1_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d1_c3(void) {
+static void lf_a_d1_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x35;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x48;PPU_DATA=0x0D;
     PPU_ADDR=0x23;PPU_ADDR=0x4C;PPU_DATA=0x22;
@@ -207,10 +199,6 @@ static void lf_a_d2_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x27;PPU_DATA=0x1E;
     PPU_ADDR=0x21;PPU_ADDR=0x29;PPU_DATA=0x64;
     PPU_ADDR=0x21;PPU_ADDR=0x3B;PPU_DATA=0x15;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d2_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x48;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0x52;PPU_DATA=0x0F;
     PPU_ADDR=0x21;PPU_ADDR=0x5A;PPU_DATA=0x22;
@@ -221,6 +209,10 @@ static void lf_a_d2_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x9C;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x1A;
     PPU_ADDR=0x21;PPU_ADDR=0xBD;PPU_DATA=0x15;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d2_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xC2;PPU_DATA=0x0F;
     PPU_ADDR=0x21;PPU_ADDR=0xD6;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x00;
@@ -231,10 +223,6 @@ static void lf_a_d2_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x04;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x18;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x1C;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d2_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x25;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x39;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x3B;PPU_DATA=0x00;
@@ -258,7 +246,7 @@ static void lf_a_d2_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d2_c3(void) {
+static void lf_a_d2_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x3F;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x48;PPU_DATA=0x0F;
     PPU_ADDR=0x23;PPU_ADDR=0x4E;PPU_DATA=0x24;
@@ -296,10 +284,6 @@ static void lf_a_d3_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xFE;PPU_DATA=0x14;PPU_DATA=0x14;
     PPU_ADDR=0x21;PPU_ADDR=0x1C;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x23;PPU_DATA=0x00;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x25;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x29;PPU_DATA=0x1E;
     PPU_ADDR=0x21;PPU_ADDR=0x3B;PPU_DATA=0x00;
@@ -310,6 +294,10 @@ static void lf_a_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x73;PPU_DATA=0x2C;
     PPU_ADDR=0x21;PPU_ADDR=0x7B;PPU_DATA=0x2E;
     PPU_ADDR=0x21;PPU_ADDR=0x90;PPU_DATA=0x0F;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x92;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x9E;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x12;
@@ -320,10 +308,6 @@ static void lf_a_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xD8;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xDE;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE3;PPU_DATA=0x12;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d3_c2(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xF7;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xFD;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x06;PPU_DATA=0x66;
@@ -347,7 +331,7 @@ static void lf_a_d3_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d3_c3(void) {
+static void lf_a_d3_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0xE9;PPU_DATA=0x1A;
     PPU_ADDR=0x22;PPU_ADDR=0xF5;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0xF7;PPU_DATA=0x00;
@@ -388,10 +372,6 @@ static void lf_a_d4_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x3D;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x46;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0x4A;PPU_DATA=0x0F;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x54;PPU_DATA=0x22;
     PPU_ADDR=0x21;PPU_ADDR=0x5C;PPU_DATA=0x22;
     PPU_ADDR=0x21;PPU_ADDR=0x75;PPU_DATA=0x44;
@@ -402,6 +382,10 @@ static void lf_a_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB1;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xB3;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0xBF;PPU_DATA=0x15;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xC4;PPU_DATA=0x0F;
     PPU_ADDR=0x21;PPU_ADDR=0xCA;PPU_DATA=0x0F;
     PPU_ADDR=0x21;PPU_ADDR=0xD8;PPU_DATA=0x00;
@@ -412,10 +396,6 @@ static void lf_a_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xFF;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x06;PPU_DATA=0x40;
     PPU_ADDR=0x22;PPU_ADDR=0x1E;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d4_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x27;PPU_DATA=0x67;
     PPU_ADDR=0x22;PPU_ADDR=0x3D;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x48;PPU_DATA=0x0F;
@@ -439,7 +419,7 @@ static void lf_a_d4_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d4_c3(void) {
+static void lf_a_d4_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x18;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x39;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x50;PPU_DATA=0x24;
@@ -473,10 +453,6 @@ static void lf_a_d5_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x3D;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x3F;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x46;PPU_DATA=0x0F;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d5_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x56;PPU_DATA=0x24;
     PPU_ADDR=0x21;PPU_ADDR=0x67;PPU_DATA=0x1A;
     PPU_ADDR=0x21;PPU_ADDR=0x75;PPU_DATA=0x2E;
@@ -487,6 +463,10 @@ static void lf_a_d5_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB5;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0xBF;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xD4;PPU_DATA=0x04;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d5_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xE5;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xE7;PPU_DATA=0x1A;
     PPU_ADDR=0x21;PPU_ADDR=0xEB;PPU_DATA=0x12;
@@ -497,10 +477,6 @@ static void lf_a_d5_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x27;PPU_DATA=0x41;
     PPU_ADDR=0x22;PPU_ADDR=0x29;PPU_DATA=0x1A;
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x15;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d5_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x3F;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x52;PPU_DATA=0x24;
     PPU_ADDR=0x22;PPU_ADDR=0x69;PPU_DATA=0x12;
@@ -524,7 +500,7 @@ static void lf_a_d5_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d5_c3(void) {
+static void lf_a_d5_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x37;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x39;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x3B;PPU_DATA=0x15;
@@ -560,10 +536,6 @@ static void lf_a_d6_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xE7;PPU_DATA=0x2E;
     PPU_ADDR=0x21;PPU_ADDR=0x06;PPU_DATA=0x14;
     PPU_ADDR=0x21;PPU_ADDR=0x08;PPU_DATA=0x62;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d6_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x1E;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x3F;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x48;PPU_DATA=0x0D;
@@ -574,6 +546,10 @@ static void lf_a_d6_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB5;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xC6;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0xD4;PPU_DATA=0x00;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d6_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xDA;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE7;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xF5;PPU_DATA=0x15;
@@ -584,10 +560,6 @@ static void lf_a_d6_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x40;PPU_DATA=0x68;
     PPU_ADDR=0x22;PPU_ADDR=0x52;PPU_DATA=0x22;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d6_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x73;PPU_DATA=0x44;
     PPU_ADDR=0x22;PPU_ADDR=0x82;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x8A;PPU_DATA=0x0D;
@@ -611,7 +583,7 @@ static void lf_a_d6_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d6_c3(void) {
+static void lf_a_d6_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x5C;PPU_DATA=0x04;
     PPU_ADDR=0x23;PPU_ADDR=0x71;PPU_DATA=0x2E;
     PPU_ADDR=0x23;PPU_ADDR=0x96;PPU_DATA=0x00;
@@ -644,10 +616,6 @@ static void lf_a_d7_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xC8;PPU_DATA=0x22;
     PPU_ADDR=0x20;PPU_ADDR=0xDC;PPU_DATA=0x00;
     PPU_ADDR=0x20;PPU_ADDR=0xE9;PPU_DATA=0x44;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x00;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x08;PPU_DATA=0x14;
     PPU_ADDR=0x21;PPU_ADDR=0x1E;PPU_DATA=0x00;
@@ -658,6 +626,10 @@ static void lf_a_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x77;PPU_DATA=0x2E;
     PPU_ADDR=0x21;PPU_ADDR=0x88;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0x90;PPU_DATA=0x0D;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x94;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x96;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x9E;PPU_DATA=0x00;
@@ -668,10 +640,6 @@ static void lf_a_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xF5;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xFB;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x08;PPU_DATA=0x0F;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d7_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x0A;PPU_DATA=0x0D;
     PPU_ADDR=0x22;PPU_ADDR=0x10;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x12;PPU_DATA=0x00;
@@ -694,7 +662,7 @@ static void lf_a_d7_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d7_c3(void) {
+static void lf_a_d7_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x35;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x39;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x3D;PPU_DATA=0x00;
@@ -733,10 +701,6 @@ static void lf_a_d8_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x02;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x29;PPU_DATA=0x1E;
     PPU_ADDR=0x21;PPU_ADDR=0x4A;PPU_DATA=0x0D;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d8_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x58;PPU_DATA=0x22;
     PPU_ADDR=0x21;PPU_ADDR=0x69;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x44;
@@ -747,6 +711,10 @@ static void lf_a_d8_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB1;PPU_DATA=0x1A;
     PPU_ADDR=0x21;PPU_ADDR=0xB7;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0xD6;PPU_DATA=0x00;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d8_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE7;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xF7;PPU_DATA=0x15;
@@ -757,10 +725,6 @@ static void lf_a_d8_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x14;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x2B;PPU_DATA=0x1A;
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x15;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d8_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x33;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x42;PPU_DATA=0x24;
     PPU_ADDR=0x22;PPU_ADDR=0x61;PPU_DATA=0x43;
@@ -784,7 +748,7 @@ static void lf_a_d8_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d8_c3(void) {
+static void lf_a_d8_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x73;PPU_DATA=0x2E;
     PPU_ADDR=0x23;PPU_ADDR=0x7D;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x88;PPU_DATA=0x00;
@@ -817,10 +781,6 @@ static void lf_a_d9_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x2E;
     PPU_ADDR=0x21;PPU_ADDR=0x80;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0x92;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d9_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xB1;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xB7;PPU_DATA=0x00;
@@ -831,6 +791,10 @@ static void lf_a_d9_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x2B;PPU_DATA=0x12;
     PPU_ADDR=0x22;PPU_ADDR=0x96;PPU_DATA=0x24;
     PPU_ADDR=0x22;PPU_ADDR=0xB5;PPU_DATA=0x2E;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d9_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0xC0;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0xC2;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0xD0;PPU_DATA=0x00;
@@ -841,10 +805,6 @@ static void lf_a_d9_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0xE5;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0xF5;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x04;PPU_DATA=0x62;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d9_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x0E;PPU_DATA=0x04;
     PPU_ADDR=0x23;PPU_ADDR=0x2D;PPU_DATA=0x41;
     PPU_ADDR=0x23;PPU_ADDR=0x48;PPU_DATA=0x0F;
@@ -879,10 +839,6 @@ static void lf_a_d10_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x23;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x5A;PPU_DATA=0x22;
     PPU_ADDR=0x21;PPU_ADDR=0x6B;PPU_DATA=0x12;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d10_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x7B;PPU_DATA=0x44;
     PPU_ADDR=0x21;PPU_ADDR=0x80;PPU_DATA=0x0F;
     PPU_ADDR=0x21;PPU_ADDR=0x92;PPU_DATA=0x00;
@@ -893,6 +849,10 @@ static void lf_a_d10_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xEB;PPU_DATA=0x1A;
     PPU_ADDR=0x21;PPU_ADDR=0xF7;PPU_DATA=0x00;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d10_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xFD;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x00;PPU_DATA=0x0F;
     PPU_ADDR=0x22;PPU_ADDR=0x0A;PPU_DATA=0x0D;
@@ -903,10 +863,6 @@ static void lf_a_d10_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x35;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x42;PPU_DATA=0x22;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d10_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x52;PPU_DATA=0x24;
     PPU_ADDR=0x22;PPU_ADDR=0x63;PPU_DATA=0x44;
     PPU_ADDR=0x22;PPU_ADDR=0x96;PPU_DATA=0x22;
@@ -930,7 +886,7 @@ static void lf_a_d10_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d10_c3(void) {
+static void lf_a_d10_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x7F;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x8C;PPU_DATA=0x04;
     PPU_ADDR=0x23;PPU_ADDR=0x9A;PPU_DATA=0x04;
@@ -962,10 +918,6 @@ static void lf_a_d11_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x25;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x46;PPU_DATA=0x0D;
     PPU_ADDR=0x21;PPU_ADDR=0x5C;PPU_DATA=0x24;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d11_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x7B;PPU_DATA=0x2E;
     PPU_ADDR=0x21;PPU_ADDR=0xA1;PPU_DATA=0x12;
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x12;
@@ -976,6 +928,10 @@ static void lf_a_d11_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xEB;PPU_DATA=0x12;
     PPU_ADDR=0x22;PPU_ADDR=0x02;PPU_DATA=0x0D;
     PPU_ADDR=0x22;PPU_ADDR=0x0A;PPU_DATA=0x0F;
+}
+
+__attribute__((section(".prg_rom_8.text"), noinline))
+static void lf_a_d11_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x16;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x18;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x21;PPU_DATA=0x12;
@@ -986,10 +942,6 @@ static void lf_a_d11_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x63;PPU_DATA=0x2E;
     PPU_ADDR=0x22;PPU_ADDR=0x73;PPU_DATA=0x44;
     PPU_ADDR=0x22;PPU_ADDR=0x80;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d11_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x98;PPU_DATA=0x24;
     PPU_ADDR=0x22;PPU_ADDR=0xB7;PPU_DATA=0x2E;
     PPU_ADDR=0x22;PPU_ADDR=0xC4;PPU_DATA=0x04;
@@ -1013,73 +965,61 @@ static void lf_a_d11_c2(void) {
 }
 
 __attribute__((section(".prg_rom_8.text"), noinline))
-static void lf_a_d11_c3(void) {
+static void lf_a_d11_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0xAD;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0xBB;PPU_DATA=0x15;
     PPU_ADDR=0x28;PPU_ADDR=0x16;PPU_DATA=0x00;
     PPU_ADDR=0x28;PPU_ADDR=0x37;PPU_DATA=0x15;
 }
 
-// Flush function pointer table — variant A (47 entries)
+// Flush function pointer table — variant A (35 entries)
 __attribute__((section(".prg_rom_8")))
 const flush_fn_t la_flush_table_a[] = {
     lf_a_d0_c0,
     lf_a_d0_c1,
     lf_a_d0_c2,
-    lf_a_d0_c3,
     lf_a_d1_c0,
     lf_a_d1_c1,
     lf_a_d1_c2,
-    lf_a_d1_c3,
     lf_a_d2_c0,
     lf_a_d2_c1,
     lf_a_d2_c2,
-    lf_a_d2_c3,
     lf_a_d3_c0,
     lf_a_d3_c1,
     lf_a_d3_c2,
-    lf_a_d3_c3,
     lf_a_d4_c0,
     lf_a_d4_c1,
     lf_a_d4_c2,
-    lf_a_d4_c3,
     lf_a_d5_c0,
     lf_a_d5_c1,
     lf_a_d5_c2,
-    lf_a_d5_c3,
     lf_a_d6_c0,
     lf_a_d6_c1,
     lf_a_d6_c2,
-    lf_a_d6_c3,
     lf_a_d7_c0,
     lf_a_d7_c1,
     lf_a_d7_c2,
-    lf_a_d7_c3,
     lf_a_d8_c0,
     lf_a_d8_c1,
     lf_a_d8_c2,
-    lf_a_d8_c3,
     lf_a_d9_c0,
     lf_a_d9_c1,
-    lf_a_d9_c2,
     lf_a_d10_c0,
     lf_a_d10_c1,
     lf_a_d10_c2,
-    lf_a_d10_c3,
     lf_a_d11_c0,
     lf_a_d11_c1,
     lf_a_d11_c2,
-    lf_a_d11_c3,
 };
 
 __attribute__((section(".prg_rom_8")))
 const uint16_t la_flush_offsets_a[12] = {
-    0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 39, 43,
+    0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 29, 32,
 };
 
 __attribute__((section(".prg_rom_8")))
 const uint8_t la_chunk_counts_a[12] = {
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4,
+    3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 3,
 };
 
 __attribute__((section(".prg_rom_8.text"), noinline))
@@ -1170,10 +1110,6 @@ static void lf_b_d0_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xDE;PPU_DATA=0x04;
     PPU_ADDR=0x20;PPU_ADDR=0xE7;PPU_DATA=0x98;
     PPU_ADDR=0x20;PPU_ADDR=0xF9;PPU_DATA=0x98;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d0_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x00;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x06;PPU_DATA=0x62;
     PPU_ADDR=0x21;PPU_ADDR=0x21;PPU_DATA=0x15;
@@ -1184,6 +1120,10 @@ static void lf_b_d0_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x98;
     PPU_ADDR=0x21;PPU_ADDR=0xC0;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xCA;PPU_DATA=0x73;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d0_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xD4;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xDE;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE1;PPU_DATA=0x79;
@@ -1194,10 +1134,6 @@ static void lf_b_d0_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x16;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x1A;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x23;PPU_DATA=0x63;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d0_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x37;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x39;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x44;PPU_DATA=0x7D;
@@ -1221,7 +1157,7 @@ static void lf_b_d0_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d0_c3(void) {
+static void lf_b_d0_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x9C;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0xAD;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0xBB;PPU_DATA=0x00;
@@ -1254,10 +1190,6 @@ static void lf_b_d1_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xFF;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x02;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x06;PPU_DATA=0x14;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x08;PPU_DATA=0x62;
     PPU_ADDR=0x21;PPU_ADDR=0x1A;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x21;PPU_DATA=0x00;
@@ -1268,6 +1200,10 @@ static void lf_b_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x86;
     PPU_ADDR=0x21;PPU_ADDR=0x88;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0x9C;PPU_DATA=0x04;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xC2;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0xD6;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x04;
@@ -1278,10 +1214,6 @@ static void lf_b_d1_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xFF;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x04;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x18;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d1_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x1A;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x23;PPU_DATA=0x14;
     PPU_ADDR=0x22;PPU_ADDR=0x37;PPU_DATA=0x00;
@@ -1305,7 +1237,7 @@ static void lf_b_d1_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d1_c3(void) {
+static void lf_b_d1_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x35;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x48;PPU_DATA=0x72;
     PPU_ADDR=0x23;PPU_ADDR=0x4C;PPU_DATA=0x7D;
@@ -1346,10 +1278,6 @@ static void lf_b_d2_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x27;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0x29;PPU_DATA=0x79;
     PPU_ADDR=0x21;PPU_ADDR=0x3B;PPU_DATA=0x15;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d2_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x48;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0x52;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0x5A;PPU_DATA=0x7D;
@@ -1360,6 +1288,10 @@ static void lf_b_d2_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x9C;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x79;
     PPU_ADDR=0x21;PPU_ADDR=0xBD;PPU_DATA=0x15;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d2_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xC2;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xD6;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x00;
@@ -1370,10 +1302,6 @@ static void lf_b_d2_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x04;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x18;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x1C;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d2_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x25;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x39;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x3B;PPU_DATA=0x00;
@@ -1397,7 +1325,7 @@ static void lf_b_d2_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d2_c3(void) {
+static void lf_b_d2_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x3F;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x48;PPU_DATA=0x73;
     PPU_ADDR=0x23;PPU_ADDR=0x4E;PPU_DATA=0x7E;
@@ -1435,10 +1363,6 @@ static void lf_b_d3_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xFE;PPU_DATA=0x14;PPU_DATA=0x14;
     PPU_ADDR=0x21;PPU_ADDR=0x1C;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x23;PPU_DATA=0x00;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x25;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x29;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0x3B;PPU_DATA=0x00;
@@ -1449,6 +1373,10 @@ static void lf_b_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x73;PPU_DATA=0x85;
     PPU_ADDR=0x21;PPU_ADDR=0x7B;PPU_DATA=0x86;
     PPU_ADDR=0x21;PPU_ADDR=0x90;PPU_DATA=0x73;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x92;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x9E;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x73;
@@ -1459,10 +1387,6 @@ static void lf_b_d3_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xD8;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xDE;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE3;PPU_DATA=0x73;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d3_c2(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xF7;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xFD;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x06;PPU_DATA=0xA4;
@@ -1486,7 +1410,7 @@ static void lf_b_d3_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d3_c3(void) {
+static void lf_b_d3_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0xE9;PPU_DATA=0x79;
     PPU_ADDR=0x22;PPU_ADDR=0xF5;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0xF7;PPU_DATA=0x00;
@@ -1527,10 +1451,6 @@ static void lf_b_d4_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x3D;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x46;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0x4A;PPU_DATA=0x73;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x54;PPU_DATA=0x7D;
     PPU_ADDR=0x21;PPU_ADDR=0x5C;PPU_DATA=0x7D;
     PPU_ADDR=0x21;PPU_ADDR=0x75;PPU_DATA=0x98;
@@ -1541,6 +1461,10 @@ static void lf_b_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB1;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xB3;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0xBF;PPU_DATA=0x15;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xC4;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xCA;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xD8;PPU_DATA=0x00;
@@ -1551,10 +1475,6 @@ static void lf_b_d4_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xFF;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x06;PPU_DATA=0x94;
     PPU_ADDR=0x22;PPU_ADDR=0x1E;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d4_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x27;PPU_DATA=0xA5;
     PPU_ADDR=0x22;PPU_ADDR=0x3D;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x48;PPU_DATA=0x73;
@@ -1578,7 +1498,7 @@ static void lf_b_d4_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d4_c3(void) {
+static void lf_b_d4_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x18;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x39;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x50;PPU_DATA=0x7E;
@@ -1612,10 +1532,6 @@ static void lf_b_d5_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x3D;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x3F;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x46;PPU_DATA=0x73;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d5_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x56;PPU_DATA=0x7E;
     PPU_ADDR=0x21;PPU_ADDR=0x67;PPU_DATA=0x79;
     PPU_ADDR=0x21;PPU_ADDR=0x75;PPU_DATA=0x86;
@@ -1626,6 +1542,10 @@ static void lf_b_d5_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB5;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0xBF;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xD4;PPU_DATA=0x04;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d5_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xE5;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xE7;PPU_DATA=0x79;
     PPU_ADDR=0x21;PPU_ADDR=0xEB;PPU_DATA=0x73;
@@ -1636,10 +1556,6 @@ static void lf_b_d5_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x27;PPU_DATA=0x94;
     PPU_ADDR=0x22;PPU_ADDR=0x29;PPU_DATA=0x79;
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x15;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d5_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x3F;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x52;PPU_DATA=0x7E;
     PPU_ADDR=0x22;PPU_ADDR=0x69;PPU_DATA=0x73;
@@ -1663,7 +1579,7 @@ static void lf_b_d5_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d5_c3(void) {
+static void lf_b_d5_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x37;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x39;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x3B;PPU_DATA=0x15;
@@ -1699,10 +1615,6 @@ static void lf_b_d6_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xE7;PPU_DATA=0x86;
     PPU_ADDR=0x21;PPU_ADDR=0x06;PPU_DATA=0x14;
     PPU_ADDR=0x21;PPU_ADDR=0x08;PPU_DATA=0x62;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d6_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x1E;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x3F;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x48;PPU_DATA=0x72;
@@ -1713,6 +1625,10 @@ static void lf_b_d6_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB5;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xC6;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0xD4;PPU_DATA=0x00;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d6_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xDA;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE7;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xF5;PPU_DATA=0x15;
@@ -1723,10 +1639,6 @@ static void lf_b_d6_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x40;PPU_DATA=0xA6;
     PPU_ADDR=0x22;PPU_ADDR=0x52;PPU_DATA=0x7D;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d6_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x73;PPU_DATA=0x98;
     PPU_ADDR=0x22;PPU_ADDR=0x82;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x8A;PPU_DATA=0x72;
@@ -1750,7 +1662,7 @@ static void lf_b_d6_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d6_c3(void) {
+static void lf_b_d6_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x5C;PPU_DATA=0x04;
     PPU_ADDR=0x23;PPU_ADDR=0x71;PPU_DATA=0x86;
     PPU_ADDR=0x23;PPU_ADDR=0x96;PPU_DATA=0x00;
@@ -1783,10 +1695,6 @@ static void lf_b_d7_c0(void) {
     PPU_ADDR=0x20;PPU_ADDR=0xC8;PPU_DATA=0x7D;
     PPU_ADDR=0x20;PPU_ADDR=0xDC;PPU_DATA=0x00;
     PPU_ADDR=0x20;PPU_ADDR=0xE9;PPU_DATA=0x98;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x00;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x08;PPU_DATA=0x14;
     PPU_ADDR=0x21;PPU_ADDR=0x1E;PPU_DATA=0x00;
@@ -1797,6 +1705,10 @@ static void lf_b_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x77;PPU_DATA=0x86;
     PPU_ADDR=0x21;PPU_ADDR=0x88;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0x90;PPU_DATA=0x72;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x94;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x96;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x9E;PPU_DATA=0x00;
@@ -1807,10 +1719,6 @@ static void lf_b_d7_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xF5;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xFB;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x08;PPU_DATA=0x73;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d7_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x0A;PPU_DATA=0x72;
     PPU_ADDR=0x22;PPU_ADDR=0x10;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x12;PPU_DATA=0x00;
@@ -1833,7 +1741,7 @@ static void lf_b_d7_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d7_c3(void) {
+static void lf_b_d7_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x35;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x39;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x3D;PPU_DATA=0x00;
@@ -1872,10 +1780,6 @@ static void lf_b_d8_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x02;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0x29;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0x4A;PPU_DATA=0x72;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d8_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x58;PPU_DATA=0x7D;
     PPU_ADDR=0x21;PPU_ADDR=0x69;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x98;
@@ -1886,6 +1790,10 @@ static void lf_b_d8_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xB1;PPU_DATA=0x79;
     PPU_ADDR=0x21;PPU_ADDR=0xB7;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0xD6;PPU_DATA=0x00;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d8_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x04;
     PPU_ADDR=0x21;PPU_ADDR=0xE7;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xF7;PPU_DATA=0x15;
@@ -1896,10 +1804,6 @@ static void lf_b_d8_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x14;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x2B;PPU_DATA=0x79;
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x15;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d8_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x33;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x42;PPU_DATA=0x7E;
     PPU_ADDR=0x22;PPU_ADDR=0x61;PPU_DATA=0x97;
@@ -1923,7 +1827,7 @@ static void lf_b_d8_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d8_c3(void) {
+static void lf_b_d8_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x73;PPU_DATA=0x86;
     PPU_ADDR=0x23;PPU_ADDR=0x7D;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x88;PPU_DATA=0x00;
@@ -1956,10 +1860,6 @@ static void lf_b_d9_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x79;PPU_DATA=0x86;
     PPU_ADDR=0x21;PPU_ADDR=0x80;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0x92;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d9_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xB1;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xB7;PPU_DATA=0x00;
@@ -1970,6 +1870,10 @@ static void lf_b_d9_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x2B;PPU_DATA=0x73;
     PPU_ADDR=0x22;PPU_ADDR=0x96;PPU_DATA=0x7E;
     PPU_ADDR=0x22;PPU_ADDR=0xB5;PPU_DATA=0x86;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d9_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0xC0;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0xC2;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0xD0;PPU_DATA=0x00;
@@ -1980,10 +1884,6 @@ static void lf_b_d9_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0xE5;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0xF5;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0x04;PPU_DATA=0x62;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d9_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x0E;PPU_DATA=0x04;
     PPU_ADDR=0x23;PPU_ADDR=0x2D;PPU_DATA=0x94;
     PPU_ADDR=0x23;PPU_ADDR=0x48;PPU_DATA=0x73;
@@ -2018,10 +1918,6 @@ static void lf_b_d10_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x23;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0x5A;PPU_DATA=0x7D;
     PPU_ADDR=0x21;PPU_ADDR=0x6B;PPU_DATA=0x73;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d10_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x7B;PPU_DATA=0x98;
     PPU_ADDR=0x21;PPU_ADDR=0x80;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0x92;PPU_DATA=0x00;
@@ -2032,6 +1928,10 @@ static void lf_b_d10_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xDC;PPU_DATA=0x00;
     PPU_ADDR=0x21;PPU_ADDR=0xEB;PPU_DATA=0x79;
     PPU_ADDR=0x21;PPU_ADDR=0xF7;PPU_DATA=0x00;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d10_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xFD;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x00;PPU_DATA=0x73;
     PPU_ADDR=0x22;PPU_ADDR=0x0A;PPU_DATA=0x72;
@@ -2042,10 +1942,6 @@ static void lf_b_d10_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x31;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x35;PPU_DATA=0x15;
     PPU_ADDR=0x22;PPU_ADDR=0x42;PPU_DATA=0x7D;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d10_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x52;PPU_DATA=0x7E;
     PPU_ADDR=0x22;PPU_ADDR=0x63;PPU_DATA=0x98;
     PPU_ADDR=0x22;PPU_ADDR=0x96;PPU_DATA=0x7D;
@@ -2069,7 +1965,7 @@ static void lf_b_d10_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d10_c3(void) {
+static void lf_b_d10_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0x7F;PPU_DATA=0x00;
     PPU_ADDR=0x23;PPU_ADDR=0x8C;PPU_DATA=0x04;
     PPU_ADDR=0x23;PPU_ADDR=0x9A;PPU_DATA=0x04;
@@ -2101,10 +1997,6 @@ static void lf_b_d11_c0(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x25;PPU_DATA=0x15;
     PPU_ADDR=0x21;PPU_ADDR=0x46;PPU_DATA=0x72;
     PPU_ADDR=0x21;PPU_ADDR=0x5C;PPU_DATA=0x7E;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d11_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0x7B;PPU_DATA=0x86;
     PPU_ADDR=0x21;PPU_ADDR=0xA1;PPU_DATA=0x73;
     PPU_ADDR=0x21;PPU_ADDR=0xA9;PPU_DATA=0x73;
@@ -2115,6 +2007,10 @@ static void lf_b_d11_c1(void) {
     PPU_ADDR=0x21;PPU_ADDR=0xEB;PPU_DATA=0x73;
     PPU_ADDR=0x22;PPU_ADDR=0x02;PPU_DATA=0x72;
     PPU_ADDR=0x22;PPU_ADDR=0x0A;PPU_DATA=0x73;
+}
+
+__attribute__((section(".prg_rom_9.text"), noinline))
+static void lf_b_d11_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x16;PPU_DATA=0x04;
     PPU_ADDR=0x22;PPU_ADDR=0x18;PPU_DATA=0x00;
     PPU_ADDR=0x22;PPU_ADDR=0x21;PPU_DATA=0x73;
@@ -2125,10 +2021,6 @@ static void lf_b_d11_c1(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x63;PPU_DATA=0x86;
     PPU_ADDR=0x22;PPU_ADDR=0x73;PPU_DATA=0x98;
     PPU_ADDR=0x22;PPU_ADDR=0x80;PPU_DATA=0x04;
-}
-
-__attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d11_c2(void) {
     PPU_ADDR=0x22;PPU_ADDR=0x98;PPU_DATA=0x7E;
     PPU_ADDR=0x22;PPU_ADDR=0xB7;PPU_DATA=0x86;
     PPU_ADDR=0x22;PPU_ADDR=0xC4;PPU_DATA=0x04;
@@ -2152,73 +2044,61 @@ static void lf_b_d11_c2(void) {
 }
 
 __attribute__((section(".prg_rom_9.text"), noinline))
-static void lf_b_d11_c3(void) {
+static void lf_b_d11_c2(void) {
     PPU_ADDR=0x23;PPU_ADDR=0xAD;PPU_DATA=0x15;
     PPU_ADDR=0x23;PPU_ADDR=0xBB;PPU_DATA=0x15;
     PPU_ADDR=0x28;PPU_ADDR=0x16;PPU_DATA=0x00;
     PPU_ADDR=0x28;PPU_ADDR=0x37;PPU_DATA=0x15;
 }
 
-// Flush function pointer table — variant B (47 entries)
+// Flush function pointer table — variant B (35 entries)
 __attribute__((section(".prg_rom_9")))
 const flush_fn_t la_flush_table_b[] = {
     lf_b_d0_c0,
     lf_b_d0_c1,
     lf_b_d0_c2,
-    lf_b_d0_c3,
     lf_b_d1_c0,
     lf_b_d1_c1,
     lf_b_d1_c2,
-    lf_b_d1_c3,
     lf_b_d2_c0,
     lf_b_d2_c1,
     lf_b_d2_c2,
-    lf_b_d2_c3,
     lf_b_d3_c0,
     lf_b_d3_c1,
     lf_b_d3_c2,
-    lf_b_d3_c3,
     lf_b_d4_c0,
     lf_b_d4_c1,
     lf_b_d4_c2,
-    lf_b_d4_c3,
     lf_b_d5_c0,
     lf_b_d5_c1,
     lf_b_d5_c2,
-    lf_b_d5_c3,
     lf_b_d6_c0,
     lf_b_d6_c1,
     lf_b_d6_c2,
-    lf_b_d6_c3,
     lf_b_d7_c0,
     lf_b_d7_c1,
     lf_b_d7_c2,
-    lf_b_d7_c3,
     lf_b_d8_c0,
     lf_b_d8_c1,
     lf_b_d8_c2,
-    lf_b_d8_c3,
     lf_b_d9_c0,
     lf_b_d9_c1,
-    lf_b_d9_c2,
     lf_b_d10_c0,
     lf_b_d10_c1,
     lf_b_d10_c2,
-    lf_b_d10_c3,
     lf_b_d11_c0,
     lf_b_d11_c1,
     lf_b_d11_c2,
-    lf_b_d11_c3,
 };
 
 __attribute__((section(".prg_rom_9")))
 const uint16_t la_flush_offsets_b[12] = {
-    0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 39, 43,
+    0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 29, 32,
 };
 
 __attribute__((section(".prg_rom_9")))
 const uint8_t la_chunk_counts_b[12] = {
-    4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 4, 4,
+    3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 3, 3,
 };
 
 __attribute__((section(".prg_rom_9.text"), noinline))
