@@ -216,6 +216,51 @@ NES_SPRITE_NAME_OVERRIDES = {
     47: ("eFlyingBerrySprite", "FLYING_BERRY_WING_DOWN"),
 }
 
+# SNES-specific fixed OAM tile values used by runtime code and data.
+# Keep these stable even if sprite packing internals change.
+SNES_SPRITE_VALUE_OVERRIDES = {
+    "PLAYER_SPRITE_IDLE": 0x00,
+    "PLAYER_SPRITE_WALK_1": 0x02,
+    "PLAYER_SPRITE_WALK_2": 0x04,
+    "PLAYER_SPRITE_WALK_3": 0x06,
+    "PLAYER_SPRITE_WALL": 0x08,
+    "PLAYER_SPRITE_DOWN": 0x0A,
+    "PLAYER_SPRITE_UP": 0x0C,
+    "KEY_SPRITE_1": 0x0E,
+    "KEY_SPRITE_2": 0x20,
+    "KEY_SPRITE_3": 0x22,
+    "PLATMOV_SPRITE_1": 0x24,
+    "PLATMOV_SPRITE_2": 0x26,
+    "BALLOON_STRING_1": 0x28,
+    "BALLOON_STRING_2": 0x2A,
+    "BALLOON_STRING_3": 0x2C,
+    "SPRING_SPRITE_1": 0x2E,
+    "SPRING_SPRITE_2": 0x40,
+    "CHEST_SPRITE_1": 0x42,
+    "BALLOON_SPRITE_1": 0x46,
+    "COLLAPSE_TILE_SPRITE_1": 0x48,
+    "COLLAPSE_TILE_SPRITE_2": 0x4A,
+    "COLLAPSE_TILE_SPRITE_3": 0x4C,
+    "STRAWBERRY_SPRITE_1": 0x4E,
+    "FLYING_BERRY_SPRITE_1": 0x60,
+    "SMOKE_SPRITE_1": 0x62,
+    "SMOKE_SPRITE_2": 0x64,
+    "SMOKE_SPRITE_3": 0x66,
+    "WING_SPRITE_1": 0x68,
+    "WING_SPRITE_2": 0x6A,
+    "WING_SPRITE_3": 0x6C,
+    "DECO_TREE_SPRITE_1": 0x6E,
+    "FLOWER_SPRITE_1": 0x80,
+    "BREAKABLE_WALL_SPRITE_1": 0x82,
+    "MONUMENT_SPRITE_1": 0x84,
+    "MONUMENT_SPRITE_2": 0x86,
+    "MONUMENT_SPRITE_3": 0x88,
+    "MONUMENT_SPRITE_4": 0x8A,
+    "BIG_CHEST_SPRITE_1": 0x8C,
+    "BIG_CHEST_SPRITE_2": 0x8E,
+    "DOUBLE_JUMP_ORB_SPRITE_1": 0xA0,
+}
+
 
 def get_tile_group(tile_index):
     """Returns (group_name, frame_index) for a tile index, or None if unmapped."""
@@ -527,15 +572,43 @@ def load_generated_tables(filepath=None):
 
 def generate_sprite_enums_snes(sprite_info, output_path):
     """Auto-generates sprite_animation_enums_snes.h from sprite_info and SPRITE_SEMANTIC_MAP."""
+    def _get_gfx_index(info):
+        # Accept both dict-based entries from converters and struct-like inputs.
+        if isinstance(info, dict):
+            if 'gfx_idx' in info:
+                return info['gfx_idx']
+            if 'gfx_index' in info:
+                return info['gfx_index']
+            return None
+        return getattr(info, 'gfx_idx', getattr(info, 'gfx_index', None))
+
     enums = {}
     for tile_index, (enum_type, enum_name) in sorted(SPRITE_SEMANTIC_MAP.items()):
         if tile_index < len(sprite_info):
             info = sprite_info[tile_index]
-            gfx_idx = info['gfx_idx']
+            gfx_idx = _get_gfx_index(info)
+            if gfx_idx is None:
+                raise KeyError(f"Missing gfx index for tile {tile_index} while generating SNES enums")
             oam_tile = gfx_idx * 2
+            if enum_name in SNES_SPRITE_VALUE_OVERRIDES:
+                oam_tile = SNES_SPRITE_VALUE_OVERRIDES[enum_name]
+            if oam_tile > 0xFF:
+                raise ValueError(f"OAM tile out of range for {enum_name}: 0x{oam_tile:X}")
             if enum_type not in enums:
                 enums[enum_type] = []
             enums[enum_type].append((enum_name, oam_tile))
+
+    # Guardrail: if almost all non-player sprites collapse to tile 0, fail fast.
+    non_player_members = []
+    for enum_type, members in enums.items():
+        if enum_type != "ePlayerSprite":
+            non_player_members.extend(members)
+    if non_player_members:
+        zero_count = sum(1 for _, value in non_player_members if value == 0)
+        if zero_count >= int(len(non_player_members) * 0.7):
+            raise ValueError(
+                f"Refusing to write SNES enums: {zero_count}/{len(non_player_members)} non-player entries resolve to 0x00"
+            )
 
     _write_enum_header(enums, output_path, 'SNES', 'OAM tile numbers')
 

@@ -1,0 +1,18 @@
+{
+  "cart": "C:/path/to/game.p8.png",
+  "out_base": "C:/path/to/output/game",
+  "spc_header": "C:/path/to/project/spc700/p8_music_data.h",
+  "brr_header": "C:/path/to/project/spc700/brrSamples.h",
+  "noise_seed": 100,
+  "noise_ref": 35,
+  "noise_norm": 1.0,
+  "cap": [
+    "0=1.5",
+    "1=4.0",
+    "2=1.5",
+    "3=1.5",
+    "4=2.0",
+    "5=4.0",
+    "7=4.0"
+  ]
+}

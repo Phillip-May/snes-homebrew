@@ -1,0 +1,31 @@
+# Build artifacts
+*.o
+*.bc
+*.i
+*.elf
+*.spc.elf
+
+# Generated audio (reproducible via build.sh + spc2wav)
+*.wav
+
+# Logs
+*.log
+
+# Temp/bisect files
+main_*.spc
+main_*.c
+
+# blargg snes_spc source copies (clone game-music-emu if needed)
+Snes_Spc.*
+Spc_Cpu.*
+Spc_Dsp.*
+Spc_Filter.*
+blargg_*.h
+
+# Python cache
+__pycache__/
+*.pyc
+
+# testrom outputs
+testrom/build/
+testrom/stop_verify_result.txt

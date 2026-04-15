@@ -94,3 +94,17 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
 	vpath %.h $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port .
 endif
 
+.PHONY: spc700-build spc700-payload-header spc700-sync
+
+# Ensure the SNES build always embeds the latest SPC payload.
+all: spc700-sync
+
+spc700-build:
+	@echo Building SPC700 payload...
+	@powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "spc700/build_spc700.ps1"
+
+spc700-payload-header: spc700-build
+	@echo Regenerating SPC payload header for SNES embed...
+	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'spc700/testrom/tools/gen_spc_payload.py' } else { python 'spc700/testrom/tools/gen_spc_payload.py' } }"
+
+spc700-sync: spc700-payload-header

@@ -12,6 +12,7 @@ extern void famistudio_init(void);       // X=data_lo, Y=data_hi
 extern void famistudio_music_play(void); // A=song_index
 extern void famistudio_music_stop(void);
 extern void famistudio_update(void);
+extern const unsigned char music_data_untitled[];
 
 // C wrappers that set up 6502 registers for the engine's calling convention
 static void fs_init(const unsigned char *data) {
@@ -33,6 +34,43 @@ static void fs_play(uint8_t song) {
         "jsr famistudio_music_play\n"
         : : "r"(song) : "a", "x", "y"
     );
+}
+
+static void fs_stop(void) {
+    __asm__ volatile(
+        "jsr famistudio_music_stop\n"
+        :
+        :
+        : "a", "x", "y"
+    );
+}
+
+void port_audioInit(void) {
+    set_prg_bank(BANK_MUSIC);
+    fs_init(music_data_untitled);
+    set_prg_bank(0);
+}
+
+void port_audioUpdate(void) {
+    set_prg_bank(BANK_MUSIC);
+    famistudio_update();
+    set_prg_bank(0);
+}
+
+void port_audioPlayMusic(uint8_t pattern) {
+    set_prg_bank(BANK_MUSIC);
+    fs_play(pattern);
+    set_prg_bank(0);
+}
+
+void port_audioPlaySfx(uint8_t sfxID) {
+    (void)sfxID;
+}
+
+void port_audioStopAll(void) {
+    set_prg_bank(BANK_MUSIC);
+    fs_stop();
+    set_prg_bank(0);
 }
 
 // sprite_animation_enums_nes.h is included by port.h when __NES__ is defined
@@ -670,9 +708,7 @@ static void title_screen_loop(void) {
         // Everything below runs during visible frame (CPU time is free)
 
         // Update music engine
-        set_prg_bank(BANK_MUSIC);
-        famistudio_update();
-        set_prg_bank(0);
+        port_audioUpdate();
 
         // Poll input
         volatile uint8_t raw = (uint8_t)pad_poll(0);
@@ -773,10 +809,7 @@ void port_init(void) {
     ppu_wait_nmi();  // First NMI sets NTSC_MODE — must happen before music init
 
     // Init FamiStudio engine (engine + data both in bank 7)
-    set_prg_bank(BANK_MUSIC);
-    fs_init(music_data_untitled);
-    fs_play(0);
-    set_prg_bank(0);
+    port_audioInit();
 
     // Show title screen (blocks until START is pressed)
     title_screen_loop();

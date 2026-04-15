@@ -9,28 +9,44 @@ def key_to_freq(key):
     return 440.0 * (2 ** ((key - 33) / 12.0))
 
 def dsp_to_freq(p):
-    return p * 32000.0 / (4096.0 * 32.0) if p > 0 else 0
+    return p * 32000.0 / (4096.0 * 64.0) if p > 0 else 0
+
+# PICO-8 uses 32-sample lookup tables with linear interpolation.
+# Pre-compute tables for all 8 instruments (zepto-8/fake-08 formulas).
+_WAVE_TABLE_SIZE = 32
+_WAVE_TABLES = {}
+for _inst in range(8):
+    _tbl = [0.0] * _WAVE_TABLE_SIZE
+    for _i in range(_WAVE_TABLE_SIZE):
+        _t = _i / _WAVE_TABLE_SIZE
+        if _inst == 0: _tbl[_i] = (1.0 - abs(4.0*_t - 2.0)) * 0.5
+        elif _inst == 1:
+            _a = 0.875; _tbl[_i] = (2.0*_t/_a - 1.0 if _t < _a else 2.0*(1.0-_t)/(1.0-_a) - 1.0) * 0.5
+        elif _inst == 2: _tbl[_i] = 0.653 * (_t if _t < 0.5 else _t - 1.0)
+        elif _inst == 3: _tbl[_i] = 0.25 if _t < 0.5 else -0.25
+        elif _inst == 4: _tbl[_i] = 0.25 if _t < 0.316 else -0.25
+        elif _inst == 5:
+            _r = 3.0 - abs(24.0*_t - 6.0) if _t < 0.5 else 1.0 - abs(16.0*_t - 12.0)
+            _tbl[_i] = _r / 9.0
+        elif _inst == 6: _tbl[_i] = 0.25 if _t < 0.5 else -0.25
+        elif _inst == 7:
+            _r = 2.0 - abs(8.0*_t - 4.0)
+            _t2 = (_t * 109.0/110.0) % 1.0
+            _r += 1.0 - abs(4.0*_t2 - 2.0)
+            _tbl[_i] = _r / 6.0
+    _WAVE_TABLES[_inst] = _tbl
 
 def waveform_sample(phase, inst):
-    """Generate one sample for a PICO-8-like waveform based on instrument."""
-    p = phase % 1.0
-    if inst == 0:  # triangle
-        return 4 * p - 1 if p < 0.5 else 3 - 4 * p
-    elif inst == 1:  # tilted saw
-        return p / 0.75 * 2 - 1 if p < 0.75 else 1 - (p - 0.75) / 0.25 * 2
-    elif inst == 2:  # saw
-        return 2 * p - 1
-    elif inst == 3:  # square
-        return 1.0 if p < 0.5 else -1.0
-    elif inst == 4:  # pulse
-        return 1.0 if p < 0.25 else -1.0
-    elif inst == 5:  # organ
-        return 0.7 * math.sin(2 * math.pi * p) + 0.3 * math.sin(4 * math.pi * p)
-    elif inst == 6:  # noise
-        return np.random.uniform(-1, 1)
-    elif inst == 7:  # phaser
-        return 0.6 * math.sin(2 * math.pi * p) + 0.4 * math.sin(2 * math.pi * p * 1.02 + 0.5)
-    return math.sin(2 * math.pi * p)
+    """Table-based waveform with linear interpolation, matching PICO-8's 32-sample tables."""
+    if inst == 6:  # noise is hardware PRNG
+        return np.random.uniform(-1, 1) * 0.25
+    tbl = _WAVE_TABLES[inst]
+    pos = (phase % 1.0) * _WAVE_TABLE_SIZE
+    idx = int(pos)
+    frac = pos - idx
+    s0 = tbl[idx % _WAVE_TABLE_SIZE]
+    s1 = tbl[(idx + 1) % _WAVE_TABLE_SIZE]
+    return s0 + (s1 - s0) * frac
 
 def synthesize_from_capture(csv_path, sr=22050, duration=47.0):
     """Synthesize audio from DSP capture using PICO-8 waveform shapes."""
@@ -57,7 +73,7 @@ def synthesize_from_capture(csv_path, sr=22050, duration=47.0):
             env = int(row[f'v{v}_env'])
             vol = int(row[f'v{v}_vol'])
             srcn = int(row[f'v{v}_srcn'])
-            if pitch > 0 and env > 2 and vol > 0:
+            if pitch > 0 and env > 2 and vol > 0 and srcn < 8:
                 freq = dsp_to_freq(pitch)
                 amp = (vol / 127.0) * (env / 127.0) * 0.25
                 for i in range(end - start):
@@ -83,11 +99,10 @@ def compute_chroma(audio, sr, hop=512):
     return librosa.feature.chroma_stft(y=audio, sr=sr, hop_length=hop, n_chroma=12)
 
 def compare_chromas(chroma_ref, chroma_spc, fps=43):
-    """Compare two chromagrams frame-by-frame."""
+    """Compare two chromagrams with frame-by-frame and local-aligned methods."""
     n = min(chroma_ref.shape[1], chroma_spc.shape[1])
-    notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
-    # Per-frame cosine similarity (frame-indexed, not compressed)
+    # Frame-by-frame cosine similarity (strict)
     frame_sims = np.full(n, np.nan)
     for i in range(n):
         ref = chroma_ref[:, i]
@@ -97,9 +112,28 @@ def compare_chromas(chroma_ref, chroma_spc, fps=43):
         if norm_r > 0.01 and norm_s > 0.01:
             frame_sims[i] = np.dot(ref, spc) / (norm_r * norm_s)
 
-    valid = ~np.isnan(frame_sims)
-    avg_sim = np.nanmean(frame_sims) if valid.any() else 0
-    return avg_sim, frame_sims
+    # Local-aligned: for each ref frame, find best match within ±3 frames of SPC.
+    # Accounts for normal STFT windowing jitter (~70ms tolerance).
+    aligned_sims = np.full(n, np.nan)
+    for i in range(n):
+        ref = chroma_ref[:, i]
+        norm_r = np.linalg.norm(ref)
+        if norm_r < 0.01:
+            continue
+        best = -1.0
+        for j in range(max(0, i - 3), min(n, i + 4)):
+            spc = chroma_spc[:, j]
+            norm_s = np.linalg.norm(spc)
+            if norm_s > 0.01:
+                sim = np.dot(ref, spc) / (norm_r * norm_s)
+                if sim > best:
+                    best = sim
+        if best >= 0:
+            aligned_sims[i] = best
+
+    avg_strict = np.nanmean(frame_sims) if np.any(~np.isnan(frame_sims)) else 0
+    avg_aligned = np.nanmean(aligned_sims) if np.any(~np.isnan(aligned_sims)) else 0
+    return avg_strict, avg_aligned, frame_sims
 
 def main():
     project = Path(__file__).parent.parent
@@ -124,8 +158,10 @@ def main():
     print(f"  Ref: {chroma_ref.shape}, SPC: {chroma_spc.shape}")
 
     print("\nComparing...")
-    avg_sim, sims = compare_chromas(chroma_ref, chroma_spc)
-    print(f"  Average chroma similarity: {avg_sim:.3f} (1.0 = perfect)")
+    avg_strict, avg_aligned, sims = compare_chromas(chroma_ref, chroma_spc)
+    print(f"  Strict frame-by-frame: {avg_strict:.3f}")
+    print(f"  Local-aligned (±3):    {avg_aligned:.3f}")
+    print(f"  (1.0 = perfect)")
 
     # Per-second breakdown
     fps = sr / hop

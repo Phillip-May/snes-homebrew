@@ -1212,6 +1212,10 @@ def main():
                 # Generate graphics data with the optimized palette
                 top_data, bottom_data = convert_tile_to_4bpp_16x16(tile, optimized_palette, False, color_mapping, original_palette)
                 
+                # Recompute 4bpp graphics index after optimization/repack.
+                # The earlier provisional gfx_idx is stale once palettes are regrouped.
+                info['gfx_idx'] = len(row_top_4bpp_data) // 32
+
                 # Update sprite info with new palette index (absolute index including 2bpp palettes)
                 info['pal_idx'] = len(all_2bpp_palettes) + new_pal_idx
                 

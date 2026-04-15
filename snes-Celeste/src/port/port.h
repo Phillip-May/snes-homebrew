@@ -226,6 +226,11 @@ void port_resetSprites(void);
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y);
 uint8_t port_getInputs(void);
 void port_vblank(void);
+void port_audioInit(void);
+void port_audioUpdate(void); // Per-frame audio update hook (target-specific backend)
+void port_audioPlayMusic(uint8_t pattern);
+void port_audioPlaySfx(uint8_t sfxID);
+void port_audioStopAll(void);
 void port_LoadRoomData(uint16_t roomID);
 void port_restoreCollisionFlags(void); // Re-derive collision from ROM (for future collisionFlagsReset removal)
 void port_levelAnimAdvance(void); // Advance level animation on display frame (level 4)

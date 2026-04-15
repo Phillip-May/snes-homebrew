@@ -27,25 +27,59 @@ static int16_t sign(int16_t v) {
 
 enum eSoundEffect {
     SOUND_EFFECT_JUMP = 0,
-    SOUND_EFFECT_DASH_START = 1,
-    SOUND_EFFECT_DASH_END = 2,
-    SOUND_EFFECT_DASH_RESTORED = 3,
-    SOUND_EFFECT_DASH_MISFIRE = 4,
-    SOUND_EFFECT_DEATH = 5,
-    SOUND_EFFECT_BREAKABLE_WALL_HIT = 6,
-    SOUND_EFFECT_STRAWBERRY = 7,
-    SOUND_EFFECT_SPRING = 8,
-    SOUND_EFFECT_BALLOON_POP = 9,
-    SOUND_EFFECT_KEY_COLLECT = 10,
-    SOUND_EFFECT_TEXT_DISPLAY = 11,
-    SOUND_EFFECT_BIG_CHEST = 12
+    SOUND_EFFECT_WALL_JUMP,
+    SOUND_EFFECT_DASH_START,
+    SOUND_EFFECT_DASH_END,
+    SOUND_EFFECT_DASH_RESTORED,
+    SOUND_EFFECT_DASH_MISFIRE,
+    SOUND_EFFECT_DEATH,
+    SOUND_EFFECT_BREAKABLE_WALL_HIT,
+    SOUND_EFFECT_STRAWBERRY,
+    SOUND_EFFECT_SPRING,
+    SOUND_EFFECT_BALLOON_POP,
+    SOUND_EFFECT_KEY_COLLECT,
+    SOUND_EFFECT_TEXT_DISPLAY,
+    SOUND_EFFECT_BIG_CHEST
 };
+
+#ifndef __NES__
+    enum eMusicPattern {
+        MUSIC_PATTERN_LEVEL_START = 0,
+        MUSIC_PATTERN_ORB = 10,
+        MUSIC_PATTERN_WIND = 20,
+        MUSIC_PATTERN_WIDE_OPEN = 30
+    };
+    static uint8_t s_musicTimer = 0u;
+
+    PORT_FUNC_BANK6
+    static uint8_t mapSoundEffectToSpcID(enum eSoundEffect soundEffect) {
+        switch (soundEffect) {
+            case SOUND_EFFECT_JUMP: return 1u;
+            case SOUND_EFFECT_WALL_JUMP: return 2u;
+            case SOUND_EFFECT_DASH_START: return 3u;
+            case SOUND_EFFECT_DASH_END: return 2u;
+            case SOUND_EFFECT_DASH_RESTORED: return 54u;
+            case SOUND_EFFECT_DASH_MISFIRE: return 9u;
+            case SOUND_EFFECT_DEATH: return 0u;
+            case SOUND_EFFECT_BREAKABLE_WALL_HIT: return 16u;
+            case SOUND_EFFECT_STRAWBERRY: return 13u;
+            case SOUND_EFFECT_SPRING: return 8u;
+            case SOUND_EFFECT_BALLOON_POP: return 6u;
+            case SOUND_EFFECT_KEY_COLLECT: return 23u;
+            case SOUND_EFFECT_TEXT_DISPLAY: return 35u;
+            case SOUND_EFFECT_BIG_CHEST: return 37u;
+            default: return 0u;
+        }
+    }
+#endif
 
 PORT_FUNC_BANK6
 void playSoundEffect(enum eSoundEffect soundEffect){
-    // TODO: export SFX from FamiStudio, then:
-    // sfx_play((char)soundEffect, 0);
+#ifdef __NES__
     (void)soundEffect;
+#else
+    port_audioPlaySfx(mapSoundEffectToSpcID(soundEffect));
+#endif
 }
 
 
@@ -409,8 +443,8 @@ void springUpdate(uint8_t index) {
         GLOBAL_PlayerData.objData.pos.y = thisY - 4;
         GLOBAL_PlayerData.posF.y = 0; // reset remainder after position snap
         
-        //Apply spring physics
-        GLOBAL_PlayerData.spd.x = FIXED_MUL_1_5(GLOBAL_PlayerData.spd.x); //Reduce horizontal speed (~0.2)
+        // Apply spring physics (ccleste: spd.x *= 0.2, spd.y = -3).
+        GLOBAL_PlayerData.spd.x = GLOBAL_PlayerData.spd.x / 5;
         GLOBAL_PlayerData.spd.y = INT_TO_FIXED(-3); //Set upward velocity (original)
         GLOBAL_PlayerData.dashesLeft = player->doubleDashUnlocked ? 2 : 1; //Restore dashes
         
@@ -790,30 +824,33 @@ void monumentUpdate(uint8_t index) {
                        (GLOBAL_PlayerData.objData.pos.y < this->pos.y+16);
 
     if (isPlayerTouching) {
-        if (GLOBAL_FrameCount % 4 > 0) {        
+        if (GLOBAL_FrameCount % 4 > 0) {
             return;
         }
-        char *curLineStr = monumentText[curLineNum];
-        uint8_t curLineLength = strlen(curLineStr);
-        char outputText[40];
-        playSoundEffect(SOUND_EFFECT_TEXT_DISPLAY);
+
         isTextDisplayed = true;
         if (curLineNum < 3) {
+            const char *curLineStr = monumentText[curLineNum];
+            uint8_t curLineLength = (uint8_t)strlen(curLineStr);
+            char outputText[40];
+
             if (curLineCharCount < curLineLength) {
+                // Match ccleste: only tick typing sound when a new character appears.
                 curLineCharCount++;
-            }
-            else {
+                playSoundEffect(SOUND_EFFECT_TEXT_DISPLAY);
+                strncpy(outputText, curLineStr, curLineCharCount);
+                outputText[curLineCharCount] = '\0';
+                port_drawText((const unsigned char *)outputText, 20, (uint8_t)(92 + (curLineNum * 4)));
+            } else {
                 curLineNum++;
                 curLineCharCount = 0;
             }
-            strncpy(outputText, curLineStr, curLineCharCount);
-            outputText[curLineCharCount] = '\0';
-            port_drawText((const unsigned char *)outputText, 20, (uint8_t)(92 + (curLineNum * 4)));
         }
     }
     else if (isTextDisplayed) {
         isTextDisplayed = false;
         curLineNum = 0;
+        curLineCharCount = 0;
         port_drawText((const unsigned char *)"                      ", 20, 92);
         port_drawText((const unsigned char *)"                      ", 20, 96);
         port_drawText((const unsigned char *)"                      ", 20, 100);
@@ -852,6 +889,9 @@ void bigChestUpdate(uint8_t index) {
     switch (this->data.bigChest.state) {
         case BIG_CHEST_STATE_IDLE:
             if (isPlayerTouching) {
+#ifndef __NES__
+                port_audioStopAll();
+#endif
                 playSoundEffect(SOUND_EFFECT_BIG_CHEST);
                 initObject(OBJ_SMOKE,this->pos.x,this->pos.y);
                 initObject(OBJ_SMOKE,this->pos.x+8,this->pos.y);
@@ -924,6 +964,9 @@ void doubleDashOrbUpdate(uint8_t index) {
             GLOBAL_DoubleDashUnlocked = true;
             GLOBAL_PlayerData.dashesLeft = 2;
             GLOBAL_PlayerData.doubleDashUnlocked = true;
+#ifndef __NES__
+            s_musicTimer = 45u;
+#endif
             GLOBAL_ActiveLevel.swapActivePalette = true;
             this->eType = OBJ_UNUSED;
             this->flags |= OBJ_FLAG_DIRTY;
@@ -1344,6 +1387,30 @@ void playerInit(struct sPlayerData* this);
 // onVblank is in fixed bank (bank 0), not bank 6
 void onVblank(void);
 
+#ifndef __NES__
+    static void updateRoomMusic(uint16_t roomID) {
+        switch (roomID) {
+            case 1:
+                port_audioPlayMusic(MUSIC_PATTERN_LEVEL_START);
+                break;
+            case 12: // entered room (3,1), after leaving (2,1)
+                port_audioPlayMusic(MUSIC_PATTERN_WIDE_OPEN);
+                break;
+            case 13: // entered room (4,1), after leaving (3,1)
+                port_audioPlayMusic(MUSIC_PATTERN_WIND);
+                break;
+            case 22: // entered room (5,2), after leaving (4,2)
+                port_audioPlayMusic(MUSIC_PATTERN_WIDE_OPEN);
+                break;
+            case 31: // entered room (6,3), after leaving (5,3)
+                port_audioPlayMusic(MUSIC_PATTERN_WIDE_OPEN);
+                break;
+            default:
+                break;
+        }
+    }
+#endif
+
 
 
 void LoadRoomData(uint16_t roomID) {
@@ -1371,6 +1438,9 @@ void LoadRoomData(uint16_t roomID) {
     }
     port_prg_bank_switch(0);
     port_finishSpriteBuild();
+#ifndef __NES__
+    updateRoomMusic(roomID);
+#endif
 }
 
 void LoadNextRoom(void) {
@@ -1465,7 +1535,7 @@ void playerInit(struct sPlayerData* this){
 }
 
 PORT_FUNC_BANK6
-bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, int16_t xspd, int16_t yspd) {
+bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, fixed_t xspd, fixed_t yspd) {
     // Optimized: hitbox is 6x5, always fits in one tile row/col.
     // Direct tile lookups instead of loops.
     uint8_t tX, tY, idx;
@@ -1543,7 +1613,7 @@ static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     int16_t y = this->objData.pos.y + yOffset;
 
     // Pass hitbox bounds {1,3,6,5} instead of full sprite bounds
-    return isDeathAtPoint(x + 1, y + 3, 6, 5, FIXED_TO_INT(this->spd.x), FIXED_TO_INT(this->spd.y));
+    return isDeathAtPoint(x + 1, y + 3, 6, 5, this->spd.x, this->spd.y);
 }
 
 PORT_FUNC_BANK6
@@ -1777,7 +1847,7 @@ void playerUpdate(struct sPlayerData* this) {
                 //Wall jump
                 int8_t wall_dir=(OBJ_isSolidAt(this, -3,0) ? -1 : (OBJ_isSolidAt(this, 3,0) ? 1 : 0));
                 if (wall_dir!=0) {
-                    playSoundEffect(SOUND_EFFECT_JUMP);
+                    playSoundEffect(SOUND_EFFECT_WALL_JUMP);
                     jumpBuffer = 0;
                     this->spd.y = INT_TO_FIXED(-2);
                     { fixed_t wallSpd = FIXED_ADD(maxrun, INT_TO_FIXED(1));
@@ -2073,22 +2143,14 @@ int16_t randint16(int16_t min, int16_t max) {
     return (int16_t)((randomValue % range) + min);
 }
 
-// FamiStudio update — called from fixed bank, switches to bank 7 internally
-extern void famistudio_update(void);
-static void music_update(void) {
-    port_prg_bank_switch(7);
-    famistudio_update();
-    port_prg_bank_switch(0);
-}
-
 void onVblank(void) {
     static bool gameFrameToggle = false;
 
     //Start of vblank critical code
     port_vblank();
 
-    // Music update — runs at 60Hz regardless of game logic rate
-    music_update();
+    // Music/audio update — target-specific backend.
+    port_audioUpdate();
 
     // Frame counter at 60Hz for animation timing
     GLOBAL_FrameCount += 1;
@@ -2100,6 +2162,14 @@ void onVblank(void) {
 
     if (gameFrameToggle) {
         // --- GAME FRAME: player physics + sprite-only OAM rebuild ---
+#ifndef __NES__
+        if (s_musicTimer > 0u) {
+            s_musicTimer--;
+            if (s_musicTimer == 0u) {
+                port_audioPlayMusic(MUSIC_PATTERN_ORB);
+            }
+        }
+#endif
         if (GLOBAL_FreezeFrames > 0) {
             GLOBAL_FreezeFrames--;
             return;

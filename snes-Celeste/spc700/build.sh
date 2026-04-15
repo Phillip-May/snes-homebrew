@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
-/c/llvm-mos/bin/mos-sim-spc700-clang.bat -Os -o main.spc main.c -T link.ld -save-temps
+SPC_CFLAGS="${SPC_CFLAGS:--Os}"
+/c/llvm-mos/bin/mos-sim-spc700-clang.bat ${SPC_CFLAGS} -o main.spc main.c -T link.ld -save-temps
 # Pad .spc to exact size: 256 header + 65536 RAM + 128 DSP = 65920 bytes
 /c/Python37/python.exe -c "
 spc = bytearray(open('main.spc','rb').read())

@@ -63,6 +63,10 @@
 #include "../levelDat/tilemap_level31.h"
 #include "../levelDat/tilemap_level32.h"
 #ifdef __SNESXC_16BIT_POINTERS__
+#pragma clang section rodata="rom_bank_7"
+#endif
+#include "../../spc700/testrom/spc_payload.h"
+#ifdef __SNESXC_16BIT_POINTERS__
 #pragma clang section rodata="rom_bank_0"
 #endif
 #pragma SECTION CONST=CONST
@@ -98,6 +102,235 @@ static uint16_t s_tilemapBg3[512];
 
 uint8_t GLOBAL_InputLo;
 uint8_t GLOBAL_InputHi;
+
+#define SPC_CMD_PLAY_SFX_A 0x01u
+#define SPC_CMD_STOP_ALL   0x03u
+#define SPC_CMD_PLAY_SFX_B 0x04u
+#define SPC_CMD_PLAY_MUSIC 0x06u
+#define BANK_07  7  // rom_bank_7 (SPC payload)
+
+static bool s_spcReady = false;
+static bool s_spcInitTried = false;
+static bool s_spcRuntimeReady = false;
+static uint8_t s_spcLastData = 0xFFu;
+static uint8_t s_spcForceData = 0x80u;
+static uint8_t s_spcSfxCmdToggle = 0u;
+volatile uint8_t GLOBAL_SpcDebugStage = 0u;
+volatile uint8_t GLOBAL_SpcDebugApu0 = 0u;
+volatile uint8_t GLOBAL_SpcDebugApu1 = 0u;
+volatile uint8_t GLOBAL_SpcDebugApu2 = 0u;
+volatile uint8_t GLOBAL_SpcDebugApu3 = 0u;
+volatile uint8_t GLOBAL_SpcDebugLastCmd = 0u;
+volatile uint8_t GLOBAL_SpcDebugLastData = 0u;
+volatile uint8_t GLOBAL_SpcDebugSendCount = 0u;
+volatile uint8_t GLOBAL_SpcDebugSendFail = 0u;
+static uint8_t s_spcUploadBuf[SPC_CHUNK_SIZE];
+
+static bool spc_wait_boot(void) {
+    uint32_t timeout = 1500000u;
+    while (timeout > 0u) {
+        if (REG_APUIO0 == 0xAAu && REG_APUIO1 == 0xBBu) {
+            return true;
+        }
+        timeout--;
+    }
+    return false;
+}
+
+static bool spc_transfer_block(const uint8_t *src, uint16_t dest, uint16_t size) {
+    uint8_t token;
+    uint16_t i;
+    uint32_t timeout;
+
+    REG_APUIO2 = (uint8_t)(dest & 0xFFu);
+    REG_APUIO3 = (uint8_t)(dest >> 8);
+
+    token = (uint8_t)(REG_APUIO0 + 0x22u);
+    if (token == 0u) {
+        token = 1u;
+    }
+
+    REG_APUIO1 = token;
+    REG_APUIO0 = token;
+
+    timeout = 250000u;
+    while (REG_APUIO0 != token) {
+        if (timeout == 0u) {
+            return false;
+        }
+        timeout--;
+    }
+
+    for (i = 0; i < size; i++) {
+        REG_APUIO1 = src[i];
+        REG_APUIO0 = (uint8_t)i;
+
+        timeout = 250000u;
+        while (REG_APUIO0 != (uint8_t)i) {
+            if (timeout == 0u) {
+                return false;
+            }
+            timeout--;
+        }
+    }
+
+    return true;
+}
+
+static bool spc_execute(uint16_t startAddr) {
+    uint8_t execToken;
+    uint32_t timeout;
+
+    REG_APUIO2 = (uint8_t)(startAddr & 0xFFu);
+    REG_APUIO3 = (uint8_t)(startAddr >> 8);
+    REG_APUIO1 = 0u;
+
+    execToken = (uint8_t)(REG_APUIO0 + 2u);
+    REG_APUIO0 = execToken;
+
+    timeout = 250000u;
+    while (REG_APUIO0 != execToken) {
+        if (timeout == 0u) {
+            return false;
+        }
+        timeout--;
+    }
+
+    return true;
+}
+
+static const uint8_t *spc_chunk_ptr(uint16_t ci) {
+    switch (ci) {
+        case 0u: return spc_chunk_000;
+        case 1u: return spc_chunk_001;
+        case 2u: return spc_chunk_002;
+        case 3u: return spc_chunk_003;
+        case 4u: return spc_chunk_004;
+        case 5u: return spc_chunk_005;
+        case 6u: return spc_chunk_006;
+        case 7u: return spc_chunk_007;
+        case 8u: return spc_chunk_008;
+        case 9u: return spc_chunk_009;
+        case 10u: return spc_chunk_010;
+        case 11u: return spc_chunk_011;
+        case 12u: return spc_chunk_012;
+        case 13u: return spc_chunk_013;
+        case 14u: return spc_chunk_014;
+        case 15u: return spc_chunk_015;
+        case 16u: return spc_chunk_016;
+        case 17u: return spc_chunk_017;
+        case 18u: return spc_chunk_018;
+        case 19u: return spc_chunk_019;
+        case 20u: return spc_chunk_020;
+        case 21u: return spc_chunk_021;
+        case 22u: return spc_chunk_022;
+        case 23u: return spc_chunk_023;
+        case 24u: return spc_chunk_024;
+        case 25u: return spc_chunk_025;
+        case 26u: return spc_chunk_026;
+        case 27u: return spc_chunk_027;
+        case 28u: return spc_chunk_028;
+        case 29u: return spc_chunk_029;
+        case 30u: return spc_chunk_030;
+        case 31u: return spc_chunk_031;
+        case 32u: return spc_chunk_032;
+        case 33u: return spc_chunk_033;
+        case 34u: return spc_chunk_034;
+        case 35u: return spc_chunk_035;
+        case 36u: return spc_chunk_036;
+        case 37u: return spc_chunk_037;
+        case 38u: return spc_chunk_038;
+        case 39u: return spc_chunk_039;
+        case 40u: return spc_chunk_040;
+        case 41u: return spc_chunk_041;
+        case 42u: return spc_chunk_042;
+        case 43u: return spc_chunk_043;
+        case 44u: return spc_chunk_044;
+        case 45u: return spc_chunk_045;
+        case 46u: return spc_chunk_046;
+        case 47u: return spc_chunk_047;
+        case 48u: return spc_chunk_048;
+        case 49u: return spc_chunk_049;
+        case 50u: return spc_chunk_050;
+        case 51u: return spc_chunk_051;
+        case 52u: return spc_chunk_052;
+        default: return 0;
+    }
+}
+static bool spc_upload_image(void) {
+    uint16_t ci;
+    snesXC_setDataBank(BANK_07);
+    for (ci = 0; ci < SPC_CHUNK_COUNT; ci++) {
+        uint16_t dest = (uint16_t)(spc_load_addr + (uint16_t)(ci * SPC_CHUNK_SIZE));
+        uint16_t remaining = (uint16_t)(spc_load_size - (uint16_t)(ci * SPC_CHUNK_SIZE));
+        uint16_t size = remaining < (uint16_t)SPC_CHUNK_SIZE ? remaining : (uint16_t)SPC_CHUNK_SIZE;
+        // For 16-bit pointer builds, ROM pointers are near pointers and direct
+        // CPU reads from other banks are unsafe. DMA-copy each chunk to WRAM first.
+        const uint8_t *chunk = spc_chunk_ptr(ci);
+        if (chunk == 0) {
+            snesXC_setDataBank(0u);
+            return false;
+        }
+        snesXC_memcpy_banked(s_spcUploadBuf, chunk, size);
+        if (!spc_transfer_block(s_spcUploadBuf, dest, size)) {
+            snesXC_setDataBank(0u);
+            return false;
+        }
+    }
+    snesXC_setDataBank(0u);
+    return true;
+}
+
+static bool spc_send_cmd(uint8_t cmd, uint8_t data) {
+    uint32_t timeout = 20000u;
+    if (REG_APUIO3 != 0x99u) {
+        return false;
+    }
+    GLOBAL_SpcDebugLastCmd = cmd;
+    GLOBAL_SpcDebugLastData = data;
+    GLOBAL_SpcDebugSendCount++;
+    REG_APUIO1 = cmd;
+    REG_APUIO0 = data;
+    while (REG_APUIO0 != data) {
+        if (timeout == 0u) {
+            GLOBAL_SpcDebugSendFail++;
+            return false;
+        }
+        timeout--;
+    }
+    s_spcLastData = data;
+    return true;
+}
+
+static bool spc_wait_runtime_ready(uint32_t timeout) {
+    while (timeout > 0u) {
+        if (REG_APUIO3 == 0x99u) {
+            return true;
+        }
+        timeout--;
+    }
+    return false;
+}
+
+static bool spc_force_stop(void) {
+    uint8_t token0;
+    uint8_t token1;
+
+    do {
+        s_spcForceData++;
+    } while (s_spcForceData == s_spcLastData || s_spcForceData == REG_APUIO0);
+    token0 = s_spcForceData;
+
+    if (!spc_send_cmd(SPC_CMD_STOP_ALL, token0)) {
+        return false;
+    }
+
+    do {
+        s_spcForceData++;
+    } while (s_spcForceData == token0 || s_spcForceData == REG_APUIO0);
+    token1 = s_spcForceData;
+    return spc_send_cmd(SPC_CMD_STOP_ALL, token1);
+}
 
 uint8_t port_getInputs(void)
 {
@@ -196,6 +429,8 @@ static uint8_t s_textFlashPhase = 0;
 #define PORT_BIG_CHEST_STATE_IDLE 0u
 #define PORT_BIG_CHEST_STATE_OPEN_ANIM 1u
 #define PORT_OAM_ENTRY_COUNT 128u
+// Global visual alignment tweak for SNES OAM Y coordinates.
+#define PORT_SPRITE_Y_BIAS (-1)
 
 static uint8_t s_nextExtraSprite = PORT_EXTRA_SPRITE_START;
 static uint8_t s_maxExtraSpriteUsed = PORT_EXTRA_SPRITE_START;
@@ -279,7 +514,7 @@ static void writeStandardSprite(uint8_t index, const OBJ_DATA *obj)
 {
     uint8_t table2Index = (uint8_t)(index / 4u);
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
-    int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
+    int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
     GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(index, 1u, 0u, currentByte);
     GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = (uint8_t)(obj->pos.x << 1);
     GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = (uint8_t)screenY;
@@ -296,7 +531,7 @@ static void writeConditionalSprite(uint8_t index, const OBJ_DATA *obj, bool hide
     if (hide) {
         GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = 240;
     } else {
-        int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
         GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = (uint8_t)screenY;
     }
     GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = obj->oamTile;
@@ -327,7 +562,7 @@ static bool writeBreakableWallSprite(uint8_t index, OBJ_DATA *obj)
         GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = obj->oamTile;
         GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = (uint8_t)(obj->oamProps | propMask);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)((uint16_t)(obj->pos.x << 1) + offsetX);
-        int16_t extraScreenY = (int16_t)((int16_t)(obj->pos.y << 1) + offsetY - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t extraScreenY = (int16_t)((int16_t)(obj->pos.y << 1) + offsetY - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)extraScreenY;
     }
 
@@ -375,7 +610,7 @@ static bool writeMonumentSprite(uint8_t index, OBJ_DATA *obj)
         GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(slot, 1u, 0u, currentByte);
 
         int16_t spriteX = (int16_t)(obj->pos.x << 1) + kOffsetsX[extra];
-        int16_t spriteY = (int16_t)(obj->pos.y << 1) + kOffsetsY[extra] - (int16_t)GLOBAL_ScrollBG2Y;
+        int16_t spriteY = (int16_t)(obj->pos.y << 1) + kOffsetsY[extra] - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS;
         GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = kTiles[extra];
         GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = kProps[extra];
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)spriteX;
@@ -410,7 +645,7 @@ static bool writeBigChestSprite(uint8_t index, OBJ_DATA *obj)
     if (hide) {
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = 240;
     } else {
-        int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)screenY;
     }
 
@@ -436,7 +671,7 @@ static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
     if (hideMain) {
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = 240;
     } else {
-        int16_t stringY = (int16_t)((int16_t)(obj->pos.y << 1) + 14 + (int16_t)(obj->data.balloon.spriteYOffset << 1) - (int16_t)GLOBAL_ScrollBG2Y);
+        int16_t stringY = (int16_t)((int16_t)(obj->pos.y << 1) + 14 + (int16_t)(obj->data.balloon.spriteYOffset << 1) - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
         GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)stringY;
     }
     GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = obj->data.balloon.stringTile;
@@ -495,7 +730,7 @@ static bool writePlatMovSprite(uint8_t index, OBJ_DATA *obj)
     uint8_t rightSlot = obj->extraSpriteBase;
     uint8_t wrapSlot = (uint8_t)(rightSlot + 1u);
 
-    int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
+    int16_t screenY = (int16_t)((obj->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
 
     uint16_t rightXFull = (uint16_t)((uint16_t)(uint8_t)(obj->pos.x << 1) + PORT_PLATMOV_RIGHT_OFFSET);
     uint8_t rightXBit = 0u;
@@ -563,7 +798,7 @@ static bool writeFlyingBerrySprite(uint8_t index, OBJ_DATA *obj)
         int16_t xOffset = (offset == 0u) ? PORT_FLYING_BERRY_WING_OFFSET_X
                                          : -(int16_t)PORT_FLYING_BERRY_WING_OFFSET_X;
         int16_t wingX = (int16_t)(obj->pos.x << 1) + xOffset;
-        int16_t wingY = (int16_t)(obj->pos.y << 1) - PORT_FLYING_BERRY_WING_OFFSET_Y - (int16_t)GLOBAL_ScrollBG2Y;
+        int16_t wingY = (int16_t)(obj->pos.y << 1) - PORT_FLYING_BERRY_WING_OFFSET_Y - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS;
 
         GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = wingTile;
         GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = properties;
@@ -1059,7 +1294,8 @@ void port_init(void)
     //REG_NMITIMEN = 0x81; // Enable VBlank interrupt (bit 7) and auto-joypad read (bit 0)
     REG_NMITIMEN = 0x01; // Enable auto-joypad read (bit 0)
     REG_INIDISP = 0x0F;
-    
+    port_audioInit();
+ 
 }
 
 void port_beginSpriteBuild(const struct sPlayerData *playerObj)
@@ -1083,7 +1319,7 @@ void port_updatePlayerSprite(const struct sPlayerData *playerObj)
         return;
     }
     const struct sOBJ_DATA *playerData = &playerObj->objData;
-    int16_t screenY = (int16_t)((playerData->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y);
+    int16_t screenY = (int16_t)((playerData->pos.y << 1) - (int16_t)GLOBAL_ScrollBG2Y + PORT_SPRITE_Y_BIAS);
     uint8_t table2Index = 0u; // Sprite 0 is at index 0
     uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
     // Calculate X high bit (bit 8 of X coordinate)
@@ -1549,6 +1785,118 @@ void port_resetSprites(void)
 
 }
 
+void port_audioUpdate(void) {
+    (void)0;
+}
+
+void port_audioInit(void) {
+    if (s_spcReady) {
+        GLOBAL_SpcDebugStage = 5u;
+        return;
+    }
+    if (s_spcInitTried) {
+        return;
+    }
+    s_spcInitTried = true;
+    s_spcRuntimeReady = false;
+    GLOBAL_SpcDebugStage = 1u;
+    GLOBAL_SpcDebugApu0 = REG_APUIO0;
+    GLOBAL_SpcDebugApu1 = REG_APUIO1;
+    GLOBAL_SpcDebugApu2 = REG_APUIO2;
+    GLOBAL_SpcDebugApu3 = REG_APUIO3;
+
+    if (REG_APUIO3 == 0x99u) {
+        s_spcReady = true;
+        s_spcRuntimeReady = true;
+        s_spcLastData = REG_APUIO0;
+        GLOBAL_SpcDebugStage = 5u;
+        return;
+    }
+    if (!spc_wait_boot()) {
+        s_spcInitTried = false;
+        GLOBAL_SpcDebugStage = 11u;
+        GLOBAL_SpcDebugApu0 = REG_APUIO0;
+        GLOBAL_SpcDebugApu1 = REG_APUIO1;
+        GLOBAL_SpcDebugApu2 = REG_APUIO2;
+        GLOBAL_SpcDebugApu3 = REG_APUIO3;
+        return;
+    }
+    GLOBAL_SpcDebugStage = 2u;
+    if (!spc_upload_image()) {
+        s_spcInitTried = false;
+        GLOBAL_SpcDebugStage = 12u;
+        GLOBAL_SpcDebugApu0 = REG_APUIO0;
+        GLOBAL_SpcDebugApu1 = REG_APUIO1;
+        GLOBAL_SpcDebugApu2 = REG_APUIO2;
+        GLOBAL_SpcDebugApu3 = REG_APUIO3;
+        return;
+    }
+    GLOBAL_SpcDebugStage = 3u;
+    if (!spc_execute(spc_start_pc)) {
+        s_spcInitTried = false;
+        GLOBAL_SpcDebugStage = 13u;
+        GLOBAL_SpcDebugApu0 = REG_APUIO0;
+        GLOBAL_SpcDebugApu1 = REG_APUIO1;
+        GLOBAL_SpcDebugApu2 = REG_APUIO2;
+        GLOBAL_SpcDebugApu3 = REG_APUIO3;
+        return;
+    }
+    if (!spc_wait_runtime_ready(2000000u)) {
+        s_spcInitTried = false;
+        GLOBAL_SpcDebugStage = 14u;
+        GLOBAL_SpcDebugApu0 = REG_APUIO0;
+        GLOBAL_SpcDebugApu1 = REG_APUIO1;
+        GLOBAL_SpcDebugApu2 = REG_APUIO2;
+        GLOBAL_SpcDebugApu3 = REG_APUIO3;
+        return;
+    }
+
+    s_spcReady = true;
+    s_spcRuntimeReady = true;
+    s_spcLastData = REG_APUIO0;
+    GLOBAL_SpcDebugStage = 5u;
+    GLOBAL_SpcDebugApu0 = REG_APUIO0;
+    GLOBAL_SpcDebugApu1 = REG_APUIO1;
+    GLOBAL_SpcDebugApu2 = REG_APUIO2;
+    GLOBAL_SpcDebugApu3 = REG_APUIO3;
+}
+
+void port_audioPlayMusic(uint8_t pattern) {
+    if (!s_spcReady) {
+        port_audioInit();
+    }
+    if (!s_spcReady || !s_spcRuntimeReady) {
+        return;
+    }
+    (void)spc_send_cmd(SPC_CMD_PLAY_MUSIC, pattern);
+}
+
+void port_audioPlaySfx(uint8_t sfxID) {
+    uint8_t cmd;
+    if (!s_spcReady) {
+        port_audioInit();
+    }
+    if (!s_spcReady || !s_spcRuntimeReady) {
+        return;
+    }
+    cmd = (s_spcSfxCmdToggle & 1u) ? SPC_CMD_PLAY_SFX_B : SPC_CMD_PLAY_SFX_A;
+    s_spcSfxCmdToggle ^= 1u;
+    (void)spc_send_cmd(cmd, sfxID);
+}
+
+void port_audioStopAll(void) {
+    if (!s_spcReady) {
+        port_audioInit();
+    }
+    if (!s_spcReady) {
+        return;
+    }
+    (void)spc_force_stop();
+}
+
+void port_levelAnimAdvance(void) {
+}
+
 
 // Cross-compiler interrupt handlers, must be present
 void snesXC_cop(void) {
@@ -1563,4 +1911,5 @@ void snesXC_abort(void) {
 void snesXC_nmi(void) {
     // VBlank handling is done in onVblank() which is called from the main loop
 }
+
 

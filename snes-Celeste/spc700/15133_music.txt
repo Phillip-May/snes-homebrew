@@ -1,0 +1,899 @@
+PICO-8 Music Patterns Data
+==================================================
+
+Pattern #00
+--------------------
+Flags: 0x95 (149)
+Loop:   5 to  9
+Bytes: 95 0a 56 44
+
+Channels:
+  Channel 1: SFX #10
+  Channel 2: SFX #86
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #01
+--------------------
+Flags: 0x0a ( 10)
+Loop:  10 to  0
+Bytes: 0a 16 0c 44
+
+Channels:
+  Channel 1: SFX #22
+  Channel 2: SFX #12
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #02
+--------------------
+Flags: 0x0a ( 10)
+Loop:  10 to  0
+Bytes: 0a 16 0c 44
+
+Channels:
+  Channel 1: SFX #22
+  Channel 2: SFX #12
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #03
+--------------------
+Flags: 0x0a ( 10)
+Loop:  10 to  0
+Bytes: 0a 0b 0c 44
+
+Channels:
+  Channel 1: SFX #11
+  Channel 2: SFX #12
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #04
+--------------------
+Flags: 0x14 ( 20)
+Loop:   4 to  1
+Bytes: 14 13 12 44
+
+Channels:
+  Channel 1: SFX #19
+  Channel 2: SFX #18
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #05
+--------------------
+Flags: 0x0a ( 10)
+Loop:  10 to  0
+Bytes: 0a 16 0c 44
+
+Channels:
+  Channel 1: SFX #22
+  Channel 2: SFX #12
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #06
+--------------------
+Flags: 0x0a ( 10)
+Loop:  10 to  0
+Bytes: 0a 16 0c 44
+
+Channels:
+  Channel 1: SFX #22
+  Channel 2: SFX #12
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #07
+--------------------
+Flags: 0x0a ( 10)
+Loop:  10 to  0
+Bytes: 0a 91 12 44
+
+Channels:
+  Channel 1: SFX #145
+  Channel 2: SFX #18
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #08
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #09
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #10
+--------------------
+Flags: 0x98 (152)
+Loop:   8 to  9
+Bytes: 98 19 1a 44
+
+Channels:
+  Channel 1: SFX #25
+  Channel 2: SFX #26
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #11
+--------------------
+Flags: 0x18 ( 24)
+Loop:   8 to  1
+Bytes: 18 19 1a 44
+
+Channels:
+  Channel 1: SFX #25
+  Channel 2: SFX #26
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #12
+--------------------
+Flags: 0x1c ( 28)
+Loop:  12 to  1
+Bytes: 1c 1b 1a 44
+
+Channels:
+  Channel 1: SFX #27
+  Channel 2: SFX #26
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #13
+--------------------
+Flags: 0x1d ( 29)
+Loop:  13 to  1
+Bytes: 1d 1b 1a 44
+
+Channels:
+  Channel 1: SFX #27
+  Channel 2: SFX #26
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #14
+--------------------
+Flags: 0x1f ( 31)
+Loop:  15 to  1
+Bytes: 1f 21 1a 44
+
+Channels:
+  Channel 1: SFX #33
+  Channel 2: SFX #26
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #15
+--------------------
+Flags: 0x1f ( 31)
+Loop:  15 to  1
+Bytes: 1f 1a 21 44
+
+Channels:
+  Channel 1: SFX #26
+  Channel 2: SFX #33
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #16
+--------------------
+Flags: 0x1e ( 30)
+Loop:  14 to  1
+Bytes: 1e 1a 22 44
+
+Channels:
+  Channel 1: SFX #26
+  Channel 2: SFX #34
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #17
+--------------------
+Flags: 0x20 ( 32)
+Loop:   0 to  2
+Bytes: 20 9a 24 44
+
+Channels:
+  Channel 1: SFX #154
+  Channel 2: SFX #36
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #18
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #19
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #20
+--------------------
+Flags: 0xaa (170)
+Loop:  10 to 10
+Bytes: aa 27 29 44
+
+Channels:
+  Channel 1: SFX #39
+  Channel 2: SFX #41
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #21
+--------------------
+Flags: 0x2a ( 42)
+Loop:  10 to  2
+Bytes: 2a 27 29 44
+
+Channels:
+  Channel 1: SFX #39
+  Channel 2: SFX #41
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #22
+--------------------
+Flags: 0x2f ( 47)
+Loop:  15 to  2
+Bytes: 2f 2b 29 44
+
+Channels:
+  Channel 1: SFX #43
+  Channel 2: SFX #41
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #23
+--------------------
+Flags: 0x2f ( 47)
+Loop:  15 to  2
+Bytes: 2f 2b 2c 44
+
+Channels:
+  Channel 1: SFX #43
+  Channel 2: SFX #44
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #24
+--------------------
+Flags: 0x2f ( 47)
+Loop:  15 to  2
+Bytes: 2f 2b 29 44
+
+Channels:
+  Channel 1: SFX #43
+  Channel 2: SFX #41
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #25
+--------------------
+Flags: 0x2f ( 47)
+Loop:  15 to  2
+Bytes: 2f 2b 2c 44
+
+Channels:
+  Channel 1: SFX #43
+  Channel 2: SFX #44
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #26
+--------------------
+Flags: 0x2e ( 46)
+Loop:  14 to  2
+Bytes: 2e 2d 30 44
+
+Channels:
+  Channel 1: SFX #45
+  Channel 2: SFX #48
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #27
+--------------------
+Flags: 0x34 ( 52)
+Loop:   4 to  3
+Bytes: 34 31 27 44
+
+Channels:
+  Channel 1: SFX #49
+  Channel 2: SFX #39
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #28
+--------------------
+Flags: 0x35 ( 53)
+Loop:   5 to  3
+Bytes: 35 b2 27 44
+
+Channels:
+  Channel 1: SFX #178
+  Channel 2: SFX #39
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #29
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #30
+--------------------
+Flags: 0xbd (189)
+Loop:  13 to 11
+Bytes: bd 7e 43 44
+
+Channels:
+  Channel 1: SFX #126
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #31
+--------------------
+Flags: 0x3d ( 61)
+Loop:  13 to  3
+Bytes: 3d 7e 43 44
+
+Channels:
+  Channel 1: SFX #126
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #32
+--------------------
+Flags: 0x3d ( 61)
+Loop:  13 to  3
+Bytes: 3d 4a 43 44
+
+Channels:
+  Channel 1: SFX #74
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #33
+--------------------
+Flags: 0x3d ( 61)
+Loop:  13 to  3
+Bytes: 3d be 43 44
+
+Channels:
+  Channel 1: SFX #190
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #34
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #35
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #36
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #37
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #38
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #39
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #40
+--------------------
+Flags: 0xb8 (184)
+Loop:   8 to 11
+Bytes: b8 3a 3c 44
+
+Channels:
+  Channel 1: SFX #58
+  Channel 2: SFX #60
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #41
+--------------------
+Flags: 0x39 ( 57)
+Loop:   9 to  3
+Bytes: 39 bb 3c 44
+
+Channels:
+  Channel 1: SFX #187
+  Channel 2: SFX #60
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #42
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #43
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #44
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #45
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #46
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #47
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #48
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #49
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #50
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #51
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #52
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #53
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #54
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #55
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #56
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #57
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #58
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #59
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #60
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #61
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #62
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+
+Pattern #63
+--------------------
+Flags: 0x41 ( 65)
+Loop:   1 to  4
+Bytes: 41 42 43 44
+
+Channels:
+  Channel 1: SFX #66
+  Channel 2: SFX #67
+  Channel 3: SFX #68
+  Channel 4: (silent)
+
+==================================================
+

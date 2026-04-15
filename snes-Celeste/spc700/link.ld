@@ -3,7 +3,7 @@ MEMORY {
     zp : ORIGIN = __rc31 + 1, LENGTH = 0x0F0 - (__rc31 + 1)
     hwRegisters : ORIGIN = 0xF0, LENGTH = 0x10
     stack (rw) : ORIGIN = 0x100, LENGTH = 0x0100
-    ram (rw) : ORIGIN = 0x200, LENGTH = 0xff00
+    ram (rw) : ORIGIN = 0x200, LENGTH = 0xFE00
 }
 
 REGION_ALIAS("c_readonly", ram)

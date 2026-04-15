@@ -1,0 +1,834 @@
+[
+  {
+    "index": 0,
+    "flags": 149,
+    "loop_start": 5,
+    "loop_end": 9,
+    "pattern_bytes_hex": "95 0a 56 44",
+    "sfx_ids": [
+      10,
+      86,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 1,
+    "flags": 10,
+    "loop_start": 10,
+    "loop_end": 0,
+    "pattern_bytes_hex": "0a 16 0c 44",
+    "sfx_ids": [
+      22,
+      12,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 2,
+    "flags": 10,
+    "loop_start": 10,
+    "loop_end": 0,
+    "pattern_bytes_hex": "0a 16 0c 44",
+    "sfx_ids": [
+      22,
+      12,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 3,
+    "flags": 10,
+    "loop_start": 10,
+    "loop_end": 0,
+    "pattern_bytes_hex": "0a 0b 0c 44",
+    "sfx_ids": [
+      11,
+      12,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 4,
+    "flags": 20,
+    "loop_start": 4,
+    "loop_end": 1,
+    "pattern_bytes_hex": "14 13 12 44",
+    "sfx_ids": [
+      19,
+      18,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 5,
+    "flags": 10,
+    "loop_start": 10,
+    "loop_end": 0,
+    "pattern_bytes_hex": "0a 16 0c 44",
+    "sfx_ids": [
+      22,
+      12,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 6,
+    "flags": 10,
+    "loop_start": 10,
+    "loop_end": 0,
+    "pattern_bytes_hex": "0a 16 0c 44",
+    "sfx_ids": [
+      22,
+      12,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 7,
+    "flags": 10,
+    "loop_start": 10,
+    "loop_end": 0,
+    "pattern_bytes_hex": "0a 91 12 44",
+    "sfx_ids": [
+      145,
+      18,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 8,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 9,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 10,
+    "flags": 152,
+    "loop_start": 8,
+    "loop_end": 9,
+    "pattern_bytes_hex": "98 19 1a 44",
+    "sfx_ids": [
+      25,
+      26,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 11,
+    "flags": 24,
+    "loop_start": 8,
+    "loop_end": 1,
+    "pattern_bytes_hex": "18 19 1a 44",
+    "sfx_ids": [
+      25,
+      26,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 12,
+    "flags": 28,
+    "loop_start": 12,
+    "loop_end": 1,
+    "pattern_bytes_hex": "1c 1b 1a 44",
+    "sfx_ids": [
+      27,
+      26,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 13,
+    "flags": 29,
+    "loop_start": 13,
+    "loop_end": 1,
+    "pattern_bytes_hex": "1d 1b 1a 44",
+    "sfx_ids": [
+      27,
+      26,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 14,
+    "flags": 31,
+    "loop_start": 15,
+    "loop_end": 1,
+    "pattern_bytes_hex": "1f 21 1a 44",
+    "sfx_ids": [
+      33,
+      26,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 15,
+    "flags": 31,
+    "loop_start": 15,
+    "loop_end": 1,
+    "pattern_bytes_hex": "1f 1a 21 44",
+    "sfx_ids": [
+      26,
+      33,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 16,
+    "flags": 30,
+    "loop_start": 14,
+    "loop_end": 1,
+    "pattern_bytes_hex": "1e 1a 22 44",
+    "sfx_ids": [
+      26,
+      34,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 17,
+    "flags": 32,
+    "loop_start": 0,
+    "loop_end": 2,
+    "pattern_bytes_hex": "20 9a 24 44",
+    "sfx_ids": [
+      154,
+      36,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 18,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 19,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 20,
+    "flags": 170,
+    "loop_start": 10,
+    "loop_end": 10,
+    "pattern_bytes_hex": "aa 27 29 44",
+    "sfx_ids": [
+      39,
+      41,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 21,
+    "flags": 42,
+    "loop_start": 10,
+    "loop_end": 2,
+    "pattern_bytes_hex": "2a 27 29 44",
+    "sfx_ids": [
+      39,
+      41,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 22,
+    "flags": 47,
+    "loop_start": 15,
+    "loop_end": 2,
+    "pattern_bytes_hex": "2f 2b 29 44",
+    "sfx_ids": [
+      43,
+      41,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 23,
+    "flags": 47,
+    "loop_start": 15,
+    "loop_end": 2,
+    "pattern_bytes_hex": "2f 2b 2c 44",
+    "sfx_ids": [
+      43,
+      44,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 24,
+    "flags": 47,
+    "loop_start": 15,
+    "loop_end": 2,
+    "pattern_bytes_hex": "2f 2b 29 44",
+    "sfx_ids": [
+      43,
+      41,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 25,
+    "flags": 47,
+    "loop_start": 15,
+    "loop_end": 2,
+    "pattern_bytes_hex": "2f 2b 2c 44",
+    "sfx_ids": [
+      43,
+      44,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 26,
+    "flags": 46,
+    "loop_start": 14,
+    "loop_end": 2,
+    "pattern_bytes_hex": "2e 2d 30 44",
+    "sfx_ids": [
+      45,
+      48,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 27,
+    "flags": 52,
+    "loop_start": 4,
+    "loop_end": 3,
+    "pattern_bytes_hex": "34 31 27 44",
+    "sfx_ids": [
+      49,
+      39,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 28,
+    "flags": 53,
+    "loop_start": 5,
+    "loop_end": 3,
+    "pattern_bytes_hex": "35 b2 27 44",
+    "sfx_ids": [
+      178,
+      39,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 29,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 30,
+    "flags": 189,
+    "loop_start": 13,
+    "loop_end": 11,
+    "pattern_bytes_hex": "bd 7e 43 44",
+    "sfx_ids": [
+      126,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 31,
+    "flags": 61,
+    "loop_start": 13,
+    "loop_end": 3,
+    "pattern_bytes_hex": "3d 7e 43 44",
+    "sfx_ids": [
+      126,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 32,
+    "flags": 61,
+    "loop_start": 13,
+    "loop_end": 3,
+    "pattern_bytes_hex": "3d 4a 43 44",
+    "sfx_ids": [
+      74,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 33,
+    "flags": 61,
+    "loop_start": 13,
+    "loop_end": 3,
+    "pattern_bytes_hex": "3d be 43 44",
+    "sfx_ids": [
+      190,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 34,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 35,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 36,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 37,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 38,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 39,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 40,
+    "flags": 184,
+    "loop_start": 8,
+    "loop_end": 11,
+    "pattern_bytes_hex": "b8 3a 3c 44",
+    "sfx_ids": [
+      58,
+      60,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 41,
+    "flags": 57,
+    "loop_start": 9,
+    "loop_end": 3,
+    "pattern_bytes_hex": "39 bb 3c 44",
+    "sfx_ids": [
+      187,
+      60,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 42,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 43,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 44,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 45,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 46,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 47,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 48,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 49,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 50,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 51,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 52,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 53,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 54,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 55,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 56,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 57,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 58,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 59,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 60,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 61,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 62,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  },
+  {
+    "index": 63,
+    "flags": 65,
+    "loop_start": 1,
+    "loop_end": 4,
+    "pattern_bytes_hex": "41 42 43 44",
+    "sfx_ids": [
+      66,
+      67,
+      68,
+      0
+    ]
+  }
+]
