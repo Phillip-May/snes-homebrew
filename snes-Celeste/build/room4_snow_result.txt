@@ -1,0 +1,32 @@
+START
+f=30 room=0 fc=10 dma=0 snowX0=49152 snowY0=21
+f=60 room=0 fc=4 dma=0 snowX0=49152 snowY0=21
+f=90 room=0 fc=34 dma=0 snowX0=49152 snowY0=21
+f=120 room=1 fc=64 dma=4 snowX0=49152 snowY0=21
+f=150 room=1 fc=94 dma=0 snowX0=62592 snowY0=21
+f=180 room=1 fc=124 dma=0 snowX0=10496 snowY0=75
+f=210 room=1 fc=154 dma=0 snowX0=23936 snowY0=76
+f=240 room=1 fc=184 dma=0 snowX0=37376 snowY0=77
+f=270 room=1 fc=214 dma=0 snowX0=50816 snowY0=78
+f=300 room=1 fc=244 dma=0 snowX0=64256 snowY0=79
+f=330 room=1 fc=274 dma=0 snowX0=12160 snowY0=12
+f=360 room=1 fc=304 dma=0 snowX0=25600 snowY0=12
+f=390 room=1 fc=334 dma=0 snowX0=39040 snowY0=12
+f=420 room=1 fc=364 dma=0 snowX0=52480 snowY0=13
+f=450 room=1 fc=394 dma=0 snowX0=384 snowY0=86
+f=480 room=1 fc=424 dma=0 snowX0=13824 snowY0=86
+f=510 room=1 fc=454 dma=0 snowX0=27264 snowY0=86
+f=540 room=1 fc=484 dma=0 snowX0=40704 snowY0=86
+f=570 room=1 fc=514 dma=0 snowX0=54144 snowY0=87
+f=600 room=1 fc=544 dma=0 snowX0=2048 snowY0=169
+f=630 room=1 fc=574 dma=0 snowX0=15488 snowY0=169
+f=660 room=1 fc=604 dma=0 snowX0=28928 snowY0=169
+f=690 room=1 fc=634 dma=0 snowX0=42368 snowY0=169
+f=720 room=1 fc=664 dma=0 snowX0=55808 snowY0=170
+f=750 room=1 fc=694 dma=0 snowX0=3712 snowY0=187
+f=780 room=1 fc=724 dma=0 snowX0=17152 snowY0=186
+f=810 room=1 fc=754 dma=0 snowX0=30592 snowY0=185
+f=840 room=1 fc=784 dma=0 snowX0=44032 snowY0=184
+f=870 room=1 fc=814 dma=0 snowX0=57472 snowY0=183
+f=900 room=1 fc=844 dma=0 snowX0=5376 snowY0=149
+DONE

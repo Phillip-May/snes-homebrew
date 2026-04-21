@@ -1,0 +1,45 @@
+  Investigate SNES Celeste BG layer usage and plan cloud color fix, cloud improvements, and BG1 snow
+                                                                                                                                                                             You are looking at a SNES port of PICO-8 Celeste located at C:\Users\Admin\Documents\snes-homebrew\snes-Celeste. The game uses llvm-mos (65816) and runs in Mode 0 (four
+  2bpp BG layers).
+
+  Current BG layer layout (configured in src/port/snes.c):
+  - BG1: Dynamic text overlay (monument text, flag stats). Uses 16x16 tiles. Tilemap at byte $6000, tile data at byte $C000. Has a 50-slot system that rasterizes PICO-8
+  font glyphs into 2bpp tiles on the fly. Tile numbers start at 18 (tiles 0-17 reserved so cleared tilemap entries stay transparent). The text system is in src/port/snes.c
+   — search for bg1Text functions.
+  - BG2: Gameplay foreground tiles (platforms, walls). Tilemap at byte $2000, tile data at byte $A000. 16x16 tiles.
+  - BG3: Gameplay background tiles (decorative layer). Tilemap at byte $4000, tile data at byte $A000 (shares character base with BG2). 16x16 tiles.
+  - BG4: Clouds/parallax. Tilemap at byte $0000, tile data at byte $E000. Scrolls slowly for parallax. Cloud tile data and palette loaded in LoadInitialGraphics().
+  - Registers: REG_BGMODE = 0xF0 (Mode 0, all BGs 16x16), BG12NBA = 0x56, BG34NBA varies by mode.
+
+  Current cloud implementation: Clouds use BG4 exclusively. Cloud tile graphics are in clouds_tiles, palette in clouds_palette/clouds_palette_2. The cloud tilemap is
+  loaded once. There's a updateCloudsVblankSafe() function that runs each frame. Some levels swap the cloud palette. Look at src/clouds.h and the cloud-related code in
+  src/port/snes.c.
+
+  Original PICO-8 Celeste reference: The original game logic is in src/mainBankZero.c. Clouds and snow are software-rendered in the original — look for any cloud/snow
+  drawing functions there and in the ccleste reference at C:\Users\Admin\Documents\snes-homebrew\_refs\ccleste if it exists.
+
+  Your task — research only, do NOT write code:
+
+  1. Fix cloud colors: The current cloud palette doesn't match the original PICO-8/ccleste colors. Find the exact cloud colors used in the original (check ccleste source,
+  PICO-8 palette references, and the _draw_clouds or equivalent function). Compare against the current clouds_palette and clouds_palette_2 data in the SNES port. Determine
+   exactly which BGR15 values the SNES palette entries should be to match the originals. Account for the fact that PICO-8 uses a fixed 16-color palette and the SNES needs
+  BGR555 conversions. Note which levels use clouds_palette vs clouds_palette_2 (the palette swap).
+  2. Understand the current cloud system: Read the cloud tile data, tilemap, palette, and scroll logic. How many unique tiles does it use? How is parallax achieved? What
+  are the limitations?
+  3. Understand snow in original Celeste: Find how snow/particles work in the PICO-8 original or ccleste. How many particles? How do they move? Which levels have snow vs
+  rain?
+  4. Plan: Can clouds be improved? Consider whether BG4's current single-tilemap approach limits visual quality. Could cloud variety be increased with palette animation,
+  HDMA tricks, or tilemap updates during VBlank? Remember VBlank time is tight (text system already uses some).
+  5. Plan: Can BG1 show snow without breaking text? The BG1 text system uses a sparse 50-slot tile allocation. Most of the 16x16 tilemap and tile data region is unused
+  when text isn't active. Consider:
+    - Could snow particles be rendered into BG1 tiles (similar to how text glyphs are rasterized)?
+    - Could snow use the UNUSED tilemap entries/tiles that the text system doesn't touch?
+    - What happens when monument text and snow need to coexist? Priority/conflicts?
+    - Could snow use a different palette than text (BG1 has 8 palettes in Mode 0)?
+    - Would HDMA be needed to split BG1 between snow regions and text regions?
+    - How many snow particles could realistically be updated per VBlank given the existing text flush budget?
+  6. Identify constraints and risks: VBlank DMA budget, ROM bank switching, the text system's bg1TextFlushVram already runs during VBlank, 50-slot limit, tile-0 subtile
+  reservation (tiles 0-17 must stay zero).
+
+  Produce a structured plan with concrete recommendations, not vague suggestions. Reference specific files, functions, and VRAM addresses. Note what's feasible vs
+  aspirational.

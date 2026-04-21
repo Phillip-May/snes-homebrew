@@ -1,0 +1,1 @@
+PASS frame=600 fc=544 room=0 px=0 py=0

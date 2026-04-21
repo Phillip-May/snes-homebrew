@@ -19,11 +19,13 @@ LIBFIXMATH_SOURCES = $(PROJECT_SRC_DIR)/libfixmath/fix16.c
 LIBFIXMATH_INCLUDES = -I"$(PROJECT_SRC_DIR)/libfixmath"
 
 # Port-specific files
-PORT_SOURCES = $(PROJECT_SRC_DIR)/port/snes.c
+PORT_SOURCES = $(PROJECT_SRC_DIR)/port/snes.c \
+               $(PROJECT_SRC_DIR)/port/snes_farcall.c
 PORT_INCLUDES = -I"$(PROJECT_SRC_DIR)/port"
 
 # Include shared build system
 include $(SHARED_BUILD_DIR)/shared-config.mk
+CCFLAGS += -D__SNES__
 
 # Override source file paths to point to src/ directory
 # This must be done after the include because shared-config.mk conditionally sets these variables
@@ -60,8 +62,11 @@ endif
 
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	PROJECT_C_FILES = $(wildcard $(PROJECT_SRC_DIR)/*.c)
-	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c $(LIBFIXMATH_SOURCES) $(PORT_SOURCES)
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c $(LIBFIXMATH_SOURCES) $(PORT_SOURCES) $(PROJECT_SRC_DIR)/port/snes_farcall.s $(PROJECT_SRC_DIR)/port/bg1_text_glyph_fetch.s
 	CCFLAGS += -I$(PROJECT_SRC_DIR) $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES)
+	LDFLAGS += -Xlinker -Map -Xlinker $(BUILD_DIR)/mainBankZero_llvm-mos.map
+	POST_LINK = @powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/fix_snes_checksum.ps1" "$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)"
+	POST_LINK += && powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/sync_mesen_rom.ps1" "$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)" "$(BUILD_DIR)/mainBankZero_llvm-mos_mesen$(OUTPUT_EXT)"
 	vpath %.c $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port $(PROJECT_SRC_DIR)/libfixmath $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
 	vpath %.h $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port .
 endif
@@ -94,10 +99,10 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
 	vpath %.h $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port .
 endif
 
-.PHONY: spc700-build spc700-payload-header spc700-sync
+.PHONY: spc700-build spc700-payload-header spc700-sync title-snes-header title-snes-sync pico8-font-header pico8-font-sync score-snes-header score-snes-sync
 
 # Ensure the SNES build always embeds the latest SPC payload.
-all: spc700-sync
+all: spc700-sync title-snes-sync pico8-font-sync score-snes-sync
 
 spc700-build:
 	@echo Building SPC700 payload...
@@ -108,3 +113,21 @@ spc700-payload-header: spc700-build
 	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'spc700/testrom/tools/gen_spc_payload.py' } else { python 'spc700/testrom/tools/gen_spc_payload.py' } }"
 
 spc700-sync: spc700-payload-header
+
+title-snes-header:
+	@echo Regenerating SNES title screen header...
+	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'python/convert_title_screen_snes.py' } else { python 'python/convert_title_screen_snes.py' } }"
+
+title-snes-sync: title-snes-header
+
+pico8-font-header:
+	@echo Regenerating Pico-8 font header...
+	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'python/convert_pico8_font_snes.py' } else { python 'python/convert_pico8_font_snes.py' } }"
+
+pico8-font-sync: pico8-font-header
+
+score-snes-header:
+	@echo Regenerating SNES score sprite header...
+	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'python/convert_score_1000_snes.py' } else { python 'python/convert_score_1000_snes.py' } }"
+
+score-snes-sync: score-snes-header

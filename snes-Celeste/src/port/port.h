@@ -69,7 +69,8 @@ typedef struct sOBJ_DATA {
         OBJ_BREAKABLE_WALL = 64,
         OBJ_MONUMENT = 70,
         OBJ_BIG_CHEST = 96,
-        OBJ_BIG_CHEST_2 = 97
+        OBJ_BIG_CHEST_2 = 97,
+        OBJ_FLAG = 118
     } eType;
     union sOBJData{
         struct sSmokeData{
@@ -87,6 +88,17 @@ typedef struct sOBJ_DATA {
             uint8_t bgTextX;
             uint8_t bgTextY;
         } strawberry;
+        struct sFlyingBerryData{
+            uint8_t startY;
+            uint8_t frameCount;
+            uint8_t isCollected;
+            uint8_t bgTextX;
+            uint8_t bgTextY;
+            uint8_t isFlying;
+            uint8_t sfxDelay;
+            fixed_t speedY;
+            fixed_t remY;
+        } flyingBerry;
         struct sSpringData{
             bool isDisabled;
             uint8_t frameCount;
@@ -130,6 +142,14 @@ typedef struct sOBJ_DATA {
             uint8_t state;
             uint8_t frameCount;
         } bigChest;
+        struct sFlagData {
+            uint8_t score;
+            uint8_t show;
+            uint8_t drawn;
+            uint8_t lastSeconds;
+            uint16_t lastMinutes;
+            uint16_t lastDeaths;
+        } flag;
         struct sDoubleJumpOrbData {
             int8_t frameCount;
             int16_t speedY;
@@ -155,6 +175,7 @@ struct sPlayerData
     VEC_F dashAccel;
     uint8_t dashesLeft;
     int8_t dashCounter;
+    bool hasDashed;
 
     bool isFliped;
 };
@@ -199,7 +220,7 @@ struct sActiveLevelData
 #define GLOBAL_OBJ_LIST_SIZE 29
 
 extern struct sActiveLevelData GLOBAL_ActiveLevel;
-extern uint16_t GLOBAL_FrameCount;
+extern volatile uint16_t GLOBAL_FrameCount;
 
 void port_init(void);
 void port_beginSpriteBuild(const struct sPlayerData *playerObj);
@@ -212,6 +233,7 @@ void port_buildBalloon(uint8_t index);
 void port_buildMonument(uint8_t index);
 void port_buildChest(uint8_t index);
 void port_buildBigChest(uint8_t index);
+void port_buildFlag(uint8_t index);
 void port_buildKey(uint8_t index);
 void port_buildSpring(uint8_t index);
 void port_buildCollapseTile(uint8_t index);
@@ -224,6 +246,17 @@ void port_buildStaticDecor(uint8_t index);
 void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType);
 void port_resetSprites(void);
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y);
+void port_drawTextN(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y);
+void port_drawChar(uint8_t ch, uint8_t x, uint8_t y);
+void port_drawCharWhiteOnBlack(uint8_t ch, uint8_t x, uint8_t y);
+void port_clearChars(uint8_t x, uint8_t y, uint8_t count);
+void port_renderTextOverlays(void);
+#ifdef __SNES__
+void port_drawTextPico8N(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y);
+void port_drawTextWhiteOnBlack(const unsigned char *text, uint8_t x, uint8_t y);
+void port_drawTextWhiteOnBlackN(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y);
+void port_drawTextBoxBlack(uint8_t x, uint8_t y, uint8_t w, uint8_t h);
+#endif
 uint8_t port_getInputs(void);
 void port_vblank(void);
 void port_audioInit(void);
@@ -231,6 +264,9 @@ void port_audioUpdate(void); // Per-frame audio update hook (target-specific bac
 void port_audioPlayMusic(uint8_t pattern);
 void port_audioPlaySfx(uint8_t sfxID);
 void port_audioStopAll(void);
+void port_setTitleMode(bool enabled);
+void port_showTitleScreen(void);
+void port_showGameplayScreen(void);
 void port_LoadRoomData(uint16_t roomID);
 void port_restoreCollisionFlags(void); // Re-derive collision from ROM (for future collisionFlagsReset removal)
 void port_levelAnimAdvance(void); // Advance level animation on display frame (level 4)
@@ -244,6 +280,7 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 
 // Macros for function section attributes (bank placement)
 #ifdef __NES_UNROM_512__
+#define PORT_FUNC_BANK7 __attribute__((section(".prg_rom_7")))
 #define PORT_FUNC_BANK6 __attribute__((section(".prg_rom_6")))
 #define PORT_FUNC_BANK5 __attribute__((section(".prg_rom_5")))
 #define PORT_FUNC_BANK4 __attribute__((section(".prg_rom_4")))
@@ -251,7 +288,19 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 #define PORT_FUNC_BANK2 __attribute__((section(".prg_rom_2")))
 #define PORT_FUNC_BANK1 __attribute__((section(".prg_rom_1")))
 #define PORT_FUNC_BANK0 __attribute__((section(".prg_rom_0")))
+#elif defined(__SNES__) && defined(__mos__)
+/* SNES banked C code lives in each bank-local $8000-$AFFF window. Default
+ * unannotated code is linked into the mirrored fixed $B000-$FFDF window. */
+#define PORT_FUNC_BANK7 __attribute__((noinline, section("rom_bank_7")))
+#define PORT_FUNC_BANK6 __attribute__((noinline, section("rom_bank_6")))
+#define PORT_FUNC_BANK5 __attribute__((noinline, section("rom_bank_5")))
+#define PORT_FUNC_BANK4 __attribute__((noinline, section("rom_bank_4")))
+#define PORT_FUNC_BANK3 __attribute__((noinline, section("rom_bank_3")))
+#define PORT_FUNC_BANK2 __attribute__((noinline, section("rom_bank_2")))
+#define PORT_FUNC_BANK1 __attribute__((noinline, section("rom_bank_1")))
+#define PORT_FUNC_BANK0 __attribute__((noinline, section("rom_fixed")))
 #else
+#define PORT_FUNC_BANK7
 #define PORT_FUNC_BANK6
 #define PORT_FUNC_BANK5
 #define PORT_FUNC_BANK4
@@ -264,6 +313,7 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 // Macros for data/rodata section attributes (bank placement)
 // For const/rodata, we need to use .rodata.prg_rom_X to avoid conflicts with code sections
 #ifdef __NES_UNROM_512__
+#define PORT_DATA_BANK7 __attribute__((section(".prg_rom_7.rodata")))
 #define PORT_DATA_BANK6 __attribute__((section(".prg_rom_6.rodata")))
 #define PORT_DATA_BANK5 __attribute__((section(".prg_rom_5.rodata")))
 #define PORT_DATA_BANK4 __attribute__((section(".prg_rom_4.rodata")))
@@ -271,7 +321,17 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 #define PORT_DATA_BANK2 __attribute__((section(".prg_rom_2.rodata")))
 #define PORT_DATA_BANK1 __attribute__((section(".prg_rom_1.rodata")))
 #define PORT_DATA_BANK0 __attribute__((section(".prg_rom_0.rodata")))
+#elif defined(__SNES__) && defined(__mos__)
+#define PORT_DATA_BANK7 __attribute__((used, section("rom_bank_7_rodata")))
+#define PORT_DATA_BANK6 __attribute__((used, section("rom_bank_6_rodata")))
+#define PORT_DATA_BANK5 __attribute__((used, section("rom_bank_5_rodata")))
+#define PORT_DATA_BANK4 __attribute__((used, section("rom_bank_4_rodata")))
+#define PORT_DATA_BANK3 __attribute__((used, section("rom_bank_3_rodata")))
+#define PORT_DATA_BANK2 __attribute__((used, section("rom_bank_2_rodata")))
+#define PORT_DATA_BANK1 __attribute__((used, section("rom_bank_1_rodata")))
+#define PORT_DATA_BANK0 __attribute__((used, section("rom_fixed_rodata")))
 #else
+#define PORT_DATA_BANK7
 #define PORT_DATA_BANK6
 #define PORT_DATA_BANK5
 #define PORT_DATA_BANK4
@@ -282,11 +342,28 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 #endif
 
 // Wrapper function for bank switching (portable interface)
-static inline void port_prg_bank_switch(uint8_t bank) {
 #ifdef __NES_UNROM_512__
+static inline void port_prg_bank_switch(uint8_t bank) {
     set_prg_bank(bank);
-#endif
 }
+static inline void port_prg_bank_push(uint8_t bank) { port_prg_bank_switch(bank); }
+static inline void port_prg_bank_pop(void) { port_prg_bank_switch(0u); }
+#elif defined(__SNES__)
+void port_prg_bank_switch(uint8_t bank);
+void port_prg_bank_push(uint8_t bank);
+void port_prg_bank_pop(void);
+#else
+static inline void port_prg_bank_switch(uint8_t bank) { (void)bank; }
+static inline void port_prg_bank_push(uint8_t bank) { (void)bank; }
+static inline void port_prg_bank_pop(void) { }
+#endif
+
+#ifndef PORT_PRG_BANK_DEFAULT
+#define PORT_PRG_BANK_DEFAULT 0u
+#endif
+
+#define port_prg_bank_enter(bank) port_prg_bank_push((bank))
+#define port_prg_bank_leave() port_prg_bank_pop()
 
 #endif /* PORT_H */
 

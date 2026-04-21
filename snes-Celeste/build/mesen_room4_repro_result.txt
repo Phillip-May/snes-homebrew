@@ -1,0 +1,1 @@
+PASS room4 frame=435 fc=391 x=8 y=96

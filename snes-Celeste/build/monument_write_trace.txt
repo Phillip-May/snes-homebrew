@@ -1,0 +1,3 @@
+START
+FRAME f=1 fc=65535 room=0 logic=0 moncalls=0 disp=0 tick=0 line=0 char=0
+TIMEOUT

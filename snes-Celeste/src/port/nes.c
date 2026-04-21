@@ -73,6 +73,18 @@ void port_audioStopAll(void) {
     set_prg_bank(0);
 }
 
+void port_showTitleScreen(void) {
+    (void)0;
+}
+
+void port_showGameplayScreen(void) {
+    (void)0;
+}
+
+void port_setTitleMode(bool enabled) {
+    (void)enabled;
+}
+
 // sprite_animation_enums_nes.h is included by port.h when __NES__ is defined
 #include "../../python/gid_to_tile_shared.h"
 #include "../../python/gid_to_tile_collapse.h"

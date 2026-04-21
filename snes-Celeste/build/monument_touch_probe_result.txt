@@ -1,0 +1,22 @@
+f=1 fc=65535 room=0 same=0 px=65535 py=65535
+f=30 fc=10 room=0 same=0 px=0 py=0
+f=60 fc=4 room=12 same=0 px=60 py=40
+f=90 fc=34 room=12 same=0 px=60 py=40
+f=120 fc=64 room=12 same=0 px=60 py=40
+f=150 fc=94 room=12 same=0 px=60 py=40
+f=180 fc=124 room=12 same=0 px=60 py=40
+f=210 fc=154 room=12 same=0 px=60 py=40
+f=240 fc=184 room=12 same=0 px=60 py=40
+f=270 fc=214 room=12 same=0 px=60 py=40
+f=300 fc=244 room=12 same=0 px=60 py=40
+f=330 fc=274 room=12 same=0 px=60 py=40
+f=360 fc=304 room=12 same=0 px=60 py=40
+f=390 fc=334 room=12 same=0 px=60 py=40
+f=420 fc=364 room=12 same=0 px=60 py=40
+f=450 fc=394 room=12 same=0 px=60 py=40
+f=480 fc=424 room=12 same=0 px=60 py=40
+f=510 fc=454 room=12 same=0 px=60 py=40
+f=540 fc=484 room=12 same=0 px=60 py=40
+f=570 fc=514 room=12 same=0 px=60 py=40
+f=600 fc=544 room=12 same=0 px=60 py=40
+DONE

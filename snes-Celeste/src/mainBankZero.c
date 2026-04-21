@@ -13,6 +13,9 @@
 #include "../shared/src/snes_regs_xc.h"
 #include "../shared/src/initsnes.h"
 #include "port/port.h"
+#ifndef __NES__
+#include "port/snes_farcall.h"
+#endif
 
 // 60fps vs 30fps physics scaling factor
 
@@ -20,7 +23,9 @@
 int16_t randint16(int16_t min, int16_t max);
 
 //Basic math functions that a compiler should have
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
 static int16_t sign(int16_t v) {
     return v > 0 ? 1 : (v < 0 ? -1 : 0);
 }
@@ -39,7 +44,10 @@ enum eSoundEffect {
     SOUND_EFFECT_BALLOON_POP,
     SOUND_EFFECT_KEY_COLLECT,
     SOUND_EFFECT_TEXT_DISPLAY,
-    SOUND_EFFECT_BIG_CHEST
+    SOUND_EFFECT_BIG_CHEST,
+    SOUND_EFFECT_FLYING_BERRY,
+    SOUND_EFFECT_TITLE_START,
+    SOUND_EFFECT_FLAG
 };
 
 #ifndef __NES__
@@ -47,11 +55,13 @@ enum eSoundEffect {
         MUSIC_PATTERN_LEVEL_START = 0,
         MUSIC_PATTERN_ORB = 10,
         MUSIC_PATTERN_WIND = 20,
-        MUSIC_PATTERN_WIDE_OPEN = 30
+        MUSIC_PATTERN_WIDE_OPEN = 30,
+        MUSIC_PATTERN_TITLE = 40
     };
     static uint8_t s_musicTimer = 0u;
+    static bool s_inTitleScreen = false;
+    static int8_t s_titleStartTimer = 0;
 
-    PORT_FUNC_BANK6
     static uint8_t mapSoundEffectToSpcID(enum eSoundEffect soundEffect) {
         switch (soundEffect) {
             case SOUND_EFFECT_JUMP: return 1u;
@@ -68,12 +78,17 @@ enum eSoundEffect {
             case SOUND_EFFECT_KEY_COLLECT: return 23u;
             case SOUND_EFFECT_TEXT_DISPLAY: return 35u;
             case SOUND_EFFECT_BIG_CHEST: return 37u;
+            case SOUND_EFFECT_FLYING_BERRY: return 14u;
+            case SOUND_EFFECT_TITLE_START: return 38u;
+            case SOUND_EFFECT_FLAG: return 55u;
             default: return 0u;
         }
     }
 #endif
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
 void playSoundEffect(enum eSoundEffect soundEffect){
 #ifdef __NES__
     (void)soundEffect;
@@ -82,19 +97,33 @@ void playSoundEffect(enum eSoundEffect soundEffect){
 #endif
 }
 
+void LoadRoomData(uint16_t roomID);
+extern uint8_t GLOBAL_InputState;
+
 
 
 uint8_t GLOBAL_InputState = 0;
 
 OBJ_DATA GLOBAL_OBJList[GLOBAL_OBJ_LIST_SIZE] = {0};
 
-uint16_t GLOBAL_FrameCount = 0;
+volatile uint16_t GLOBAL_FrameCount = 0;
+static volatile uint16_t s_lastGameplayFrame = 0u;
 
 uint8_t GLOBAL_FreezeFrames = 0;
 
 uint8_t GLOBAL_PausePlayerFrames = 0;
 //Game state globals
 bool GLOBAL_DoubleDashUnlocked = false;
+uint8_t GLOBAL_GotFruitBits[4] = {0};
+uint8_t GLOBAL_FruitCount = 0;
+uint16_t GLOBAL_DeathCount = 0;
+uint8_t GLOBAL_TimerFrames = 0;
+uint8_t GLOBAL_TimerSeconds = 0;
+uint16_t GLOBAL_TimerMinutes = 0;
+
+#define GLOBAL_FRUIT_COUNT 30u
+#define GLOBAL_FRUIT_BITS_SIZE 4u
+#define GLOBAL_LEVEL_COUNT 32u
 
 
 
@@ -104,9 +133,108 @@ struct sActiveLevelData GLOBAL_ActiveLevel;
 
 struct sPlayerData GLOBAL_PlayerData;
 
+#ifdef __SNES__
+extern uint8_t GLOBAL_InputLo;
+#endif
+
 void initObject(enum eOBJType eType, int16_t x, int16_t y);
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
+static uint8_t currentFruitIndex(void) {
+    uint16_t roomID = GLOBAL_ActiveLevel.currentRoomID;
+    if (roomID == 0u || roomID > GLOBAL_FRUIT_COUNT) {
+        return 0xFFu;
+    }
+    return (uint8_t)(roomID - 1u);
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#endif
+static bool gotFruitAt(uint8_t fruitIndex) {
+    if (fruitIndex >= GLOBAL_FRUIT_COUNT) {
+        return false;
+    }
+    return (GLOBAL_GotFruitBits[fruitIndex >> 3] & (uint8_t)(1u << (fruitIndex & 7u))) != 0u;
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#endif
+static bool currentRoomFruitCollected(void) {
+    return gotFruitAt(currentFruitIndex());
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#endif
+static void collectCurrentRoomFruit(void) {
+    uint8_t fruitIndex = currentFruitIndex();
+    uint8_t mask;
+    if (fruitIndex >= GLOBAL_FRUIT_COUNT) {
+        return;
+    }
+    mask = (uint8_t)(1u << (fruitIndex & 7u));
+    if ((GLOBAL_GotFruitBits[fruitIndex >> 3] & mask) == 0u) {
+        GLOBAL_GotFruitBits[fruitIndex >> 3] |= mask;
+        GLOBAL_FruitCount++;
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#endif
+static bool objectSkipsWhenFruitCollected(enum eOBJType eType) {
+    return eType == OBJ_STRAWBERRY || eType == OBJ_FLYING_BERRY ||
+           eType == OBJ_BREAKABLE_WALL || eType == OBJ_KEY ||
+           eType == OBJ_CHEST;
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#endif
+static void resetRunState(void) {
+    uint8_t i;
+    for (i = 0; i < GLOBAL_FRUIT_BITS_SIZE; ++i) {
+        GLOBAL_GotFruitBits[i] = 0;
+    }
+    GLOBAL_FruitCount = 0;
+    GLOBAL_DeathCount = 0;
+    GLOBAL_FrameCount = 0;
+    GLOBAL_TimerFrames = 0;
+    GLOBAL_TimerSeconds = 0;
+    GLOBAL_TimerMinutes = 0;
+    GLOBAL_DoubleDashUnlocked = false;
+}
+
+#ifndef __NES__
+extern uint16_t GLOBAL_ScrollBG2X;
+extern uint16_t GLOBAL_ScrollBG2Y;
+extern uint16_t GLOBAL_ScrollBG3X;
+extern uint16_t GLOBAL_ScrollBG3Y;
+extern uint16_t GLOBAL_ScrollBG4Y;
+
+PORT_FUNC_BANK5
+static void syncCameraFromPlayer(void) {
+    int16_t playerRenderY = (int16_t)(GLOBAL_PlayerData.objData.pos.y << 1);
+    int16_t smoothScrollY = (playerRenderY - GLOBAL_ActiveLevel.scrollPointY) >> 2;
+    int16_t shakeAmount = GLOBAL_ActiveLevel.shakeFrames > 0 ? ((GLOBAL_FrameCount & 1u) ? 2 : -2) : 0;
+
+    GLOBAL_ScrollBG2Y = CLAMP(playerRenderY - 16 - GLOBAL_ActiveLevel.scrollPointY, 0, 31);
+    GLOBAL_ScrollBG2X = 0;
+    GLOBAL_ScrollBG3X = GLOBAL_ScrollBG2X + shakeAmount;
+    GLOBAL_ScrollBG3Y = GLOBAL_ScrollBG2Y + shakeAmount;
+    GLOBAL_ScrollBG4Y =  smoothScrollY + (shakeAmount >> 1) - (GLOBAL_ActiveLevel.currentRoomID << 6);
+}
+#endif
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void smokeInit(uint8_t index) {
     GLOBAL_OBJList[index].data.smoke.frameCount = 0;
     GLOBAL_OBJList[index].data.smoke.smokeSpriteState = SMOKE_SPRITE_1;
@@ -130,7 +258,11 @@ void smokeInit(uint8_t index) {
     }
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void smokeUpdate(uint8_t index) {
     OBJ_DATA *smoke = &GLOBAL_OBJList[index];
     smoke->data.smoke.frameCount++;
@@ -150,7 +282,11 @@ void smokeUpdate(uint8_t index) {
 
 
 #define COLLISION_FLAG_INDEX_FROM_TILE_XY(x,y) ((x) + (y) * 16)
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void breakableWallInit(uint8_t index) {
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
@@ -173,7 +309,11 @@ void breakableWallInit(uint8_t index) {
 
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void breakableWallUpdate(uint8_t index) {
     //Check if player is touching the wall
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
@@ -217,7 +357,11 @@ void breakableWallUpdate(uint8_t index) {
     wall->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t properties) {
     OBJ_DATA *decor = &GLOBAL_OBJList[index];
     decor->oamTile = tile;
@@ -225,17 +369,29 @@ static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t propertie
     decor->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 static void updateSimpleDecorSprite(uint8_t index) {
     GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void flowerInit(uint8_t index) {
     initSimpleDecorSprite(index, FLOWER_SPRITE_1, 0x32); // priority 3, palette 1
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void flowerUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
@@ -246,7 +402,11 @@ enum eCollapseTileState {
     COLLAPSE_TILE_STATE_HIDDEN = 2,
 };
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void collapseTileInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
@@ -283,7 +443,11 @@ void collapseTileInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void collapseTileUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint16_t thisX = this->pos.x;
@@ -368,25 +532,41 @@ void collapseTileUpdate(uint8_t index) {
     }
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void springInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.spring.frameCount = 0;
     this->data.spring.isDisabled = false;
     this->data.spring.linkedCollapseTileIndex = -1;
 
+#ifdef __SNES__
+    // Springs render as a single standard sprite on SNES; leaving the old
+    // fixed extra-sprite reservation here corrupts the dynamic extra-sprite
+    // allocator used by balloons and other multi-sprite objects.
+    this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+    this->extraSpriteCount = 0;
+#else
     // Assign fixed OAM slot (4 sprites per 16x16 object)
     // Player uses slots 0-3, objects start at slot 4
     // Each object gets 4 consecutive slots based on its index
     this->extraSpriteBase = 4 + (index * 4);
     this->extraSpriteCount = 4;
+#endif
 
     this->oamTile = SPRING_SPRITE_1;
     this->oamProps = 0x32; // priority 3, palette 2
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void springUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     struct sPlayerData *player = &GLOBAL_PlayerData;
@@ -477,7 +657,11 @@ void springUpdate(uint8_t index) {
 }
 
 enum eBalloonState {BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1};
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
 void balloonInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.balloon.state = BALLOON_STATE_IDLE;
@@ -491,40 +675,56 @@ void balloonInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-PORT_DATA_BANK6 static const uint8_t balloonStringFrames[75] = {
+#ifdef __NES__
+PORT_DATA_BANK6
+#elif defined(__SNES__)
+PORT_DATA_BANK0
+#else
+PORT_DATA_BANK4
+#endif
+static const uint8_t balloonStringFrames[75] = {
     BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2,
     BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1,
     BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_1, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2, BALLOON_STRING_2,
     BALLOON_STRING_2, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_1, BALLOON_STRING_1,
 };
 #define BALLON_YTABLE_SIZE 304
-PORT_DATA_BANK6 static const uint8_t balloon_ytable[] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-    2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
-    3, 3, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-    2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-    2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-};
-
-
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static uint8_t balloonYOffset(uint16_t tableIndex) {
+    if (tableIndex < 26u) {
+        return 0u;
+    }
+    if (tableIndex < 53u) {
+        return 1u;
+    }
+    if (tableIndex < 85u) {
+        return 2u;
+    }
+    if (tableIndex < 230u) {
+        return 3u;
+    }
+    if (tableIndex < 262u) {
+        return 2u;
+    }
+    if (tableIndex < 289u) {
+        return 1u;
+    }
+    return 0u;
+}
+
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
 void balloonUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    int8_t yOffset = balloon_ytable[this->data.balloon.yTableIndex];
+    int8_t yOffset = (int8_t)balloonYOffset(this->data.balloon.yTableIndex);
     bool isPlayerTouching = false;
 
     this->data.balloon.frameCount += 1;
@@ -567,7 +767,11 @@ void balloonUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void platMovInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     // ccleste: this->x -= 4 (center the 16px sprite on spawn tile)
@@ -594,7 +798,11 @@ void platMovInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void platMovUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t hitboxIndex = this->data.platMov.hitboxIndex;
@@ -644,7 +852,11 @@ void platMovUpdate(uint8_t index) {
 
 enum eKeyState {KEY_STATE_1 = 0, KEY_STATE_2 = 1, KEY_STATE_3 = 2, KEY_STATE_4 = 3};
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void keyInit(uint8_t index) {
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -666,7 +878,11 @@ void keyInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void keyUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t properties = 0x30; // priority 3 baseline
@@ -733,7 +949,11 @@ void keyUpdate(uint8_t index) {
 
 enum eChestState {CHEST_STATE_IDLE = 0, CHEST_STATE_SHAKING = 1, CHEST_STATE_OPEN = 2};
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void chestInit(uint8_t index) {   
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -754,7 +974,11 @@ void chestInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void chestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     int16_t shakeAmount = 0;
@@ -789,7 +1013,11 @@ void chestUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
 void monumentInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -801,20 +1029,83 @@ void monumentInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
-
-static const char monumentText[][25] = {
-    "-- CELESTE MOUNTAIN -- ",
-    "THIS MEMORIAL TO THOSE ",
-    " PERISHED ON THE CLIMB "
+PORT_DATA_BANK0
+static const unsigned char monumentText[][25] = {
+    "-- celeste mountain -- ",
+    "this memorial to those ",
+    " perished on the climb "
 };
+static unsigned char monumentBlankLine[] = "                            ";
+#ifdef __NES__
+#define MONUMENT_TEXT_X 20u
+#define MONUMENT_TEXT_Y 92u
+#define MONUMENT_TEXT_LINE_SPACING 4u
+#define MONUMENT_TEXT_CHAR_ADVANCE 5u
+#else
+#define MONUMENT_TEXT_X 8u
+#define MONUMENT_TEXT_Y 80u
+#define MONUMENT_TEXT_LINE_SPACING 7u
+#define MONUMENT_TEXT_CHAR_ADVANCE 5u
+#endif
+bool GLOBAL_MonumentTextDisplayed = false;
+uint8_t GLOBAL_MonumentCurLineCharCount = 0;
+uint8_t GLOBAL_MonumentCurLineNum = 0;
+static uint8_t s_monumentTextTick = 0;
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void resetMonumentTextState(void) {
+    GLOBAL_MonumentTextDisplayed = false;
+    GLOBAL_MonumentCurLineCharCount = 0;
+    GLOBAL_MonumentCurLineNum = 0;
+    s_monumentTextTick = 0;
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void monumentDrawCharHelper(uint8_t lineNum, uint8_t charIndex) {
+#ifdef __SNES__
+    port_drawTextPico8N(&monumentText[lineNum][charIndex],
+                        1u,
+                        (uint8_t)(MONUMENT_TEXT_X + (charIndex * MONUMENT_TEXT_CHAR_ADVANCE)),
+                        (uint8_t)(MONUMENT_TEXT_Y + (lineNum * MONUMENT_TEXT_LINE_SPACING)));
+#else
+    port_drawTextN(&monumentText[lineNum][charIndex],
+                   1u,
+                   (uint8_t)(MONUMENT_TEXT_X + (charIndex * MONUMENT_TEXT_CHAR_ADVANCE)),
+                   (uint8_t)(MONUMENT_TEXT_Y + (lineNum * MONUMENT_TEXT_LINE_SPACING)));
+#endif
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void monumentClearHelper(void) {
+    port_drawText(monumentBlankLine, MONUMENT_TEXT_X, MONUMENT_TEXT_Y);
+    port_drawText(monumentBlankLine,
+                  MONUMENT_TEXT_X,
+                  (uint8_t)(MONUMENT_TEXT_Y + MONUMENT_TEXT_LINE_SPACING));
+    port_drawText(monumentBlankLine,
+                  MONUMENT_TEXT_X,
+                  (uint8_t)(MONUMENT_TEXT_Y + (MONUMENT_TEXT_LINE_SPACING * 2u)));
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
 void monumentUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching;
-    static bool isTextDisplayed = false;
-    static uint8_t curLineCharCount = 0;
-    static uint8_t curLineNum = 0;
 
     this->flags |= OBJ_FLAG_DIRTY;
 
@@ -822,45 +1113,40 @@ void monumentUpdate(uint8_t index) {
                        (GLOBAL_PlayerData.objData.pos.x < this->pos.x+16) &&
                        (GLOBAL_PlayerData.objData.pos.y > this->pos.y) &&
                        (GLOBAL_PlayerData.objData.pos.y < this->pos.y+16);
-
     if (isPlayerTouching) {
-        if (GLOBAL_FrameCount % 4 > 0) {
+        GLOBAL_MonumentTextDisplayed = true;
+        s_monumentTextTick ^= 1u;
+        if (s_monumentTextTick != 0u) {
             return;
         }
 
-        isTextDisplayed = true;
-        if (curLineNum < 3) {
-            const char *curLineStr = monumentText[curLineNum];
-            uint8_t curLineLength = (uint8_t)strlen(curLineStr);
-            char outputText[40];
-
-            if (curLineCharCount < curLineLength) {
-                // Match ccleste: only tick typing sound when a new character appears.
-                curLineCharCount++;
+        if (GLOBAL_MonumentCurLineNum < 3u) {
+            if (GLOBAL_MonumentCurLineCharCount < 23u) {
+                uint8_t charIndex = GLOBAL_MonumentCurLineCharCount;
+                GLOBAL_MonumentCurLineCharCount++;
                 playSoundEffect(SOUND_EFFECT_TEXT_DISPLAY);
-                strncpy(outputText, curLineStr, curLineCharCount);
-                outputText[curLineCharCount] = '\0';
-                port_drawText((const unsigned char *)outputText, 20, (uint8_t)(92 + (curLineNum * 4)));
+                monumentDrawCharHelper(GLOBAL_MonumentCurLineNum, charIndex);
             } else {
-                curLineNum++;
-                curLineCharCount = 0;
+                GLOBAL_MonumentCurLineNum++;
+                GLOBAL_MonumentCurLineCharCount = 0;
             }
         }
     }
-    else if (isTextDisplayed) {
-        isTextDisplayed = false;
-        curLineNum = 0;
-        curLineCharCount = 0;
-        port_drawText((const unsigned char *)"                      ", 20, 92);
-        port_drawText((const unsigned char *)"                      ", 20, 96);
-        port_drawText((const unsigned char *)"                      ", 20, 100);
+    else if (GLOBAL_MonumentTextDisplayed) {
+        resetMonumentTextState();
+        monumentClearHelper();
     }
+
 }
 
 enum eBigChestState {BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2};
 
 // eBigChestSprite is defined in sprite_animation_enums.h
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
 void bigChestInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -874,7 +1160,11 @@ void bigChestInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
 void bigChestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 4) &&
@@ -922,7 +1212,231 @@ void bigChestUpdate(uint8_t index) {
     }
 }
 
+#ifdef __NES__
+PORT_DATA_BANK6
+#elif defined(__SNES__)
+PORT_DATA_BANK0
+#else
+PORT_DATA_BANK4
+#endif
+static const unsigned char flagBlankLine[] = "                ";
+bool GLOBAL_FlagOverlayShow = false;
+uint8_t GLOBAL_FlagOverlayLine0Len = 0u;
+uint8_t GLOBAL_FlagOverlayLine1Len = 0u;
+uint8_t GLOBAL_FlagOverlayLine2Len = 0u;
+unsigned char GLOBAL_FlagOverlayLine0[17] = {0};
+unsigned char GLOBAL_FlagOverlayLine1[17] = {0};
+unsigned char GLOBAL_FlagOverlayLine2[17] = {0};
+
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void flagLineReset(char *line) {
+    uint8_t i;
+    for (i = 0; i < 17u; ++i) {
+        line[i] = '\0';
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void flagAppendText(char *line, uint8_t *pos, const char *text) {
+    while (*text != '\0' && *pos < 16u) {
+        line[*pos] = *text;
+        (*pos)++;
+        text++;
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void flagAppendDecimal(char *line, uint8_t *pos, uint16_t value) {
+    uint16_t divisor = 10000u;
+    bool started = false;
+    while (divisor > 0u && *pos < 16u) {
+        uint8_t digit = (uint8_t)(value / divisor);
+        if (digit != 0u || started || divisor == 1u) {
+            line[*pos] = (char)('0' + digit);
+            (*pos)++;
+            started = true;
+        }
+        value = (uint16_t)(value % divisor);
+        divisor /= 10u;
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void flagAppendTwoDigits(char *line, uint8_t *pos, uint16_t value) {
+    if (*pos < 16u) {
+        line[*pos] = (char)('0' + ((value / 10u) % 10u));
+        (*pos)++;
+    }
+    if (*pos < 16u) {
+        line[*pos] = (char)('0' + (value % 10u));
+        (*pos)++;
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void flagDrawLineWhiteOnBlack(const char *line, uint8_t length, uint8_t x, uint8_t y) {
+    uint8_t i;
+    for (i = 0u; i < length; ++i) {
+        port_drawCharWhiteOnBlack((uint8_t)line[i], (uint8_t)(x + (i * 5u)), y);
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void flagDrawHelper(uint16_t score, uint16_t totalMinutes, uint16_t seconds, uint16_t deaths) {
+    char line[17];
+    uint8_t pos;
+#ifdef __SNES__
+    flagLineReset(line);
+    pos = 0;
+    flagAppendText(line, &pos, "x");
+    flagAppendDecimal(line, &pos, score);
+    memcpy(GLOBAL_FlagOverlayLine0, line, sizeof(GLOBAL_FlagOverlayLine0));
+    GLOBAL_FlagOverlayLine0Len = pos;
+    flagLineReset(line);
+    pos = 0;
+    flagAppendTwoDigits(line, &pos, (uint16_t)(totalMinutes / 60u));
+    flagAppendText(line, &pos, ":");
+    flagAppendTwoDigits(line, &pos, (uint16_t)(totalMinutes % 60u));
+    flagAppendText(line, &pos, ":");
+    flagAppendTwoDigits(line, &pos, seconds);
+    memcpy(GLOBAL_FlagOverlayLine1, line, sizeof(GLOBAL_FlagOverlayLine1));
+    GLOBAL_FlagOverlayLine1Len = pos;
+    flagLineReset(line);
+    pos = 0;
+    flagAppendText(line, &pos, "deaths:");
+    flagAppendDecimal(line, &pos, deaths);
+    memcpy(GLOBAL_FlagOverlayLine2, line, sizeof(GLOBAL_FlagOverlayLine2));
+    GLOBAL_FlagOverlayLine2Len = pos;
+    GLOBAL_FlagOverlayShow = true;
+#else
+    port_drawText(flagBlankLine, 32, 4);
+    port_drawText(flagBlankLine, 32, 12);
+    port_drawText(flagBlankLine, 32, 20);
+    flagLineReset(line);
+    pos = 0;
+    flagAppendText(line, &pos, "BERRIES:");
+    flagAppendDecimal(line, &pos, score);
+    port_drawText((const unsigned char *)line, 32, 4);
+    flagLineReset(line);
+    pos = 0;
+    flagAppendTwoDigits(line, &pos, (uint16_t)(totalMinutes / 60u));
+    flagAppendText(line, &pos, ":");
+    flagAppendTwoDigits(line, &pos, (uint16_t)(totalMinutes % 60u));
+    flagAppendText(line, &pos, ":");
+    flagAppendTwoDigits(line, &pos, seconds);
+    port_drawText((const unsigned char *)line, 32, 12);
+    flagLineReset(line);
+    pos = 0;
+    flagAppendText(line, &pos, "DEATHS:");
+    flagAppendDecimal(line, &pos, deaths);
+    port_drawText((const unsigned char *)line, 32, 20);
+#endif
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+void flagInit(uint8_t index) {
+    OBJ_DATA *this = &GLOBAL_OBJList[index];
+    this->pos.x += 5;
+    this->data.flag.score = GLOBAL_FruitCount;
+    this->data.flag.show = false;
+    this->data.flag.drawn = false;
+    this->data.flag.lastSeconds = 0xFFu;
+    this->data.flag.lastMinutes = 0xFFFFu;
+    this->data.flag.lastDeaths = 0xFFFFu;
+    GLOBAL_FlagOverlayShow = false;
+    GLOBAL_FlagOverlayLine0Len = 0u;
+    GLOBAL_FlagOverlayLine1Len = 0u;
+    GLOBAL_FlagOverlayLine2Len = 0u;
+    GLOBAL_FlagOverlayLine0[0] = '\0';
+    GLOBAL_FlagOverlayLine1[0] = '\0';
+    GLOBAL_FlagOverlayLine2[0] = '\0';
+    this->oamTile = FLAG_SPRITE_1;
+    this->oamProps = 0x32; // priority 3, palette 2
+    this->flags |= OBJ_FLAG_DIRTY;
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+void flagUpdate(uint8_t index) {
+    OBJ_DATA *this = &GLOBAL_OBJList[index];
+    bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) &&
+                            (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 8) &&
+                            (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 8) &&
+                            (GLOBAL_PlayerData.objData.pos.y < this->pos.y + 8);
+
+    switch ((GLOBAL_FrameCount / 10u) % 3u) {
+        case 0u:
+            this->oamTile = FLAG_SPRITE_1;
+            break;
+        case 1u:
+            this->oamTile = FLAG_SPRITE_2;
+            break;
+        default:
+            this->oamTile = FLAG_SPRITE_3;
+            break;
+    }
+    this->oamProps = 0x32;
+
+    if (!this->data.flag.show && isPlayerTouching) {
+        this->data.flag.show = true;
+        this->data.flag.score = GLOBAL_FruitCount;
+        this->data.flag.drawn = false;
+        playSoundEffect(SOUND_EFFECT_FLAG);
+    }
+
+    if (this->data.flag.show &&
+        (!this->data.flag.drawn ||
+         this->data.flag.lastSeconds != GLOBAL_TimerSeconds ||
+         this->data.flag.lastMinutes != GLOBAL_TimerMinutes ||
+         this->data.flag.lastDeaths != GLOBAL_DeathCount)) {
+        this->data.flag.drawn = true;
+        this->data.flag.lastSeconds = GLOBAL_TimerSeconds;
+        this->data.flag.lastMinutes = GLOBAL_TimerMinutes;
+        this->data.flag.lastDeaths = GLOBAL_DeathCount;
+    }
+    if (!this->data.flag.show) {
+        GLOBAL_FlagOverlayShow = false;
+    }
+
+    this->flags |= OBJ_FLAG_DIRTY;
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void doubleDashOrbInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -935,7 +1449,11 @@ void doubleDashOrbInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     //Speed starts at -8 and goes down by 0.5 every frame
@@ -979,15 +1497,24 @@ void doubleDashOrbUpdate(uint8_t index) {
     }
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void strawberryInit(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
 
+#ifdef __NES__
     // Assign fixed OAM slot (4 sprites per 16x16 object)
     // Player uses slots 0-3, objects start at slot 4
     // Each object gets 4 consecutive slots based on its index
     strawberry->extraSpriteBase = 4 + (index * 4);
     strawberry->extraSpriteCount = 4;
+#else
+    strawberry->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
+    strawberry->extraSpriteCount = 0;
+#endif
 
     strawberry->data.strawberry.startY = strawberry->pos.y;
     strawberry->data.strawberry.frameCount = 0;
@@ -997,26 +1524,42 @@ void strawberryInit(uint8_t index) {
     strawberry->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void decoTreeInit(uint8_t index) {
     initSimpleDecorSprite(index, DECO_TREE_SPRITE_1, 0x32); // priority 3, palette 2
 }
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK2
+#endif
 void decoTreeUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
 
+#ifdef __NES__
+PORT_DATA_BANK6
+#else
+PORT_DATA_BANK3
+#endif
+static const int8_t berry_y_positions[40] = {
+    0,   1,   2,   2,   3,   4,   4,   4,   5,   5,
+    5,   5,   5,   4,   4,   4,   3,   2,   2,   1,
+    0,  -1,  -2,  -2,  -3,  -4,  -4,  -4,  -5,  -5,
+    -5,  -5,  -5,  -4,  -4,  -4,  -3,  -2,  -2,  -1
+};
+
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void strawberryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    //Pre computed sine table
-    static const int8_t y_positions[40] = {
-        0,   1,   2,   2,   3,   4,   4,   4,   5,   5,
-        5,   5,   5,   4,   4,   4,   3,   2,   2,   1,
-        0,  -1,  -2,  -2,  -3,  -4,  -4,  -4,  -5,  -5,
-        -5,  -5,  -5,  -4,  -4,  -4,  -3,  -2,  -2,  -1
-    };
-
     uint8_t thisX = this->pos.x;
     uint8_t thisY = this->pos.y;
     uint8_t playerX = GLOBAL_PlayerData.objData.pos.x;
@@ -1037,6 +1580,10 @@ void strawberryUpdate(uint8_t index) {
             if (GLOBAL_ActiveLevel.textScrollActive && GLOBAL_ActiveLevel.textScrollOffsetY < 0xFFu) {
                 GLOBAL_ActiveLevel.textScrollOffsetY += 1;
             }
+            if (this->data.strawberry.bgTextY > 0u) {
+                this->data.strawberry.bgTextY--;
+            }
+            this->pos.y = this->data.strawberry.bgTextY;
         }
 
         if (this->data.strawberry.frameCount > 30) {
@@ -1045,12 +1592,12 @@ void strawberryUpdate(uint8_t index) {
             GLOBAL_ActiveLevel.textScrollActive = false;
             GLOBAL_ActiveLevel.textScrollOffsetX = 0;
             GLOBAL_ActiveLevel.textScrollOffsetY = 0;
-            port_drawText((const unsigned char *)"    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
             this->eType = OBJ_UNUSED;
             this->flags |= OBJ_FLAG_DIRTY;
             return;
         }
         //Draw code for this state
+        this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
 
@@ -1059,20 +1606,17 @@ void strawberryUpdate(uint8_t index) {
         uint8_t remainderY = this->pos.y%8;
 
         GLOBAL_PlayerData.dashesLeft = GLOBAL_PlayerData.doubleDashUnlocked ? 2 : 1;
+        collectCurrentRoomFruit();
         playSoundEffect(SOUND_EFFECT_STRAWBERRY);        
-        //got_fruit[level_index()] = true;
         this->data.strawberry.isCollected = true;
         this->data.strawberry.frameCount = 0;
-        this->pos.x -= 2;
+        this->pos.x -= 4;
         this->pos.y -= 4;        
-        //Draw the text for the next state
         this->data.strawberry.bgTextX = this->pos.x;
         this->data.strawberry.bgTextY = this->pos.y;
-        port_drawText((const unsigned char *)"1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
         GLOBAL_ActiveLevel.textScrollActive = true;
         GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - ((remainderX * 2u) % 8u));
         GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - ((remainderY * 2u) % 8u));
-        this->pos.y = 128;
         this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
@@ -1080,61 +1624,70 @@ void strawberryUpdate(uint8_t index) {
     if (this->data.strawberry.frameCount >= 40) {
         this->data.strawberry.frameCount = 0;
     }
-    this->pos.y = this->data.strawberry.startY + y_positions[this->data.strawberry.frameCount];
+    this->pos.y = this->data.strawberry.startY + berry_y_positions[this->data.strawberry.frameCount];
 
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void flyingBerryInit(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
-    berry->data.strawberry.frameCount = 0;
-    berry->data.strawberry.isCollected = false;
-    berry->data.strawberry.startY = berry->pos.y;
+    berry->data.flyingBerry.frameCount = 0;
+    berry->data.flyingBerry.isCollected = false;
+    berry->data.flyingBerry.startY = berry->pos.y;
+    berry->data.flyingBerry.isFlying = false;
+    berry->data.flyingBerry.sfxDelay = 8;
+    berry->data.flyingBerry.speedY = 0;
+    berry->data.flyingBerry.remY = 0;
     berry->oamTile = FLYING_BERRY_SPRITE_1;
     berry->oamProps = 0x32; // priority 3, palette 0
     berry->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
 void flyingBerryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    static const int8_t y_positions[40] = {
-        0,   1,   2,   2,   3,   4,   4,   4,   5,   5,
-        5,   5,   5,   4,   4,   4,   3,   2,   2,   1,
-        0,  -1,  -2,  -2,  -3,  -4,  -4,  -4,  -5,  -5,
-        -5,  -5,  -5,  -4,  -4,  -4,  -3,  -2,  -2,  -1
-    };
-
     uint8_t thisX = this->pos.x;
     uint8_t thisY = this->pos.y;
     uint8_t playerX = GLOBAL_PlayerData.objData.pos.x;
     uint8_t playerY = GLOBAL_PlayerData.objData.pos.y;
+    uint8_t frame;
     bool isPlayerTouching = (playerX > thisX-8) &&
                             (playerX < thisX+8) &&
                             (playerY > thisY) &&
                             (playerY < thisY+8);
 
-    if (this->data.strawberry.isCollected) {
+    if (this->data.flyingBerry.isCollected) {
         //Do the text display animation
-        if (this->data.strawberry.frameCount == 0) {
+        if (this->data.flyingBerry.frameCount == 0) {
             GLOBAL_ActiveLevel.textFlashActive = true;
             GLOBAL_ActiveLevel.swapActivePalette = true;
         }
-        this->data.strawberry.frameCount += 1;
-        if ((this->data.strawberry.frameCount % 4) == 0) {
+        this->data.flyingBerry.frameCount += 1;
+        if ((this->data.flyingBerry.frameCount % 4) == 0) {
             if (GLOBAL_ActiveLevel.textScrollActive && GLOBAL_ActiveLevel.textScrollOffsetY < 0xFFu) {
                 GLOBAL_ActiveLevel.textScrollOffsetY += 1;
             }
+            if (this->data.flyingBerry.bgTextY > 0u) {
+                this->data.flyingBerry.bgTextY--;
+            }
+            this->pos.y = this->data.flyingBerry.bgTextY;
         }
 
-        if (this->data.strawberry.frameCount > 30) {
+        if (this->data.flyingBerry.frameCount > 30) {
             GLOBAL_ActiveLevel.textFlashActive = false;
             GLOBAL_ActiveLevel.swapActivePalette = true;
             GLOBAL_ActiveLevel.textScrollActive = false;
             GLOBAL_ActiveLevel.textScrollOffsetX = 0;
             GLOBAL_ActiveLevel.textScrollOffsetY = 0;
-            port_drawText((const unsigned char *)"    ", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
             this->eType = OBJ_UNUSED;
             this->flags |= OBJ_FLAG_DIRTY;
             return;
@@ -1150,38 +1703,69 @@ void flyingBerryUpdate(uint8_t index) {
         uint8_t remainderY = this->pos.y%8;
 
         GLOBAL_PlayerData.dashesLeft = GLOBAL_PlayerData.doubleDashUnlocked ? 2 : 1;
+        collectCurrentRoomFruit();
         playSoundEffect(SOUND_EFFECT_STRAWBERRY);        
-        //got_fruit[level_index()] = true;
-        this->data.strawberry.isCollected = true;
-        this->data.strawberry.frameCount = 0;
-        this->pos.x -= 2;
+        this->data.flyingBerry.isCollected = true;
+        this->data.flyingBerry.frameCount = 0;
+        this->pos.x -= 4;
         this->pos.y -= 4;        
-        //Draw the text for the next state
-        this->data.strawberry.bgTextX = this->pos.x;
-        this->data.strawberry.bgTextY = this->pos.y;
-        port_drawText((const unsigned char *)"1000", this->data.strawberry.bgTextX, this->data.strawberry.bgTextY);
+        this->data.flyingBerry.bgTextX = this->pos.x;
+        this->data.flyingBerry.bgTextY = this->pos.y;
         GLOBAL_ActiveLevel.textScrollActive = true;
         GLOBAL_ActiveLevel.textScrollOffsetX = (uint8_t)(8u - ((remainderX * 2u) % 8u));
         GLOBAL_ActiveLevel.textScrollOffsetY = (uint8_t)(8u - ((remainderY * 2u) % 8u));
-        this->pos.y = 128;
         this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
 
-    this->pos.y = this->data.strawberry.startY + y_positions[this->data.strawberry.frameCount];
-    this->data.strawberry.frameCount += 1;
-    if (this->data.strawberry.frameCount >= 40) {
-        this->data.strawberry.frameCount = 0;
+    if (this->data.flyingBerry.isFlying) {
+        int16_t moveY;
+        this->data.flyingBerry.remY += this->data.flyingBerry.speedY;
+        moveY = (int16_t)((this->data.flyingBerry.remY + 32768) >> 16);
+        this->data.flyingBerry.remY -= INT_TO_FIXED(moveY);
+        this->pos.y += moveY;
+        if (this->pos.y < -16) {
+            this->eType = OBJ_UNUSED;
+            this->flags |= OBJ_FLAG_DIRTY;
+            return;
+        }
+        if (this->data.flyingBerry.sfxDelay > 0) {
+            this->data.flyingBerry.sfxDelay--;
+            if (this->data.flyingBerry.sfxDelay == 0) {
+                playSoundEffect(SOUND_EFFECT_FLYING_BERRY);
+            }
+        }
+        if (this->data.flyingBerry.speedY > -0x00038000) {
+            this->data.flyingBerry.speedY -= 0x00004000;
+            if (this->data.flyingBerry.speedY < -0x00038000) {
+                this->data.flyingBerry.speedY = -0x00038000;
+            }
+        }
+    } else {
+        if (GLOBAL_PlayerData.hasDashed) {
+            this->data.flyingBerry.isFlying = true;
+        }
+        frame = this->data.flyingBerry.frameCount;
+        this->pos.y = this->data.flyingBerry.startY + (berry_y_positions[frame] >> 1);
+        this->data.flyingBerry.frameCount += 1;
+        if (this->data.flyingBerry.frameCount >= 40) {
+            this->data.flyingBerry.frameCount = 0;
+        }
     }
 
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-// Returns the index of the object in the list
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
+// Returns the index of the object in the list
 void initObject(enum eOBJType eType, int16_t x, int16_t y) {
     // Find a free slot
     uint8_t i;
+    if (objectSkipsWhenFruitCollected(eType) && currentRoomFruitCollected()) {
+        return;
+    }
     //Starts from 1 to account for the fact that hardcoded player is using slot 0
     for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_UNUSED) {
@@ -1193,37 +1777,134 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
             GLOBAL_OBJList[i].oamProps = 0;
             GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
             GLOBAL_OBJList[i].extraSpriteCount = 0;
-            // Use if-else instead of switch to avoid jump table issues with banking
             if (eType == OBJ_SMOKE) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 smokeInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_BREAKABLE_WALL) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 breakableWallInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_DECO_FLOWER) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 flowerInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_STRAWBERRY) {
+#ifndef __NES__
+                port_prg_bank_enter(3);
+#endif
                 strawberryInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_DECO_TREE) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 decoTreeInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_SPRING) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 springInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_FLYING_BERRY) {
+#ifndef __NES__
+                port_prg_bank_enter(3);
+#endif
                 flyingBerryInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_COLLAPSE_TILE) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 collapseTileInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_BALLOON) {
+#ifndef __NES__
+                port_prg_bank_enter(4);
+#endif
                 balloonInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_PLATMOV_L || eType == OBJ_PLATMOV_R) {
+#ifndef __NES__
+                port_prg_bank_enter(2);
+#endif
                 platMovInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_KEY) {
+#ifndef __NES__
+                port_prg_bank_enter(3);
+#endif
                 keyInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_CHEST) {
+#ifndef __NES__
+                port_prg_bank_enter(3);
+#endif
                 chestInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_MONUMENT) {
+#ifndef __NES__
+                port_prg_bank_enter(4);
+#endif
                 monumentInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_BIG_CHEST) {
+#ifndef __NES__
+                port_prg_bank_enter(4);
+#endif
                 bigChestInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
+            } else if (eType == OBJ_FLAG) {
+#ifndef __NES__
+                port_prg_bank_enter(4);
+#endif
+                flagInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else if (eType == OBJ_DOUBLE_JUMP_ORB) {
+#ifndef __NES__
+                port_prg_bank_enter(3);
+#endif
                 doubleDashOrbInit(i);
+#ifndef __NES__
+                port_prg_bank_leave();
+#endif
             } else {
                 GLOBAL_OBJList[i].eType = OBJ_UNUSED;
                 GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -1235,23 +1916,178 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
 }
 
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
 static void clearObjectDirtyFlag(uint8_t index)
 {
     GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
-// NES staggered updates: non-critical objects skip logic on some frames.
-// Sprites still render every frame (OAM must be rebuilt for flicker rotation).
+#ifdef __NES__
 PORT_FUNC_BANK6
-static void processObject(uint8_t index)
+#else
+PORT_FUNC_BANK2
+#endif
+static void processObjectBank2(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
 #ifdef __NES__
-    uint8_t frameSlot = (uint8_t)((GLOBAL_FrameCount >> 1) & 0x01); // alternating game frames
+    uint8_t frameSlot = (uint8_t)((GLOBAL_FrameCount >> 1) & 0x01);
 #endif
-    // Use if-else instead of switch to avoid jump table issues with banking
-    // Ordered: UNUSED first (most slots empty), then gameplay-critical, then cosmetic
+
+    if (obj->eType == OBJ_COLLAPSE_TILE) {
+        collapseTileUpdate(index);
+    } else if (obj->eType == OBJ_SPRING) {
+        springUpdate(index);
+    } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
+        platMovUpdate(index);
+    } else if (obj->eType == OBJ_BREAKABLE_WALL) {
+        breakableWallUpdate(index);
+    } else if (obj->eType == OBJ_SMOKE) {
+#ifdef __NES__
+        if (!frameSlot) smokeUpdate(index);
+#else
+        smokeUpdate(index);
+#endif
+    } else if (obj->eType == OBJ_DECO_TREE) {
+#ifndef __NES__
+        decoTreeUpdate(index);
+#endif
+    } else if (obj->eType == OBJ_DECO_FLOWER) {
+#ifndef __NES__
+        flowerUpdate(index);
+#endif
+    } else {
+        return;
+    }
+
+    if ((obj->flags & OBJ_FLAG_DIRTY) != 0u) {
+        if (obj->eType == OBJ_COLLAPSE_TILE) {
+            port_buildCollapseTile(index);
+        } else if (obj->eType == OBJ_SPRING) {
+            port_buildSpring(index);
+        } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
+            port_buildPlatMov(index);
+        } else if (obj->eType == OBJ_BREAKABLE_WALL) {
+            port_buildBreakableWall(index);
+        } else if (obj->eType == OBJ_SMOKE) {
+            port_buildSmoke(index);
+        } else if (obj->eType == OBJ_DECO_TREE || obj->eType == OBJ_DECO_FLOWER) {
+            port_buildStaticDecor(index);
+        }
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK3
+#endif
+static void processObjectBank3(uint8_t index)
+{
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
+#ifdef __NES__
+    uint8_t frameSlot = (uint8_t)((GLOBAL_FrameCount >> 1) & 0x01);
+#endif
+
+    if (obj->eType == OBJ_CHEST) {
+        chestUpdate(index);
+    } else if (obj->eType == OBJ_KEY) {
+#ifdef __NES__
+        if (!frameSlot) keyUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+#else
+        keyUpdate(index);
+#endif
+    } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
+#ifdef __NES__
+        if (!frameSlot) doubleDashOrbUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+#else
+        doubleDashOrbUpdate(index);
+#endif
+    } else if (obj->eType == OBJ_STRAWBERRY) {
+#ifdef __NES__
+        if (!frameSlot) strawberryUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+#else
+        strawberryUpdate(index);
+#endif
+    } else if (obj->eType == OBJ_FLYING_BERRY) {
+#ifdef __NES__
+        if (!frameSlot) flyingBerryUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+#else
+        flyingBerryUpdate(index);
+#endif
+    } else {
+        return;
+    }
+
+    if ((obj->flags & OBJ_FLAG_DIRTY) != 0u) {
+        if (obj->eType == OBJ_CHEST) {
+            port_buildChest(index);
+        } else if (obj->eType == OBJ_KEY) {
+            port_buildKey(index);
+        } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
+            port_buildDoubleDashOrb(index);
+        } else if (obj->eType == OBJ_STRAWBERRY) {
+            port_buildStrawberry(index);
+        } else if (obj->eType == OBJ_FLYING_BERRY) {
+            port_buildFlyingBerry(index);
+        }
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK4
+#endif
+static void processObjectBank4(uint8_t index)
+{
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
+#ifdef __NES__
+    uint8_t frameSlot = (uint8_t)((GLOBAL_FrameCount >> 1) & 0x01);
+#endif
+
+    if (obj->eType == OBJ_BALLOON) {
+#ifdef __NES__
+        if (!frameSlot) balloonUpdate(index);
+        else obj->flags |= OBJ_FLAG_DIRTY;
+#else
+        balloonUpdate(index);
+#endif
+    } else if (obj->eType == OBJ_MONUMENT) {
+        monumentUpdate(index);
+    } else if (obj->eType == OBJ_BIG_CHEST) {
+        bigChestUpdate(index);
+    } else if (obj->eType == OBJ_FLAG) {
+        flagUpdate(index);
+    } else {
+        return;
+    }
+
+    if ((obj->flags & OBJ_FLAG_DIRTY) != 0u) {
+        if (obj->eType == OBJ_BALLOON) {
+            port_buildBalloon(index);
+        } else if (obj->eType == OBJ_MONUMENT) {
+            port_buildMonument(index);
+        } else if (obj->eType == OBJ_BIG_CHEST) {
+            port_buildBigChest(index);
+        } else if (obj->eType == OBJ_FLAG) {
+            port_buildFlag(index);
+        }
+    }
+}
+
+#ifdef __NES__
+PORT_FUNC_BANK6
+#endif
+static void processObject(uint8_t index)
+{
+    OBJ_DATA *obj = &GLOBAL_OBJList[index];
     if (obj->eType == OBJ_UNUSED) {
         if (obj->flags & OBJ_FLAG_DIRTY) {
             if (index == 0U) {
@@ -1260,101 +2096,87 @@ static void processObject(uint8_t index)
                 port_buildUnused(index);
             }
         }
-    // --- Always update every frame (gameplay-critical) ---
-    } else if (obj->eType == OBJ_COLLAPSE_TILE) {
-        collapseTileUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_SPRING) {
-        springUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L) {
-        platMovUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_BREAKABLE_WALL) {
-        breakableWallUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_CHEST) {
-        chestUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-#ifdef __NES__
-    // --- NES: stagger every other frame (non-critical animations) ---
-    } else if (obj->eType == OBJ_BALLOON) {
-        if (!frameSlot) balloonUpdate(index);
-        else obj->flags |= OBJ_FLAG_DIRTY;
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_STRAWBERRY) {
-        if (!frameSlot) strawberryUpdate(index);
-        else obj->flags |= OBJ_FLAG_DIRTY;
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_FLYING_BERRY) {
-        if (!frameSlot) flyingBerryUpdate(index);
-        else obj->flags |= OBJ_FLAG_DIRTY;
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_KEY) {
-        if (!frameSlot) keyUpdate(index);
-        else obj->flags |= OBJ_FLAG_DIRTY;
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
-        if (!frameSlot) doubleDashOrbUpdate(index);
-        else obj->flags |= OBJ_FLAG_DIRTY;
-        port_buildSpriteIfDirty(index, obj->eType);
-    // --- NES: skip update entirely for purely decorative (render still runs) ---
-    } else if (obj->eType == OBJ_SMOKE) {
-        if (!frameSlot) smokeUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_DECO_TREE) {
-        // Decorative: only needs initial dirty flag, no per-frame update needed
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_DECO_FLOWER) {
-        port_buildSpriteIfDirty(index, obj->eType);
-#else
-    // --- SNES: update everything every frame ---
-    } else if (obj->eType == OBJ_SMOKE) {
-        smokeUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_DOUBLE_JUMP_ORB) {
-        doubleDashOrbUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_KEY) {
-        keyUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_BALLOON) {
-        balloonUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_STRAWBERRY) {
-        strawberryUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_FLYING_BERRY) {
-        flyingBerryUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_DECO_TREE) {
-        decoTreeUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_DECO_FLOWER) {
-        flowerUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
+    } else if (obj->eType == OBJ_COLLAPSE_TILE || obj->eType == OBJ_SPRING ||
+               obj->eType == OBJ_PLATMOV_R || obj->eType == OBJ_PLATMOV_L ||
+               obj->eType == OBJ_BREAKABLE_WALL || obj->eType == OBJ_SMOKE ||
+               obj->eType == OBJ_DECO_TREE || obj->eType == OBJ_DECO_FLOWER) {
+#ifndef __NES__
+        port_prg_bank_enter(2);
 #endif
-    } else if (obj->eType == OBJ_MONUMENT) {
-        monumentUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else if (obj->eType == OBJ_BIG_CHEST) {
-        bigChestUpdate(index);
-        port_buildSpriteIfDirty(index, obj->eType);
-    } else {
-        if (obj->flags & OBJ_FLAG_DIRTY) {
-            clearObjectDirtyFlag(index);
-        }
+        processObjectBank2(index);
+#ifndef __NES__
+        port_prg_bank_leave();
+#endif
+    } else if (obj->eType == OBJ_CHEST || obj->eType == OBJ_KEY ||
+               obj->eType == OBJ_DOUBLE_JUMP_ORB || obj->eType == OBJ_STRAWBERRY ||
+               obj->eType == OBJ_FLYING_BERRY) {
+#ifndef __NES__
+        port_prg_bank_enter(3);
+#endif
+        processObjectBank3(index);
+#ifndef __NES__
+        port_prg_bank_leave();
+#endif
+    } else if (obj->eType == OBJ_BALLOON || obj->eType == OBJ_MONUMENT ||
+               obj->eType == OBJ_BIG_CHEST || obj->eType == OBJ_FLAG) {
+#ifndef __NES__
+        port_prg_bank_enter(4);
+#endif
+        processObjectBank4(index);
+#ifndef __NES__
+        port_prg_bank_leave();
+#endif
+    } else if (obj->flags & OBJ_FLAG_DIRTY) {
+        clearObjectDirtyFlag(index);
     }
 }
 
 void updateAllObjects(void) {
     uint8_t i;
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-    port_prg_bank_switch(6);
+#ifdef __NES__
+    port_prg_bank_enter(6);
+#endif
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
-        processObject(i);
+        OBJ_DATA *obj = &GLOBAL_OBJList[i];
+        if (obj->eType == OBJ_UNUSED && (obj->flags & OBJ_FLAG_DIRTY)) {
+            if (i == 0U) {
+                clearObjectDirtyFlag(i);
+            } else {
+                port_buildUnused(i);
+            }
+        }
     }
-    port_prg_bank_switch(0);
+#ifndef __NES__
+    port_prg_bank_enter(2);
+#endif
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
+        processObjectBank2(i);
+    }
+#ifndef __NES__
+    port_prg_bank_leave();
+#endif
+#ifndef __NES__
+    port_prg_bank_enter(3);
+#endif
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
+        processObjectBank3(i);
+    }
+#ifndef __NES__
+    port_prg_bank_leave();
+#endif
+#ifndef __NES__
+    port_prg_bank_enter(4);
+#endif
+    for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
+        processObjectBank4(i);
+    }
+#ifndef __NES__
+    port_prg_bank_leave();
+#endif
+#ifdef __NES__
+    port_prg_bank_leave();
+#endif
     port_finishSpriteBuild();
 }
 
@@ -1363,7 +2185,6 @@ void updateAllObjects(void) {
 void rebuildAllSprites(void) {
     uint8_t i;
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-    port_prg_bank_switch(6);
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         OBJ_DATA *obj = &GLOBAL_OBJList[i];
         if (obj->eType == OBJ_UNUSED) {
@@ -1376,18 +2197,25 @@ void rebuildAllSprites(void) {
             port_buildSpriteIfDirty(i, obj->eType);
         }
     }
-    port_prg_bank_switch(0);
     port_finishSpriteBuild();
 }
 
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 void playerInit(struct sPlayerData* this);
 
 // onVblank is in fixed bank (bank 0), not bank 6
-void onVblank(void);
+static bool onVblank(void);
+static void runGameplayFrame(void);
+static void refreshGameplaySprites(void);
+static __attribute__((noinline)) bool shouldRunGameplayFrame(void);
 
 #ifndef __NES__
+    PORT_FUNC_BANK7
     static void updateRoomMusic(uint16_t roomID) {
         switch (roomID) {
             case 1:
@@ -1411,8 +2239,6 @@ void onVblank(void);
     }
 #endif
 
-
-
 void LoadRoomData(uint16_t roomID) {
     uint8_t i = 0;
 
@@ -1423,23 +2249,31 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.swapCloudPal = false;
     GLOBAL_ActiveLevel.swapActivePalette = true;
     GLOBAL_ActiveLevel.textFlashActive = false;
+    GLOBAL_MonumentTextDisplayed = false;
+    GLOBAL_MonumentCurLineCharCount = 0;
+    GLOBAL_MonumentCurLineNum = 0;
+    s_monumentTextTick = 0;
 
     port_LoadRoomData(roomID);
 
-    port_prg_bank_switch(6);
+#ifdef __NES__
+    port_prg_bank_enter(6);
+#else
+    port_prg_bank_enter(1);
+#endif
     playerInit(&GLOBAL_PlayerData);
-    port_prg_bank_switch(0);
+    port_prg_bank_leave();
     port_updatePlayerSprite(&GLOBAL_PlayerData);
 
     port_beginSpriteBuild(&GLOBAL_PlayerData);
-    port_prg_bank_switch(6);
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; ++i) {
         processObject(i);
     }
-    port_prg_bank_switch(0);
     port_finishSpriteBuild();
 #ifndef __NES__
+    port_prg_bank_enter(7);
     updateRoomMusic(roomID);
+    port_prg_bank_leave();
 #endif
 }
 
@@ -1448,18 +2282,66 @@ void LoadNextRoom(void) {
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID);
 }
 
+#if !defined(NDEBUG) && defined(__SNES__)
+static bool debugHandleLevelSkip(uint8_t inputState)
+{
+    static uint8_t s_prevDebugSkipInput = 0u;
+    uint8_t pressed = (uint8_t)(GLOBAL_InputLo & (PORT_INPUT_L_MASK | PORT_INPUT_R_MASK));
+    uint8_t newlyPressed = (uint8_t)(pressed & (uint8_t)~s_prevDebugSkipInput);
+    uint16_t roomID = GLOBAL_ActiveLevel.currentRoomID;
+
+    (void)inputState;
+    s_prevDebugSkipInput = pressed;
+
+    if ((newlyPressed & PORT_INPUT_L_MASK) != 0u && roomID > 1u) {
+        LoadRoomData((uint16_t)(roomID - 1u));
+        return true;
+    } else if ((newlyPressed & PORT_INPUT_R_MASK) != 0u && roomID < GLOBAL_LEVEL_COUNT) {
+        LoadRoomData((uint16_t)(roomID + 1u));
+        return true;
+    }
+
+    return false;
+}
+#else
+#define debugHandleLevelSkip(inputState) false
+#endif
+
 int main(void){
     port_init();
+    resetRunState();
+#ifndef __NES__
+    s_inTitleScreen = true;
+    port_setTitleMode(true);
+    port_showTitleScreen();
+    port_audioPlayMusic(MUSIC_PATTERN_TITLE);
+#else
     GLOBAL_ActiveLevel.currentRoomID = 1;
     LoadRoomData(GLOBAL_ActiveLevel.currentRoomID);
+#endif
 
-    for (;;) { 
-        onVblank();
+    s_lastGameplayFrame = (uint16_t)(GLOBAL_FrameCount - 1u);
+    for (;;) {
+        bool gameplayReady = onVblank();
+
+        if (!gameplayReady) {
+            s_lastGameplayFrame = (uint16_t)(GLOBAL_FrameCount - 1u);
+            continue;
+        }
+        if (shouldRunGameplayFrame()) {
+            runGameplayFrame();
+        } else {
+            refreshGameplaySprites();
+        }
     }
 }
 
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     fixed_t diff = FIXED_SUB(target, current);
     if (diff > amount) {
@@ -1471,7 +2353,11 @@ fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     return target;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;
@@ -1500,6 +2386,7 @@ void playerInit(struct sPlayerData* this){
     this->doubleDashUnlocked = GLOBAL_DoubleDashUnlocked;
     this->dashesLeft = this->doubleDashUnlocked ? 2 : 1;
     this->dashCounter = 0;
+    this->hasDashed = false;
     
     //Reset collision flags
 #ifdef __NES__
@@ -1534,80 +2421,52 @@ void playerInit(struct sPlayerData* this){
 
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, fixed_t xspd, fixed_t yspd) {
-    // Optimized: hitbox is 6x5, always fits in one tile row/col.
-    // Direct tile lookups instead of loops.
-    uint8_t tX, tY, idx;
+    int16_t tx0 = x >> 3;
+    int16_t ty0 = y >> 3;
+    int16_t tx1 = (x + w - 1) >> 3;
+    int16_t ty1 = (y + h - 1) >> 3;
+    int16_t tx;
+    int16_t ty;
 
-    // Floor spikes (moving down)
-    if (yspd >= 0) {
-        uint8_t bottomY = (uint8_t)(y + h - 1);
-        if ((bottomY & 0x07) >= 6) {
-            tY = bottomY >> 3;
-            if (tY < 16) {
-                tX = (uint8_t)((uint16_t)x >> 3);
-                idx = (tY << 4) + tX;
-                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x04)) return true;
-                tX = (uint8_t)((uint16_t)(x + w - 1) >> 3);
-                idx = (tY << 4) + tX;
-                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x04)) return true;
+    if (tx0 < 0) tx0 = 0;
+    if (ty0 < 0) ty0 = 0;
+    if (tx1 > 15) tx1 = 15;
+    if (ty1 > 15) ty1 = 15;
+    if (tx0 > 15 || ty0 > 15 || tx1 < 0 || ty1 < 0) {
+        return false;
+    }
+
+    for (tx = tx0; tx <= tx1; ++tx) {
+        for (ty = ty0; ty <= ty1; ++ty) {
+            uint8_t flags = GLOBAL_ActiveLevel.collisionFlagsArr[((uint8_t)ty << 4) + (uint8_t)tx];
+            if ((flags & 0x04u) && (((uint8_t)(y + h - 1) & 7u) >= 6u || (y + h) == (ty * 8 + 8)) && yspd >= 0) {
+                return true;
+            }
+            if ((flags & 0x08u) && (((uint8_t)y & 7u) <= 2u) && yspd <= 0) {
+                return true;
+            }
+            if ((flags & 0x10u) && (((uint8_t)x & 7u) <= 2u) && xspd <= 0) {
+                return true;
+            }
+            if ((flags & 0x20u) && (((uint8_t)(x + w - 1) & 7u) >= 6u || (x + w) == (tx * 8 + 8)) && xspd >= 0) {
+                return true;
             }
         }
     }
-
-    // Ceiling spikes (moving up)
-    if (yspd <= 0) {
-        uint8_t topY = (uint8_t)((uint16_t)y);
-        if ((topY & 0x07) <= 2) {
-            tY = topY >> 3;
-            if (tY < 16) {
-                tX = (uint8_t)((uint16_t)x >> 3);
-                idx = (tY << 4) + tX;
-                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x08)) return true;
-                tX = (uint8_t)((uint16_t)(x + w - 1) >> 3);
-                idx = (tY << 4) + tX;
-                if (tX < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x08)) return true;
-            }
-        }
-    }
-
-    // Left wall spikes (moving left)
-    if (xspd <= 0) {
-        uint8_t leftX = (uint8_t)((uint16_t)x);
-        if ((leftX & 0x07) <= 2) {
-            tX = leftX >> 3;
-            if (tX < 16) {
-                tY = (uint8_t)((uint16_t)y >> 3);
-                idx = (tY << 4) + tX;
-                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x10)) return true;
-                tY = (uint8_t)((uint16_t)(y + h - 1) >> 3);
-                idx = (tY << 4) + tX;
-                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x10)) return true;
-            }
-        }
-    }
-
-    // Right wall spikes (moving right)
-    if (xspd >= 0) {
-        uint8_t rightX = (uint8_t)(x + w - 1);
-        if ((rightX & 0x07) >= 6) {
-            tX = rightX >> 3;
-            if (tX < 16) {
-                tY = (uint8_t)((uint16_t)y >> 3);
-                idx = (tY << 4) + tX;
-                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x20)) return true;
-                tY = (uint8_t)((uint16_t)(y + h - 1) >> 3);
-                idx = (tY << 4) + tX;
-                if (tY < 16 && (GLOBAL_ActiveLevel.collisionFlagsArr[idx] & 0x20)) return true;
-            }
-        }
-    }
-
     return false;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x + xOffset;
     int16_t y = this->objData.pos.y + yOffset;
@@ -1616,7 +2475,11 @@ static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     return isDeathAtPoint(x + 1, y + 3, 6, 5, this->spd.x, this->spd.y);
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     // Convert to unsigned for shift (avoids sign extension issues)
     // and use uint8_t to keep computation in 8-bit where possible
@@ -1631,7 +2494,11 @@ static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     return GLOBAL_ActiveLevel.collisionFlagsArr[(tileY << 4) + tileX] & 0x01;
 }
 
+#ifdef __NES__
 PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x;
     int16_t y = this->objData.pos.y;
@@ -1686,8 +2553,12 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
 }
 
 #define FPS60_SCALE_FACTOR 1.0f
+#ifdef __NES__
+PORT_FUNC_BANK6
+#else
+PORT_FUNC_BANK1
+#endif
 void playerUpdate(struct sPlayerData* this) {
-    port_prg_bank_switch(6);
     int16_t spdXstepInt;
     int16_t spdYStepInt;
 
@@ -1870,6 +2741,7 @@ void playerUpdate(struct sPlayerData* this) {
             this->dashesLeft-=1;
             this->dashCounter=4; //Original was 4, not 8
             dashEffectTime = 10;
+            this->hasDashed = true;
 
             vInput.x = inputX;
             vInput.y = inputY;
@@ -2042,17 +2914,15 @@ void playerUpdate(struct sPlayerData* this) {
     // Death logic (before clamping — original has no position clamp)
     if (OBJ_isDeathAt(this, 0, 0) || this->objData.pos.y > 128) {
         playSoundEffect(SOUND_EFFECT_DEATH);
+        GLOBAL_DeathCount++;
         this->objData.pos.y = 128; //offscreen
         GLOBAL_ActiveLevel.shakeFrames = 10;
-        port_prg_bank_switch(6);
         playerInit(this);
-        port_prg_bank_switch(0);
         return;
     }
 
     // next level (before clamping — player must be able to reach y < -4)
     if (this->objData.pos.y < -4 && GLOBAL_ActiveLevel.currentRoomID < 31) {
-        port_prg_bank_switch(0);
         LoadNextRoom();
         return;
     }
@@ -2087,53 +2957,20 @@ void playerUpdate(struct sPlayerData* this) {
 }
 
 
-// Table-based random number generator
-PORT_DATA_BANK6
-const uint16_t rand_table[256] = {
-    0x6f6a, 0xba79, 0xc063, 0x76ee, 0x61ba, 0xbd9f, 0xdab5, 0x340e,
-    0xa160, 0x864f, 0x2447, 0x3e2b, 0xe9fd, 0x12e2, 0x683b, 0x9d53,
-    0x20a7, 0x20f2, 0xfc0d, 0xe967, 0x9e1b, 0xf48b, 0x8e7a, 0x7102,
-    0xef3c, 0x1f38, 0x5272, 0x40e1, 0x33c2, 0x76aa, 0xa07e, 0xfe26,
-    0xabb6, 0xa8b9, 0xc06a, 0x4e66, 0x8767, 0x63c4, 0x300a, 0x94cd,
-    0xad96, 0x747a, 0xb324, 0x6c00, 0x7da9, 0xd729, 0xb4d1, 0x11f2,
-    0xed7e, 0x9468, 0x992f, 0x02ac, 0xc938, 0x428e, 0x3dbf, 0xffe3,
-    0xc733, 0xa313, 0x61de, 0x3986, 0x6e99, 0xbd22, 0xac99, 0xea69,
-    0x9dab, 0x47b2, 0x704a, 0x4589, 0x28b9, 0x7fe0, 0xd2e0, 0x5bb7,
-    0x495b, 0xed0b, 0x4b1b, 0xbcaa, 0x4562, 0x303f, 0x8284, 0xd2a0,
-    0x2fcc, 0x2650, 0xddf3, 0xaabd, 0x2b95, 0xc044, 0x6c32, 0x9402,
-    0xf8f6, 0xb08c, 0x73a7, 0x8b1e, 0x154d, 0x0aea, 0x226f, 0xf2da,
-    0x38ca, 0xb4a8, 0x5666, 0x93a1, 0x1e94, 0xb8b3, 0xc984, 0xb6ef,
-    0xe81f, 0xa593, 0x7aef, 0x01e6, 0xf4ac, 0x6e3a, 0x05d0, 0x025a,
-    0xdc26, 0x2293, 0xc419, 0xcfc8, 0xe293, 0xf83e, 0x7891, 0x18e1,
-    0x4325, 0x1ed4, 0x3146, 0xd955, 0xd563, 0xfb98, 0x0806, 0xd6d1,
-    0x0fcd, 0xb766, 0xf38a, 0x8e0e, 0x3a2b, 0xbf33, 0xcf9c, 0xd5a2,
-    0x72c0, 0x9df2, 0x51a4, 0x3eb8, 0x12d7, 0xa0f0, 0x58c5, 0x0a7d,
-    0xdd7d, 0x5235, 0x943c, 0x366e, 0xf01c, 0xbfe4, 0x2e7d, 0x29e2,
-    0x5886, 0x7bac, 0x8a96, 0x3615, 0x28b6, 0xf85d, 0xf5b3, 0x0dc3,
-    0xfaad, 0x38bf, 0x92c6, 0x12b8, 0x72c5, 0x9bfd, 0xccd8, 0x89e9,
-    0xbfe7, 0x9248, 0x1f8a, 0xdac2, 0x4f67, 0xd5a4, 0x7585, 0x3bb3,
-    0x2b7c, 0xfb36, 0x97e1, 0x4b87, 0x59ac, 0x609e, 0x202d, 0xbc63,
-    0xa257, 0xd010, 0x6ee1, 0xf632, 0xc0df, 0x2df7, 0x7cbe, 0x2b43,
-    0x061d, 0xda66, 0x603b, 0x1037, 0xd571, 0x0e00, 0x6e6e, 0xd6d6,
-    0x5542, 0x954f, 0xd232, 0xcfe3, 0x6632, 0xd11c, 0xc0bc, 0x38a2,
-    0x7de3, 0x66a0, 0x550d, 0xd60f, 0x5c98, 0x810e, 0x1ea4, 0x272c,
-    0xb64c, 0x3aec, 0x173f, 0xf8bd, 0x7036, 0x56cd, 0x0ec6, 0x992e,
-    0x86c0, 0x430b, 0x3090, 0x4914, 0x7dfa, 0x820d, 0x93e8, 0xce3a,
-    0xb08f, 0xbfb5, 0x6147, 0xfe8f, 0x9f69, 0x4a1f, 0x7c82, 0x2298,
-    0x3c1d, 0x55e8, 0x186e, 0xc1fa, 0xee00, 0xdf50, 0x18b7, 0xe356,
-    0xbab2, 0x0162, 0xa5bc, 0xcaf5, 0xa970, 0x1e1a, 0xf436, 0x28d9,
-};
-
-// Table-based random number generator
-static uint8_t global_randSeed = 0xDEADBEEE; // You can set this to time(NULL) for more randomness
+// Simple 16-bit LCG. Smaller than the old lookup table and sufficient here.
+static uint16_t global_randSeed = 0xBEEFu;
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
 uint16_t my_rand() {
-    global_randSeed = (global_randSeed + 1) % 256;
-    return rand_table[global_randSeed];
+    global_randSeed = (uint16_t)(global_randSeed * 109u + 89u);
+    return global_randSeed;
 }
 
 // Returns a random integer in [min, max]
+#ifdef __NES__
 PORT_FUNC_BANK6
+#endif
 int16_t randint16(int16_t min, int16_t max) {
     uint16_t range;
     uint16_t randomValue;
@@ -2143,56 +2980,106 @@ int16_t randint16(int16_t min, int16_t max) {
     return (int16_t)((randomValue % range) + min);
 }
 
-void onVblank(void) {
-    static bool gameFrameToggle = false;
-
+static bool onVblank(void) {
     //Start of vblank critical code
     port_vblank();
 
     // Music/audio update — target-specific backend.
     port_audioUpdate();
-
-    // Frame counter at 60Hz for animation timing
-    GLOBAL_FrameCount += 1;
-
-    // 30fps: spread compute across 2 VBlank frames
-    // Frame A (game):    player physics + player sprite (latency-sensitive)
-    // Frame B (display): object updates + object sprite builds
-    gameFrameToggle = !gameFrameToggle;
-
-    if (gameFrameToggle) {
-        // --- GAME FRAME: player physics + sprite-only OAM rebuild ---
 #ifndef __NES__
-        if (s_musicTimer > 0u) {
-            s_musicTimer--;
-            if (s_musicTimer == 0u) {
-                port_audioPlayMusic(MUSIC_PATTERN_ORB);
-            }
-        }
-#endif
-        if (GLOBAL_FreezeFrames > 0) {
-            GLOBAL_FreezeFrames--;
-            return;
-        }
-        if (GLOBAL_ActiveLevel.shakeFrames > 0) {
-            GLOBAL_ActiveLevel.shakeFrames--;
-        }
-
+    if (s_inTitleScreen) {
         GLOBAL_InputState = port_getInputs();
-        playerUpdate(&GLOBAL_PlayerData);
-        port_updatePlayerSprite(&GLOBAL_PlayerData);
-        // Rebuild object sprites with fresh flicker rotation (no game logic)
-        rebuildAllSprites();
-    } else {
-        // --- DISPLAY FRAME: object updates + sprite builds ---
-        if (GLOBAL_FreezeFrames > 0) {
-            return; // freeze blocks objects too
+        port_resetSprites();
+        if (s_titleStartTimer > 0) {
+            s_titleStartTimer--;
+            if (s_titleStartTimer == 0) {
+                s_inTitleScreen = false;
+                port_setTitleMode(false);
+                port_showGameplayScreen();
+                GLOBAL_ActiveLevel.currentRoomID = 1;
+                GLOBAL_TimerFrames = 0;
+                GLOBAL_TimerSeconds = 0;
+                GLOBAL_TimerMinutes = 0;
+                LoadRoomData(1);
+            }
+        } else if ((GLOBAL_InputState & (PORT_INPUT_B_MASK | PORT_INPUT_Y_MASK | PORT_INPUT_START_MASK)) != 0u ||
+                   (GLOBAL_InputLo & (PORT_INPUT_A_MASK | PORT_INPUT_X_MASK)) != 0u) {
+            port_audioStopAll();
+            playSoundEffect(SOUND_EFFECT_TITLE_START);
+            s_titleStartTimer = 50;
         }
-
-        updateAllObjects();
-        port_levelAnimAdvance();
+        return false;
     }
+#endif
+
+    return true;
 }
 
+static __attribute__((noinline)) bool shouldRunGameplayFrame(void)
+{
+    uint16_t currentFrame = GLOBAL_FrameCount;
+    if ((uint16_t)(currentFrame - s_lastGameplayFrame) < 2u) {
+        return false;
+    }
+    s_lastGameplayFrame = currentFrame;
+    return true;
+}
 
+static void runGameplayFrame(void) {
+    if (GLOBAL_ActiveLevel.currentRoomID <= GLOBAL_FRUIT_COUNT) {
+        GLOBAL_TimerFrames++;
+        if (GLOBAL_TimerFrames >= 30u) {
+            GLOBAL_TimerFrames = 0u;
+            GLOBAL_TimerSeconds++;
+            if (GLOBAL_TimerSeconds >= 60u) {
+                GLOBAL_TimerSeconds = 0u;
+                GLOBAL_TimerMinutes++;
+            }
+        }
+    }
+#ifndef __NES__
+    if (s_musicTimer > 0u) {
+        s_musicTimer--;
+        if (s_musicTimer == 0u) {
+            port_audioPlayMusic(MUSIC_PATTERN_ORB);
+        }
+    }
+#endif
+    if (GLOBAL_FreezeFrames > 0) {
+        GLOBAL_FreezeFrames--;
+        return;
+    }
+    if (GLOBAL_ActiveLevel.shakeFrames > 0) {
+        GLOBAL_ActiveLevel.shakeFrames--;
+    }
 
+    GLOBAL_InputState = port_getInputs();
+    if (debugHandleLevelSkip(GLOBAL_InputState)) {
+        return;
+    }
+#ifdef __NES__
+    port_prg_bank_enter(6);
+#else
+    port_prg_bank_enter(1);
+#endif
+    playerUpdate(&GLOBAL_PlayerData);
+    port_prg_bank_leave();
+#ifndef __NES__
+    // Keep sprite transforms aligned with the same camera state used for next vblank.
+    port_prg_bank_enter(5);
+    syncCameraFromPlayer();
+    port_prg_bank_leave();
+#endif
+    port_updatePlayerSprite(&GLOBAL_PlayerData);
+    updateAllObjects();
+    port_renderTextOverlays();
+    port_levelAnimAdvance();
+}
+
+static void refreshGameplaySprites(void) {
+    if (GLOBAL_FreezeFrames > 0) {
+        return;
+    }
+    port_updatePlayerSprite(&GLOBAL_PlayerData);
+    rebuildAllSprites();
+}

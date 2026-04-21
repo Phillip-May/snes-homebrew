@@ -1,0 +1,8 @@
+RUNNING
+f=179 fc=123 room=0 set[a=false b=false start=false y=false x=false] state=00 lo=00
+f=181 fc=125 room=0 set[a=true b=false start=false y=false x=false] state=00 lo=80
+f=209 fc=153 room=0 set[a=true b=false start=false y=false x=false] state=00 lo=80
+f=241 fc=185 room=0 set[a=false b=true start=false y=false x=false] state=80 lo=00
+f=301 fc=245 room=1 set[a=false b=false start=true y=false x=false] state=00 lo=00
+f=361 fc=305 room=1 set[a=false b=false start=false y=true x=false] state=00 lo=00
+f=421 fc=365 room=1 set[a=false b=false start=false y=false x=true] state=00 lo=00

@@ -3,11 +3,19 @@
 
 #define clouds_palette_size 4
 const unsigned short clouds_palette[4] = {
-    0x0000, 0x2108, 0x6318, 0x4210
+    0x0000, 0x1862, 0x34E5, 0x28A4
+    // 0: transparent
+    // 1: dark blue outline  (R=2 G=3 B=6)
+    // 2: light blue detail  (R=5 G=7 B=13)
+    // 3: body ~PICO-8 col 1 (R=4 G=5 B=10)
 };
 
 const unsigned short clouds_palette_2[4] = {
-    0x0000, 0x59BF, 0x621F, 0x5E1F
+    0x0000, 0x4179, 0x625F, 0x51DF
+    // 0: transparent
+    // 1: dark pink outline   (R=25 G=11 B=16)
+    // 2: light pink detail   (R=31 G=18 B=24)
+    // 3: body ~PICO-8 col 14 (R=31 G=14 B=20)
 };
 
 #define clouds_tiled_width 64

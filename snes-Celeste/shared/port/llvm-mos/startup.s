@@ -1,35 +1,22 @@
-; SNES Custom Startup Code for LLVM-MOS
-; Calls the modular crt0 initialization functions before main()
+; SNES early startup for LLVM-MOS.
+; Runs before the CRT init chain so interrupts can safely return from banked
+; gameplay code.
 
-.section .text.startup,"ax",@progbits
+.section .init.050,"ax",@progbits
 
-; External C function references
-.extern main
-.extern __do_zero_bss
-.extern __do_copy_data
-.extern __do_copy_zp_data
-.extern __do_init_stack
-
-; Entry point - called by SNES reset vector
-.global _start
-_start:
-    ; Call LLVM-MOS crt0 initialization functions
-    
-    ; 1. Initialize the soft stack pointer
-    jsr __do_init_stack
-    
-    ; 2. Copy zero-page data from ROM to RAM (if any)
-    jsr __do_copy_zp_data
-    
-    ; 3. Copy initialized data from ROM to RAM
-    jsr __do_copy_data
-    
-    ; 4. Zero out BSS (uninitialized data)
-    jsr __do_zero_bss
-    
-    ; 5. Call main function
-    jsr main
-    
-    ; If main returns (shouldn't normally), loop forever
-    jmp _start
-
+; Reset starts the 65816 in emulation mode. In emulation mode an interrupt
+; does not preserve the program bank, so an NMI taken during banked gameplay
+; returns to bank 0 and hangs. Switch to native mode before the CRT runs.
+__snes_native_init:
+    sei
+    clc
+    xce
+    cld
+    rep #$30
+    .byte 0xA9, 0xFF, 0x1F   ; lda #$1FFF
+    tcs
+    .byte 0xA9, 0x00, 0x00   ; lda #$0000
+    tcd
+    phk
+    plb
+    sep #$30

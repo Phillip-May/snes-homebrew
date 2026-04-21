@@ -88,6 +88,12 @@ enum eDoubleJumpOrbSprite {
     DOUBLE_JUMP_ORB_SPRITE_1 = 0x66
 };
 
+enum eFlagSprite {
+    FLAG_SPRITE_1 = 0x76,
+    FLAG_SPRITE_2 = 0x77,
+    FLAG_SPRITE_3 = 0x78
+};
+
 enum eDecoTreeSprite {
     DECO_TREE_SPRITE_1 = 0x6E
 };

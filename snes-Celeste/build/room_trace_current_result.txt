@@ -1,0 +1,20 @@
+START
+ROOM frame=1 fc=65535 room=0 x=-1 y=-1
+f=60 fc=4 room=0 x=0 y=0
+f=120 fc=64 room=0 x=0 y=0
+ROOM frame=172 fc=116 room=12 x=0 y=0
+f=180 fc=124 room=12 x=16 y=104
+f=240 fc=184 room=12 x=16 y=104
+f=300 fc=244 room=12 x=16 y=104
+f=360 fc=304 room=12 x=16 y=104
+f=420 fc=364 room=12 x=16 y=104
+f=480 fc=424 room=12 x=16 y=104
+f=540 fc=484 room=12 x=16 y=104
+f=600 fc=544 room=12 x=16 y=104
+f=660 fc=604 room=12 x=25 y=104
+f=720 fc=664 room=12 x=25 y=104
+f=780 fc=724 room=12 x=25 y=104
+f=840 fc=784 room=12 x=25 y=104
+f=900 fc=844 room=12 x=25 y=104
+f=960 fc=904 room=12 x=25 y=104
+DONE

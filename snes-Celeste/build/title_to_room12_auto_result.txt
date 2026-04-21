@@ -1,0 +1,17 @@
+TRACE frame=1 fc=65535 room=0 px=65535 py=65535 gpf=65535 ref=65535 title=255 last=65535 tick=255 line=255 char=255
+TRACE frame=60 fc=16 room=0 px=0 py=0 gpf=0 ref=40 title=127 last=64064 tick=0 line=0 char=0
+TRACE frame=120 fc=76 room=0 px=0 py=0 gpf=0 ref=40 title=127 last=64064 tick=0 line=0 char=0
+TRACE frame=180 fc=136 room=1 px=8 py=88 gpf=0 ref=1 title=127 last=19070 tick=0 line=0 char=0
+TRACE frame=240 fc=196 room=1 px=8 py=79 gpf=0 ref=1 title=127 last=32342 tick=0 line=0 char=0
+TRACE frame=300 fc=256 room=1 px=8 py=79 gpf=0 ref=1 title=127 last=55836 tick=0 line=0 char=0
+TRACE frame=360 fc=316 room=1 px=8 py=79 gpf=0 ref=1 title=127 last=18508 tick=0 line=0 char=0
+TRACE frame=420 fc=376 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=23234 tick=0 line=0 char=0
+TRACE frame=480 fc=436 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=42984 tick=0 line=0 char=0
+TRACE frame=540 fc=496 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=35094 tick=0 line=0 char=0
+TRACE frame=600 fc=556 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=60976 tick=0 line=0 char=0
+TRACE frame=660 fc=616 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=46122 tick=0 line=0 char=0
+TRACE frame=720 fc=676 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=20624 tick=0 line=0 char=0
+TRACE frame=780 fc=736 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=34098 tick=0 line=0 char=0
+TRACE frame=840 fc=796 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=7050 tick=0 line=0 char=0
+TRACE frame=900 fc=856 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=7068 tick=0 line=0 char=0
+PASS frame=900 fc=856 room=1 px=8 py=96 gpf=0 ref=1 title=127 last=7068 tick=0 line=0 char=0

@@ -1,0 +1,25 @@
+RUNNING
+ROOM f=1 fc=65535 room=0 px=-1 py=-1
+TRACE f=60 fc=4 room=0 px=0 py=0
+TRACE f=120 fc=64 room=0 px=0 py=0
+ROOM f=172 fc=116 room=1 px=0 py=0
+TRACE f=180 fc=124 room=1 px=8 py=96
+TRACE f=240 fc=184 room=1 px=8 py=96
+TRACE f=300 fc=244 room=1 px=8 py=96
+TRACE f=360 fc=304 room=1 px=8 py=96
+TRACE f=420 fc=364 room=1 px=8 py=96
+ROOM f=421 fc=365 room=2 px=8 py=96
+TRACE f=480 fc=424 room=2 px=8 py=112
+TRACE f=540 fc=484 room=2 px=8 py=112
+TRACE f=600 fc=544 room=2 px=8 py=112
+TRACE f=660 fc=604 room=2 px=8 py=112
+TRACE f=720 fc=664 room=2 px=8 py=112
+TRACE f=780 fc=724 room=2 px=8 py=112
+TRACE f=840 fc=784 room=2 px=8 py=112
+TRACE f=900 fc=844 room=2 px=8 py=112
+TRACE f=960 fc=904 room=2 px=8 py=112
+TRACE f=1020 fc=964 room=2 px=8 py=112
+TRACE f=1080 fc=1024 room=2 px=8 py=112
+TRACE f=1140 fc=1084 room=2 px=8 py=112
+TRACE f=1200 fc=1144 room=2 px=8 py=112
+DONE

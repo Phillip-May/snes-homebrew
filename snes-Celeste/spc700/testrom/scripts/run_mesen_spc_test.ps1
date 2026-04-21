@@ -1,7 +1,8 @@
 param(
     [string]$Compiler = "llvm-mos",
     [string]$MesenPath = "",
-    [bool]$CloseOnFinish = $false
+    [bool]$CloseOnFinish = $false,
+    [int]$TimeoutSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
@@ -46,20 +47,44 @@ if ([string]::IsNullOrWhiteSpace($MesenPath) -or !(Test-Path $MesenPath)) {
 }
 
 $lua = Join-Path $Root "scripts\mesen_spc_test.lua"
+ $resultPath = Join-Path $Root "spc_test_result.txt"
+if (Test-Path $resultPath) { Remove-Item -LiteralPath $resultPath -Force }
 Write-Host "[4/4] Run Mesen test" -ForegroundColor Cyan
 $args = @(
     "--fullscreen=0",
-    "--movie", "",
     "--lua", "$lua",
     "$rom"
 )
 
 if ($CloseOnFinish) {
     $env:SPC_TEST_AUTOCLOSE = "1"
-    & $MesenPath @args
-    $exitCode = $LASTEXITCODE
-    Write-Host "Mesen exit code: $exitCode"
-    exit $exitCode
+    # Ensure deterministic automation; Mesen single-instance mode can hijack launch.
+    Get-Process | Where-Object { $_.ProcessName -like "Mesen*" } | ForEach-Object {
+        try { Stop-Process -Id $_.Id -Force -ErrorAction Stop } catch { }
+    }
+    Start-Sleep -Milliseconds 250
+
+    $before = @(Get-Process | Where-Object { $_.ProcessName -like "Mesen*" } | Select-Object -ExpandProperty Id)
+    $proc = Start-Process -FilePath $MesenPath -ArgumentList $args -PassThru
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    $txt = "RUNNING"
+    while ((Get-Date) -lt $deadline) {
+        Start-Sleep -Milliseconds 250
+        if (Test-Path $resultPath) {
+            $txt = (Get-Content -Raw $resultPath).Trim()
+            if ($txt -ne "RUNNING" -and $txt.Length -gt 0) { break }
+        }
+    }
+    $after = @(Get-Process | Where-Object { $_.ProcessName -like "Mesen*" } | Select-Object -ExpandProperty Id)
+    $newPids = $after | Where-Object { $_ -notin $before }
+    foreach ($procId in $newPids) {
+        try { Stop-Process -Id $procId -Force -ErrorAction Stop } catch { }
+    }
+    if (!(Test-Path $resultPath)) { throw "SPC test result not generated (timeout)." }
+    $txt = (Get-Content -Raw $resultPath).Trim()
+    Write-Host "SPC test result: $txt"
+    if ($txt -notlike "PASS*") { throw "SPC test failed: $txt" }
+    exit 0
 } else {
     $env:SPC_TEST_AUTOCLOSE = "0"
     $proc = Start-Process -FilePath $MesenPath -ArgumentList $args -PassThru

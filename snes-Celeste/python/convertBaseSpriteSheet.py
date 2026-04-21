@@ -1135,6 +1135,14 @@ def main():
         all_2bpp_data.extend(segment_top)
         all_2bpp_data.extend(segment_bottom)
 
+    if tile_count_2bpp > 0:
+        last_2bpp_tile = tile_count_2bpp - 1
+        last_packed_top_left = ((last_2bpp_tile % 8) * 2) + ((last_2bpp_tile // 8) * 32)
+        used_2bpp_8x8_tiles = last_packed_top_left + 18
+        used_2bpp_bytes = used_2bpp_8x8_tiles * 16
+        if used_2bpp_bytes < len(all_2bpp_data):
+            del all_2bpp_data[used_2bpp_bytes:]
+
     # Note: 4bpp data will be generated after palette optimization
 
     all_2bpp_palettes.extend(row_2bpp_palettes)
@@ -1270,6 +1278,7 @@ def main():
         # --- 2bpp Data ---
         if all_2bpp_data:
             f.write(f"// 2bpp sprite sheet graphics ({len(all_2bpp_data)} bytes, {len(all_2bpp_data)//16} 8x8 tiles)\n")
+            f.write(f"#define SPRITE_GFX_2BPP_TILE_COUNT {len(all_2bpp_data)//16}u\n")
             f.write("const unsigned char sprite_gfx_2bpp[] = {\n    ")
             for i, byte in enumerate(all_2bpp_data):
                 f.write(f"0x{byte:02x}, ")

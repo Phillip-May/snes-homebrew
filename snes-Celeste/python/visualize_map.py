@@ -18,6 +18,10 @@ icy_gids = [66,67,68,69,82,83,84,85,98,99,100,101,114,115,116,117]
 
 arrMustBeObject = [8, 9, 10, 11, 12, 13, 14, 15, 18, 19, 20, 21, 22, 23, 24, 25, 26, 28, 29, 30, 31, 45,46,47, 60,62,64, 70,71,86,87, 96,97, 102, 118,119,120]
 
+SNES_TEXT_PALETTE_INDEX = 7
+SNES_PALETTE_BITS = 0x1C00
+SNES_NO_TEXT_PALETTE_REMAP = 255
+
 
 # Load tables from generated_tables.json (written by convertBaseSpriteSheet.py)
 # Falls back to hardcoded values if JSON not found
@@ -51,6 +55,35 @@ def decode_tiled_layer_data(layer):
         num_tiles = len(decompressed_data) // 4
         unpacked_data = struct.unpack(f"<{num_tiles}I", decompressed_data)
         layer["data"] = list(unpacked_data)
+
+
+def reserve_snes_text_palette(bg2_rows, palettes):
+    used_palettes = set()
+    replacement = SNES_NO_TEXT_PALETTE_REMAP
+
+    for row in bg2_rows:
+        for entry in row:
+            if entry != 0:
+                used_palettes.add((entry >> 10) & 0x07)
+
+    while len(palettes) <= SNES_TEXT_PALETTE_INDEX:
+        palettes.append([(0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)])
+
+    if SNES_TEXT_PALETTE_INDEX in used_palettes:
+        for candidate in range(SNES_TEXT_PALETTE_INDEX - 1, -1, -1):
+            if candidate not in used_palettes:
+                replacement = candidate
+                break
+
+        if replacement == SNES_NO_TEXT_PALETTE_REMAP:
+            raise RuntimeError("SNES room uses all 8 BG palettes; no slot remains for text")
+
+        for row in bg2_rows:
+            for i, entry in enumerate(row):
+                if entry != 0 and ((entry >> 10) & 0x07) == SNES_TEXT_PALETTE_INDEX:
+                    row[i] = (entry & ~SNES_PALETTE_BITS) | (replacement << 10)
+
+    return replacement
 
 
 def visualize_map(tilemap_path, spritesheet_path, output_path, output_path_bg3):
@@ -351,6 +384,9 @@ def visualize_map(tilemap_path, spritesheet_path, output_path, output_path_bg3):
                                 pal.append((0, 0, 0))
                             snes_tilemap_colour_data.append(pal)
 
+                    # Text is on BG1 now — all 8 BG2 palettes are available.
+                    bg2_text_palette_remap = SNES_NO_TEXT_PALETTE_REMAP
+
                     # Write SNES tilemap data to C header file
                     header_filename = f"tilemap_{layer_name}.h"
                     header_guard = f"TILEMAP_{layer_name.upper()}_H"
@@ -415,6 +451,7 @@ def visualize_map(tilemap_path, spritesheet_path, output_path, output_path_bg3):
                                 f.write("\n")
                         f.write("};\n\n")
                         f.write(f"#define PALETTE_{layer_name.upper()}_COUNT {len(snes_tilemap_colour_data)}\n\n")
+                        f.write(f"#define BG2_TEXT_PALETTE_REMAP_{layer_name.upper()} {bg2_text_palette_remap}\n\n")
 
                         #write collision data
                         f.write(f"// Collision data for layer '{layer_name}'\n")
@@ -431,7 +468,7 @@ def visualize_map(tilemap_path, spritesheet_path, output_path, output_path_bg3):
 
                         #write object data
                         if len(snes_tilemap_list_of_objects) == 0:
-                            f.write(f"const unsigned char object_{layer_name}[];\n")
+                            f.write(f"const unsigned char object_{layer_name}[] = {{ 0 }};\n")
                             f.write(f"#define OBJECT_{layer_name.upper()}_COUNT {0}\n\n")
                         else:
                             f.write(f"// Object data for layer '{layer_name}'\n")
@@ -445,7 +482,8 @@ def visualize_map(tilemap_path, spritesheet_path, output_path, output_path_bg3):
 
                         #Write spawnXY
                         f.write(f"// Player start location for layer '{layer_name}'\n")
-                        f.write(f"const unsigned char spawn_{layer_name}[] = {{ {snes_tilemap_playerStartXY[0]}, {snes_tilemap_playerStartXY[1]} }};\n\n")
+                        f.write(f"#define SPAWN_X_{layer_name.upper()} {snes_tilemap_playerStartXY[0]}\n")
+                        f.write(f"#define SPAWN_Y_{layer_name.upper()} {snes_tilemap_playerStartXY[1]}\n\n")
 
                         f.write(f"#endif // {header_guard}\n")
 

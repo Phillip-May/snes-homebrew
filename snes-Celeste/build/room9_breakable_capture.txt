@@ -1,0 +1,2 @@
+START
+f=1 fc=65535 room=0 px=65535 py=65535 wall=nil,nil

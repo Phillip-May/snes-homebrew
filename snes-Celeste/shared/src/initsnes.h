@@ -15,6 +15,12 @@
 #define FUNCTIONATR
 #endif
 
+#ifdef __mos__
+#define SNESXC_NOINLINE __attribute__((noinline))
+#else
+#define SNESXC_NOINLINE
+#endif
+
 #ifndef _INITSNES
 #define _INITSNES
 void initSNES(uint8_t ROMSPEED);
@@ -50,7 +56,7 @@ void initSA1(void);
 
 // For 16 bit mode code
 // Banked memory copy copies data from ROM in another bank to LoRAM memory
-void snesXC_memcpy_banked(void *dest, const void *src, size_t n);
+SNESXC_NOINLINE void snesXC_memcpy_banked(void *dest, const void *src, size_t n);
 void snesXC_setDataBank(uint8_t bankNum);
 
 #endif // _INITSNES

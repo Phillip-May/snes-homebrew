@@ -1,0 +1,20 @@
+START
+f=10 fc=0 room=0 titleMode=0
+f=20 fc=0 room=0 titleMode=0
+f=30 fc=0 room=0 titleMode=0
+f=40 fc=0 room=0 titleMode=0
+f=50 fc=0 room=0 titleMode=0
+f=60 fc=2 room=0 titleMode=1
+f=70 fc=11 room=0 titleMode=1
+f=80 fc=21 room=0 titleMode=1
+f=90 fc=31 room=0 titleMode=1
+f=100 fc=41 room=0 titleMode=1
+f=110 fc=51 room=0 titleMode=1
+ROOM 1 at f=112 fc=53 titleMode=0
+f=120 fc=53 room=1 titleMode=0
+f=130 fc=53 room=1 titleMode=0
+f=140 fc=53 room=1 titleMode=0
+f=150 fc=53 room=1 titleMode=0
+f=160 fc=53 room=1 titleMode=0
+f=170 fc=53 room=1 titleMode=0
+DONE

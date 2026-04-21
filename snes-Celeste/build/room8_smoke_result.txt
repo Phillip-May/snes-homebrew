@@ -1,0 +1,1 @@
+FAIL room=1 fc=364 x=8 y=96

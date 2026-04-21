@@ -1,0 +1,8 @@
+START
+ROOM frame=1 fc=65535 room=0 px=65535 py=65535 spawn=0,0 objectCount=0 data=
+f=1 fc=65535 room=0 same=0 px=65535 py=65535
+f=60 fc=0 room=0 same=57 px=16 py=16
+f=120 fc=0 room=0 same=117 px=76 py=76
+ROOM frame=172 fc=0 room=1 px=128 py=126 spawn=1,12 objectCount=2 data=64,1,4,62,7,10
+f=180 fc=0 room=1 same=177 px=136 py=136
+HANG frame=200 fc=0 room=1 px=156 py=155 spawn=1,12 objectCount=2 data=64,1,4,62,7,10

@@ -1,0 +1,1 @@
+PASS frame=224 fc=180 room=12 mon=1 x=56 y=32 displayed=1 line=0 char=8 tick=0 char5=true

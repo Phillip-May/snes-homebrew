@@ -1,0 +1,6 @@
+START
+f=1 fc=65535 room=0 px=65535 py=65535 mon=255 line=255 char=255 tick=0 calls=0 before=0 after=0 touch=0 flags=0 freeze=0 rawType=0 rawFlags=0 run=0 refresh=0 stage=0 objPass=0 objIndex=0 objType=0 objStep=0
+f=30 fc=10 room=0 px=0 py=0 mon=0 line=0 char=0 tick=0 calls=0 before=0 after=0 touch=0 flags=0 freeze=0 rawType=0 rawFlags=0 run=0 refresh=0 stage=0 objPass=0 objIndex=0 objType=0 objStep=0
+f=60 fc=4 room=0 px=0 py=0 mon=0 line=0 char=0 tick=0 calls=0 before=0 after=0 touch=0 flags=0 freeze=0 rawType=0 rawFlags=0 run=0 refresh=0 stage=0 objPass=0 objIndex=0 objType=0 objStep=0
+f=90 fc=34 room=0 px=0 py=0 mon=0 line=0 char=0 tick=0 calls=0 before=0 after=0 touch=0 flags=0 freeze=0 rawType=0 rawFlags=0 run=0 refresh=0 stage=0 objPass=0 objIndex=0 objType=0 objStep=0
+f=120 fc=64 room=0 px=0 py=0 mon=0 line=0 char=0 tick=0 calls=0 before=0 after=0 touch=0 flags=0 freeze=0 rawType=0 rawFlags=0 run=0 refresh=0 stage=0 objPass=0 objIndex=0 objType=0 objStep=0

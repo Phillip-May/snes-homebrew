@@ -2,6 +2,10 @@
 #include "initsnes.h"
 #include <string.h>
 
+#ifndef __VBCC__
+extern unsigned char snesXC_irq[64];
+#endif
+
 
 #ifdef __TCC816__
 // PVSnesLib interrupt handling - header may not be available, declare function manually
@@ -54,7 +58,7 @@ void* farMalloc(uint32_t size) {
 // Bank switching for 16-bit pointer mode
 // Only defined when __SNESXC_16BIT_POINTERS__ is enabled
 #ifdef __SNESXC_16BIT_POINTERS__
-uint8_t snesXC_dataBank = 0x00; // Default to bank 0
+uint8_t snesXC_dataBank __attribute__((section(".zp.bss")));
 
 void snesXC_setDataBank(uint8_t bankNum) {
     snesXC_dataBank = bankNum;
@@ -214,6 +218,7 @@ void initSNES(uint8_t ROMSPEED){
 	// Initialize TCC816 interrupt handling
 	init_tcc816_interrupts();
 #endif
+
 }
 
 //======================================
@@ -654,8 +659,9 @@ void snesXC_nmi_wrapper(void) {
 
 // General IRQ buffer for non-VBCC compilers
 #ifndef __VBCC__
-// Point to a bit of ram where code can be generated for the irq handler
-unsigned char snesXC_irq[64] = {0xEA, 0xEA, 0xEA};
+// Point to a bit of ram where code can be generated for the irq handler.
+// Keep this zero-initialized so it stays in BSS instead of .data.
+unsigned char snesXC_irq[64];
 
 unsigned char* snesXC_getIRQ_ASM_Buffer(void) {
     return snesXC_irq;
@@ -735,6 +741,8 @@ void init_tcc816_interrupts(void) {
 void emitWAI(void) {
 #ifdef __VBCC__
     __asm("\twai\n");
+#elif defined(__mos__)
+    __asm volatile("wai");
 #else
 #endif
 }
@@ -774,7 +782,7 @@ void initSA1(void) {
 // 2. Switch to that bank
 // 3. Copy the data
 // 4. Restore bank
-void snesXC_memcpy_banked(void *dest, const void *src, size_t n) {
+SNESXC_NOINLINE void snesXC_memcpy_banked(void *dest, const void *src, size_t n) {
 #ifdef __SNESXC_16BIT_POINTERS__
     // Use DMA for ROM to RAM transfer using the active bank
     uint16_t regWrite1; // Source address (low 16 bits)

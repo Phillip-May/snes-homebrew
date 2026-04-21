@@ -1,0 +1,23 @@
+START
+ROOM 1 at f=112 fc=53 px=0 py=0
+f=120 fc=53 room=1 px=8 py=96 (since_room=8)
+f=150 fc=53 room=1 px=8 py=96 (since_room=38)
+f=180 fc=53 room=1 px=8 py=96 (since_room=68)
+f=210 fc=53 room=1 px=8 py=96 (since_room=98)
+f=240 fc=53 room=1 px=8 py=96 (since_room=128)
+f=270 fc=53 room=1 px=8 py=96 (since_room=158)
+f=300 fc=53 room=1 px=8 py=96 (since_room=188)
+f=330 fc=53 room=1 px=8 py=96 (since_room=218)
+f=360 fc=53 room=1 px=8 py=96 (since_room=248)
+f=390 fc=53 room=1 px=8 py=96 (since_room=278)
+f=420 fc=53 room=1 px=8 py=96 (since_room=308)
+f=450 fc=53 room=1 px=8 py=96 (since_room=338)
+f=480 fc=53 room=1 px=8 py=96 (since_room=368)
+f=510 fc=53 room=1 px=8 py=96 (since_room=398)
+f=540 fc=53 room=1 px=8 py=96 (since_room=428)
+f=570 fc=53 room=1 px=8 py=96 (since_room=458)
+f=600 fc=53 room=1 px=8 py=96 (since_room=488)
+f=630 fc=53 room=1 px=8 py=96 (since_room=518)
+f=660 fc=53 room=1 px=8 py=96 (since_room=548)
+f=690 fc=53 room=1 px=8 py=96 (since_room=578)
+DONE

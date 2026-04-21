@@ -1,0 +1,34 @@
+ROOM f=1 fc=65535 room=0 inTitle=0 titleTimer=0 px=-1 py=-1 bg4x=0 dbg=00
+TRACE f=1 fc=65535 room=0 inTitle=0 timer=0 inHi=00 inLo=00 px=-1 py=-1 bg4x=0 dbg=00
+TRACE f=30 fc=10 room=0 inTitle=0 timer=0 inHi=00 inLo=00 px=0 py=0 bg4x=0 dbg=00
+TRACE f=60 fc=4 room=0 inTitle=1 timer=0 inHi=00 inLo=00 px=0 py=0 bg4x=1536 dbg=00
+TRACE f=90 fc=34 room=0 inTitle=1 timer=0 inHi=00 inLo=00 px=0 py=0 bg4x=47104 dbg=00
+TRACE f=120 fc=64 room=0 inTitle=1 timer=0 inHi=00 inLo=00 px=0 py=0 bg4x=27648 dbg=00
+TRACE f=150 fc=94 room=0 inTitle=1 timer=22 inHi=00 inLo=00 px=0 py=0 bg4x=8192 dbg=00
+ROOM f=172 fc=116 room=1 inTitle=0 titleTimer=0 px=0 py=0 bg4x=41984 dbg=00
+TRACE f=180 fc=124 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=96 bg4x=41984 dbg=00
+TRACE f=210 fc=154 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=77 bg4x=22528 dbg=00
+TRACE f=240 fc=184 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=96 bg4x=3072 dbg=00
+TRACE f=270 fc=214 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=79 bg4x=49152 dbg=00
+TRACE f=300 fc=244 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=96 bg4x=29696 dbg=00
+TRACE f=330 fc=274 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=79 bg4x=57344 dbg=00
+TRACE f=360 fc=304 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=96 bg4x=64512 dbg=00
+TRACE f=390 fc=334 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=96 bg4x=6656 dbg=00
+TRACE f=420 fc=364 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=79 bg4x=14336 dbg=00
+TRACE f=450 fc=394 room=1 inTitle=0 timer=0 inHi=80 inLo=00 px=8 py=88 bg4x=22016 dbg=00
+TRACE f=480 fc=424 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=85 bg4x=29696 dbg=00
+TRACE f=510 fc=454 room=1 inTitle=0 timer=0 inHi=80 inLo=00 px=8 py=83 bg4x=52736 dbg=00
+TRACE f=540 fc=484 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=90 bg4x=40960 dbg=00
+TRACE f=570 fc=514 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=79 bg4x=29184 dbg=00
+TRACE f=600 fc=544 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=8 py=96 bg4x=17408 dbg=00
+TRACE f=630 fc=574 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=5632 dbg=00
+TRACE f=660 fc=604 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=47104 dbg=00
+TRACE f=690 fc=634 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=54784 dbg=00
+TRACE f=720 fc=664 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=62464 dbg=00
+TRACE f=750 fc=694 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=4608 dbg=00
+TRACE f=780 fc=724 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=12288 dbg=00
+TRACE f=810 fc=754 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=40448 dbg=00
+TRACE f=840 fc=784 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=36352 dbg=00
+TRACE f=870 fc=814 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=32256 dbg=00
+TRACE f=900 fc=844 room=1 inTitle=0 timer=0 inHi=00 inLo=00 px=10 py=96 bg4x=28160 dbg=00
+DONE

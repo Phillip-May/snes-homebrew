@@ -1,0 +1,309 @@
+START
+ROOM_CHANGE room=0 frame=1 fc=65535 px=65535 py=65535
+f=1 fc=65535 room=0 px=65535 py=65535 cand=1 try=0
+f=30 fc=23 room=0 px=0 py=0 cand=1 try=0
+f=60 fc=16 room=0 px=0 py=0 cand=1 try=0
+f=90 fc=46 room=0 px=0 py=0 cand=1 try=0
+f=120 fc=76 room=0 px=0 py=0 cand=1 try=0
+f=150 fc=106 room=0 px=0 py=0 cand=1 try=0
+ROOM_CHANGE room=1 frame=172 fc=128 px=0 py=0
+f=172 fc=128 room=1 px=0 py=0 cand=1 try=0
+f=173 fc=129 room=1 px=0 py=0 cand=1 try=0
+f=174 fc=130 room=1 px=8 py=96 cand=1 try=0
+f=175 fc=131 room=1 px=8 py=96 cand=1 try=0
+f=176 fc=132 room=1 px=8 py=96 cand=1 try=0
+f=177 fc=133 room=1 px=8 py=96 cand=1 try=0
+TRY room=1 x=4 frame=178 fc=134
+f=178 fc=134 room=1 px=4 py=65528 cand=1 try=1
+f=179 fc=135 room=1 px=4 py=65528 cand=1 try=2
+ROOM_ADVANCE from=1 to=2 x=4 frame=180 fc=136
+ROOM_CHANGE room=2 frame=180 fc=136 px=4 py=65528
+f=180 fc=136 room=2 px=4 py=65528 cand=1 try=0
+f=181 fc=137 room=2 px=4 py=65528 cand=1 try=0
+f=182 fc=138 room=2 px=8 py=112 cand=1 try=0
+f=183 fc=139 room=2 px=8 py=112 cand=1 try=0
+f=184 fc=140 room=2 px=8 py=112 cand=1 try=0
+f=185 fc=141 room=2 px=8 py=112 cand=1 try=0
+TRY room=2 x=4 frame=186 fc=142
+f=186 fc=142 room=2 px=4 py=65528 cand=1 try=1
+ROOM_ADVANCE from=2 to=3 x=4 frame=187 fc=143
+ROOM_CHANGE room=3 frame=187 fc=143 px=4 py=65528
+f=187 fc=143 room=3 px=4 py=65528 cand=1 try=0
+f=188 fc=144 room=3 px=4 py=65528 cand=1 try=0
+f=189 fc=145 room=3 px=8 py=104 cand=1 try=0
+f=190 fc=146 room=3 px=8 py=104 cand=1 try=0
+f=191 fc=147 room=3 px=8 py=101 cand=1 try=0
+f=192 fc=148 room=3 px=8 py=101 cand=1 try=0
+TRY room=3 x=4 frame=193 fc=149
+f=193 fc=149 room=3 px=4 py=65528 cand=1 try=1
+f=194 fc=150 room=3 px=4 py=65528 cand=1 try=2
+ROOM_ADVANCE from=3 to=4 x=4 frame=195 fc=151
+ROOM_CHANGE room=4 frame=195 fc=151 px=4 py=65528
+f=195 fc=151 room=4 px=4 py=65528 cand=1 try=0
+f=196 fc=152 room=4 px=4 py=65528 cand=1 try=0
+f=197 fc=153 room=4 px=8 py=96 cand=1 try=0
+f=198 fc=154 room=4 px=8 py=96 cand=1 try=0
+f=199 fc=155 room=4 px=8 py=96 cand=1 try=0
+f=200 fc=156 room=4 px=8 py=96 cand=1 try=0
+TRY room=4 x=4 frame=201 fc=157
+f=201 fc=157 room=4 px=4 py=65528 cand=1 try=1
+f=202 fc=158 room=4 px=4 py=65528 cand=1 try=2
+f=203 fc=159 room=4 px=4 py=65528 cand=1 try=3
+f=204 fc=160 room=4 px=4 py=65528 cand=1 try=4
+f=205 fc=161 room=4 px=4 py=65528 cand=1 try=5
+f=206 fc=162 room=4 px=4 py=65528 cand=1 try=6
+f=207 fc=163 room=4 px=4 py=65528 cand=1 try=7
+f=208 fc=164 room=4 px=4 py=65528 cand=2 try=0
+TRY room=4 x=8 frame=209 fc=165
+f=209 fc=165 room=4 px=8 py=65528 cand=2 try=1
+f=210 fc=166 room=4 px=8 py=65528 cand=2 try=2
+f=211 fc=167 room=4 px=8 py=65528 cand=2 try=3
+f=212 fc=168 room=4 px=8 py=65528 cand=2 try=4
+f=213 fc=169 room=4 px=8 py=65528 cand=2 try=5
+f=214 fc=170 room=4 px=8 py=65528 cand=2 try=6
+f=215 fc=171 room=4 px=8 py=65528 cand=2 try=7
+f=216 fc=172 room=4 px=8 py=65528 cand=3 try=0
+TRY room=4 x=12 frame=217 fc=173
+f=217 fc=173 room=4 px=12 py=65528 cand=3 try=1
+f=218 fc=174 room=4 px=12 py=65528 cand=3 try=2
+f=219 fc=175 room=4 px=12 py=65528 cand=3 try=3
+f=220 fc=176 room=4 px=12 py=65528 cand=3 try=4
+f=221 fc=177 room=4 px=12 py=65528 cand=3 try=5
+f=222 fc=178 room=4 px=12 py=65528 cand=3 try=6
+f=223 fc=179 room=4 px=12 py=65528 cand=3 try=7
+f=224 fc=180 room=4 px=12 py=65528 cand=4 try=0
+TRY room=4 x=16 frame=225 fc=181
+f=225 fc=181 room=4 px=16 py=65528 cand=4 try=1
+f=226 fc=182 room=4 px=16 py=65528 cand=4 try=2
+f=227 fc=183 room=4 px=16 py=65528 cand=4 try=3
+f=228 fc=184 room=4 px=16 py=65528 cand=4 try=4
+f=229 fc=185 room=4 px=16 py=65528 cand=4 try=5
+f=230 fc=186 room=4 px=16 py=65528 cand=4 try=6
+f=231 fc=187 room=4 px=16 py=65528 cand=4 try=7
+f=232 fc=188 room=4 px=16 py=65528 cand=5 try=0
+TRY room=4 x=20 frame=233 fc=189
+f=233 fc=189 room=4 px=20 py=65528 cand=5 try=1
+f=234 fc=190 room=4 px=20 py=65528 cand=5 try=2
+f=235 fc=191 room=4 px=20 py=65528 cand=5 try=3
+f=236 fc=192 room=4 px=20 py=65528 cand=5 try=4
+f=237 fc=193 room=4 px=20 py=65528 cand=5 try=5
+f=238 fc=194 room=4 px=20 py=65528 cand=5 try=6
+f=239 fc=195 room=4 px=20 py=65528 cand=5 try=7
+f=240 fc=196 room=4 px=20 py=65528 cand=6 try=0
+TRY room=4 x=24 frame=241 fc=197
+f=241 fc=197 room=4 px=24 py=65528 cand=6 try=1
+f=242 fc=198 room=4 px=24 py=65528 cand=6 try=2
+f=243 fc=199 room=4 px=24 py=65528 cand=6 try=3
+f=244 fc=200 room=4 px=24 py=65528 cand=6 try=4
+f=245 fc=201 room=4 px=24 py=65528 cand=6 try=5
+f=246 fc=202 room=4 px=24 py=65528 cand=6 try=6
+f=247 fc=203 room=4 px=24 py=65528 cand=6 try=7
+f=248 fc=204 room=4 px=24 py=65528 cand=7 try=0
+TRY room=4 x=28 frame=249 fc=205
+f=249 fc=205 room=4 px=28 py=65528 cand=7 try=1
+f=250 fc=206 room=4 px=28 py=65528 cand=7 try=2
+f=251 fc=207 room=4 px=28 py=65528 cand=7 try=3
+f=252 fc=208 room=4 px=28 py=65528 cand=7 try=4
+f=253 fc=209 room=4 px=28 py=65528 cand=7 try=5
+f=254 fc=210 room=4 px=28 py=65528 cand=7 try=6
+f=255 fc=211 room=4 px=28 py=65528 cand=7 try=7
+f=256 fc=212 room=4 px=28 py=65528 cand=8 try=0
+TRY room=4 x=32 frame=257 fc=213
+f=257 fc=213 room=4 px=32 py=65528 cand=8 try=1
+f=258 fc=214 room=4 px=32 py=65528 cand=8 try=2
+f=259 fc=215 room=4 px=32 py=65528 cand=8 try=3
+f=260 fc=216 room=4 px=32 py=65528 cand=8 try=4
+f=261 fc=217 room=4 px=32 py=65528 cand=8 try=5
+f=262 fc=218 room=4 px=32 py=65528 cand=8 try=6
+f=263 fc=219 room=4 px=32 py=65528 cand=8 try=7
+f=264 fc=220 room=4 px=32 py=65528 cand=9 try=0
+TRY room=4 x=36 frame=265 fc=221
+f=265 fc=221 room=4 px=36 py=65528 cand=9 try=1
+f=266 fc=222 room=4 px=36 py=65528 cand=9 try=2
+f=267 fc=223 room=4 px=36 py=65528 cand=9 try=3
+f=268 fc=224 room=4 px=36 py=65528 cand=9 try=4
+f=269 fc=225 room=4 px=36 py=65528 cand=9 try=5
+f=270 fc=226 room=4 px=36 py=65528 cand=9 try=6
+f=271 fc=227 room=4 px=36 py=65528 cand=9 try=7
+f=272 fc=228 room=4 px=36 py=65528 cand=10 try=0
+TRY room=4 x=40 frame=273 fc=229
+f=273 fc=229 room=4 px=40 py=65528 cand=10 try=1
+f=274 fc=230 room=4 px=40 py=65528 cand=10 try=2
+f=275 fc=231 room=4 px=40 py=65528 cand=10 try=3
+f=276 fc=232 room=4 px=40 py=65528 cand=10 try=4
+f=277 fc=233 room=4 px=40 py=65528 cand=10 try=5
+f=278 fc=234 room=4 px=40 py=65528 cand=10 try=6
+f=279 fc=235 room=4 px=40 py=65528 cand=10 try=7
+f=280 fc=236 room=4 px=40 py=65528 cand=11 try=0
+TRY room=4 x=44 frame=281 fc=237
+f=281 fc=237 room=4 px=44 py=65528 cand=11 try=1
+f=282 fc=238 room=4 px=44 py=65528 cand=11 try=2
+f=283 fc=239 room=4 px=44 py=65528 cand=11 try=3
+f=284 fc=240 room=4 px=44 py=65528 cand=11 try=4
+f=285 fc=241 room=4 px=44 py=65528 cand=11 try=5
+f=286 fc=242 room=4 px=44 py=65528 cand=11 try=6
+f=287 fc=243 room=4 px=44 py=65528 cand=11 try=7
+f=288 fc=244 room=4 px=44 py=65528 cand=12 try=0
+TRY room=4 x=48 frame=289 fc=245
+f=289 fc=245 room=4 px=48 py=65528 cand=12 try=1
+f=290 fc=246 room=4 px=48 py=65528 cand=12 try=2
+f=291 fc=247 room=4 px=48 py=65528 cand=12 try=3
+f=292 fc=248 room=4 px=48 py=65528 cand=12 try=4
+f=293 fc=249 room=4 px=48 py=65528 cand=12 try=5
+f=294 fc=250 room=4 px=48 py=65528 cand=12 try=6
+f=295 fc=251 room=4 px=48 py=65528 cand=12 try=7
+f=296 fc=252 room=4 px=48 py=65528 cand=13 try=0
+TRY room=4 x=52 frame=297 fc=253
+f=297 fc=253 room=4 px=52 py=65528 cand=13 try=1
+f=298 fc=254 room=4 px=52 py=65528 cand=13 try=2
+f=299 fc=255 room=4 px=52 py=65528 cand=13 try=3
+f=300 fc=256 room=4 px=52 py=65528 cand=13 try=4
+f=301 fc=257 room=4 px=52 py=65528 cand=13 try=5
+f=302 fc=258 room=4 px=52 py=65528 cand=13 try=6
+f=303 fc=259 room=4 px=52 py=65528 cand=13 try=7
+f=304 fc=260 room=4 px=52 py=65528 cand=14 try=0
+TRY room=4 x=56 frame=305 fc=261
+f=305 fc=261 room=4 px=56 py=65528 cand=14 try=1
+f=306 fc=262 room=4 px=56 py=65528 cand=14 try=2
+f=307 fc=263 room=4 px=56 py=65528 cand=14 try=3
+f=308 fc=264 room=4 px=56 py=65528 cand=14 try=4
+f=309 fc=265 room=4 px=56 py=65528 cand=14 try=5
+f=310 fc=266 room=4 px=56 py=65528 cand=14 try=6
+f=311 fc=267 room=4 px=56 py=65528 cand=14 try=7
+f=312 fc=268 room=4 px=56 py=65528 cand=15 try=0
+TRY room=4 x=60 frame=313 fc=269
+f=313 fc=269 room=4 px=60 py=65528 cand=15 try=1
+f=314 fc=270 room=4 px=60 py=65528 cand=15 try=2
+f=315 fc=271 room=4 px=60 py=65528 cand=15 try=3
+f=316 fc=272 room=4 px=60 py=65528 cand=15 try=4
+f=317 fc=273 room=4 px=60 py=65528 cand=15 try=5
+f=318 fc=274 room=4 px=60 py=65528 cand=15 try=6
+f=319 fc=275 room=4 px=60 py=65528 cand=15 try=7
+f=320 fc=276 room=4 px=60 py=65528 cand=16 try=0
+TRY room=4 x=64 frame=321 fc=277
+f=321 fc=277 room=4 px=64 py=65528 cand=16 try=1
+f=322 fc=278 room=4 px=64 py=65528 cand=16 try=2
+f=323 fc=279 room=4 px=64 py=65528 cand=16 try=3
+f=324 fc=280 room=4 px=64 py=65528 cand=16 try=4
+f=325 fc=281 room=4 px=64 py=65528 cand=16 try=5
+f=326 fc=282 room=4 px=64 py=65528 cand=16 try=6
+f=327 fc=283 room=4 px=64 py=65528 cand=16 try=7
+f=328 fc=284 room=4 px=64 py=65528 cand=17 try=0
+TRY room=4 x=68 frame=329 fc=285
+f=329 fc=285 room=4 px=68 py=65528 cand=17 try=1
+f=330 fc=286 room=4 px=68 py=65528 cand=17 try=2
+f=331 fc=287 room=4 px=68 py=65528 cand=17 try=3
+f=332 fc=288 room=4 px=68 py=65528 cand=17 try=4
+f=333 fc=289 room=4 px=68 py=65528 cand=17 try=5
+f=334 fc=290 room=4 px=68 py=65528 cand=17 try=6
+f=335 fc=291 room=4 px=68 py=65528 cand=17 try=7
+f=336 fc=292 room=4 px=68 py=65528 cand=18 try=0
+TRY room=4 x=72 frame=337 fc=293
+f=337 fc=293 room=4 px=72 py=65528 cand=18 try=1
+f=338 fc=294 room=4 px=72 py=65528 cand=18 try=2
+f=339 fc=295 room=4 px=72 py=65528 cand=18 try=3
+f=340 fc=296 room=4 px=72 py=65528 cand=18 try=4
+f=341 fc=297 room=4 px=72 py=65528 cand=18 try=5
+f=342 fc=298 room=4 px=72 py=65528 cand=18 try=6
+f=343 fc=299 room=4 px=72 py=65528 cand=18 try=7
+f=344 fc=300 room=4 px=72 py=65528 cand=19 try=0
+TRY room=4 x=76 frame=345 fc=301
+f=345 fc=301 room=4 px=76 py=65528 cand=19 try=1
+f=346 fc=302 room=4 px=76 py=65528 cand=19 try=2
+f=347 fc=303 room=4 px=76 py=65528 cand=19 try=3
+f=348 fc=304 room=4 px=76 py=65528 cand=19 try=4
+f=349 fc=305 room=4 px=76 py=65528 cand=19 try=5
+f=350 fc=306 room=4 px=76 py=65528 cand=19 try=6
+f=351 fc=307 room=4 px=76 py=65528 cand=19 try=7
+f=352 fc=308 room=4 px=76 py=65528 cand=20 try=0
+TRY room=4 x=80 frame=353 fc=309
+f=353 fc=309 room=4 px=80 py=65528 cand=20 try=1
+f=354 fc=310 room=4 px=80 py=65528 cand=20 try=2
+f=355 fc=311 room=4 px=80 py=65528 cand=20 try=3
+f=356 fc=312 room=4 px=80 py=65528 cand=20 try=4
+f=357 fc=313 room=4 px=80 py=65528 cand=20 try=5
+f=358 fc=314 room=4 px=80 py=65528 cand=20 try=6
+f=359 fc=315 room=4 px=80 py=65528 cand=20 try=7
+f=360 fc=316 room=4 px=80 py=65528 cand=21 try=0
+TRY room=4 x=84 frame=361 fc=317
+f=361 fc=317 room=4 px=84 py=65528 cand=21 try=1
+f=362 fc=318 room=4 px=84 py=65528 cand=21 try=2
+f=363 fc=319 room=4 px=84 py=65528 cand=21 try=3
+f=364 fc=320 room=4 px=84 py=65528 cand=21 try=4
+f=365 fc=321 room=4 px=84 py=65528 cand=21 try=5
+f=366 fc=322 room=4 px=84 py=65528 cand=21 try=6
+f=367 fc=323 room=4 px=84 py=65528 cand=21 try=7
+f=368 fc=324 room=4 px=84 py=65528 cand=22 try=0
+TRY room=4 x=88 frame=369 fc=325
+f=369 fc=325 room=4 px=88 py=65528 cand=22 try=1
+f=370 fc=326 room=4 px=88 py=65528 cand=22 try=2
+f=371 fc=327 room=4 px=88 py=65528 cand=22 try=3
+f=372 fc=328 room=4 px=88 py=65528 cand=22 try=4
+f=373 fc=329 room=4 px=88 py=65528 cand=22 try=5
+f=374 fc=330 room=4 px=88 py=65528 cand=22 try=6
+f=375 fc=331 room=4 px=88 py=65528 cand=22 try=7
+f=376 fc=332 room=4 px=88 py=65528 cand=23 try=0
+TRY room=4 x=92 frame=377 fc=333
+f=377 fc=333 room=4 px=92 py=65528 cand=23 try=1
+f=378 fc=334 room=4 px=92 py=65528 cand=23 try=2
+f=379 fc=335 room=4 px=92 py=65528 cand=23 try=3
+f=380 fc=336 room=4 px=92 py=65528 cand=23 try=4
+f=381 fc=337 room=4 px=92 py=65528 cand=23 try=5
+f=382 fc=338 room=4 px=92 py=65528 cand=23 try=6
+f=383 fc=339 room=4 px=92 py=65528 cand=23 try=7
+f=384 fc=340 room=4 px=92 py=65528 cand=24 try=0
+TRY room=4 x=96 frame=385 fc=341
+f=385 fc=341 room=4 px=96 py=65528 cand=24 try=1
+f=386 fc=342 room=4 px=96 py=65528 cand=24 try=2
+f=387 fc=343 room=4 px=96 py=65528 cand=24 try=3
+f=388 fc=344 room=4 px=96 py=65528 cand=24 try=4
+f=389 fc=345 room=4 px=96 py=65528 cand=24 try=5
+f=390 fc=346 room=4 px=96 py=65528 cand=24 try=6
+f=391 fc=347 room=4 px=96 py=65528 cand=24 try=7
+f=392 fc=348 room=4 px=96 py=65528 cand=25 try=0
+TRY room=4 x=100 frame=393 fc=349
+f=393 fc=349 room=4 px=100 py=65528 cand=25 try=1
+f=394 fc=350 room=4 px=100 py=65528 cand=25 try=2
+f=395 fc=351 room=4 px=100 py=65528 cand=25 try=3
+f=396 fc=352 room=4 px=100 py=65528 cand=25 try=4
+f=397 fc=353 room=4 px=100 py=65528 cand=25 try=5
+f=398 fc=354 room=4 px=100 py=65528 cand=25 try=6
+f=399 fc=355 room=4 px=100 py=65528 cand=25 try=7
+f=400 fc=356 room=4 px=100 py=65528 cand=26 try=0
+TRY room=4 x=104 frame=401 fc=357
+f=401 fc=357 room=4 px=104 py=65528 cand=26 try=1
+f=402 fc=358 room=4 px=104 py=65528 cand=26 try=2
+f=403 fc=359 room=4 px=104 py=65528 cand=26 try=3
+f=404 fc=360 room=4 px=104 py=65528 cand=26 try=4
+f=405 fc=361 room=4 px=104 py=65528 cand=26 try=5
+f=406 fc=362 room=4 px=104 py=65528 cand=26 try=6
+f=407 fc=363 room=4 px=104 py=65528 cand=26 try=7
+f=408 fc=364 room=4 px=104 py=65528 cand=27 try=0
+TRY room=4 x=108 frame=409 fc=365
+f=409 fc=365 room=4 px=108 py=65528 cand=27 try=1
+f=410 fc=366 room=4 px=108 py=65528 cand=27 try=2
+f=411 fc=367 room=4 px=108 py=65528 cand=27 try=3
+f=412 fc=368 room=4 px=108 py=65528 cand=27 try=4
+f=413 fc=369 room=4 px=108 py=65528 cand=27 try=5
+f=414 fc=370 room=4 px=108 py=65528 cand=27 try=6
+f=415 fc=371 room=4 px=108 py=65528 cand=27 try=7
+f=416 fc=372 room=4 px=108 py=65528 cand=28 try=0
+TRY room=4 x=112 frame=417 fc=373
+f=417 fc=373 room=4 px=112 py=65528 cand=28 try=1
+f=418 fc=374 room=4 px=112 py=65528 cand=28 try=2
+f=419 fc=375 room=4 px=112 py=65528 cand=28 try=3
+f=420 fc=376 room=4 px=112 py=65528 cand=28 try=4
+f=421 fc=377 room=4 px=112 py=65528 cand=28 try=5
+f=422 fc=378 room=4 px=112 py=65528 cand=28 try=6
+f=423 fc=379 room=4 px=112 py=65528 cand=28 try=7
+f=424 fc=380 room=4 px=112 py=65528 cand=29 try=0
+TRY room=4 x=116 frame=425 fc=381
+f=425 fc=381 room=4 px=116 py=65528 cand=29 try=1
+f=426 fc=382 room=4 px=116 py=65528 cand=29 try=2
+f=427 fc=383 room=4 px=116 py=65528 cand=29 try=3
+f=428 fc=384 room=4 px=116 py=65528 cand=29 try=4
+f=429 fc=385 room=4 px=116 py=65528 cand=29 try=5
+f=430 fc=386 room=4 px=116 py=65528 cand=29 try=6
+f=431 fc=387 room=4 px=116 py=65528 cand=29 try=7
+f=432 fc=388 room=4 px=116 py=65528 cand=30 try=0
+FAIL no-exit room=4 frame=433 fc=389

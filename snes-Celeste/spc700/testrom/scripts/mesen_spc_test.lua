@@ -9,6 +9,15 @@ local started = false
 local result = 0
 local done = false
 local autoClose = (os.getenv("SPC_TEST_AUTOCLOSE") == "1")
+local outPath = "C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/spc700/testrom/spc_test_result.txt"
+
+local function write_result(text)
+    local f = io.open(outPath, "w")
+    if f then
+        f:write(text)
+        f:close()
+    end
+end
 
 local function tap_start()
     if emu.setInput then
@@ -39,11 +48,13 @@ emu.addEventCallback(function()
     result = emu.read(0x2142, cpu)
     if result == 0x55 then
         emu.log("[SPC TEST] PASS at frame " .. frame)
+        write_result("PASS frame=" .. frame)
         done = true
         if autoClose and emu.stop then emu.stop(0) end
         return
     elseif result == 0xEE then
         emu.log("[SPC TEST] FAIL at frame " .. frame)
+        write_result("FAIL frame=" .. frame)
         done = true
         if autoClose and emu.stop then emu.stop(1) end
         return
@@ -51,9 +62,11 @@ emu.addEventCallback(function()
 
     if frame >= maxFrames then
         emu.log("[SPC TEST] TIMEOUT")
+        write_result("TIMEOUT frame=" .. frame)
         done = true
         if autoClose and emu.stop then emu.stop(2) end
     end
 end, emu.eventType.endFrame)
 
+write_result("RUNNING")
 emu.log("[SPC TEST] Waiting for ROM init; will press START at frame 120")

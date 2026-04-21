@@ -99,6 +99,8 @@ const unsigned short palette_level24[] = {
 
 #define PALETTE_LEVEL24_COUNT 7
 
+#define BG2_TEXT_PALETTE_REMAP_LEVEL24 255
+
 // Collision data for layer 'level24'
 const unsigned char collision_level24[] = {
 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 4, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 4, 4, 4, 4, 1, 1, 1, 1, 0, 0, 32, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 32, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 32, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 32, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 0, 32, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 32, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 32, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 32, 1, 1, 1, 1, 1, 1, 1, 
@@ -114,6 +116,7 @@ const unsigned char object_level24[] = {
 #define OBJECT_LEVEL24_COUNT 1
 
 // Player start location for layer 'level24'
-const unsigned char spawn_level24[] = { 1, 14 };
+#define SPAWN_X_LEVEL24 1
+#define SPAWN_Y_LEVEL24 14
 
 #endif // TILEMAP_LEVEL24_H
