@@ -1,1 +1,0 @@
-FAIL timeout room=1 frame=1800 fc=1756 wallX=nil wallY=nil

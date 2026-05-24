@@ -1,6 +1,0 @@
-START
-ROOM frame=1 fc=65535 room=0 px=65535 py=65535 mon=0 line=0 char=0 tick=0
-BANK frame=1 active=255 sp=255
-META spawn=0,0 objectCount=0 data=
-f=1 fc=65535 room=0 same=0 px=65535 py=65535 mon=0 line=0 char=0 tick=0 bank=255 sp=255
-HANG

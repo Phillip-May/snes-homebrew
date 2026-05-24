@@ -1,3 +1,0 @@
-START
-f=1 fc=65535 room=0 same=0 px=65535 py=65535 mon=255 tick=0 line=255 char=255 objx=nil objy=nil
-HANG

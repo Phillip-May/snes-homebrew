@@ -15,6 +15,18 @@ REQUIRED = [
     "GLOBAL_MonumentCurLineNum",
     "GLOBAL_MonumentCurLineCharCount",
     "s_monumentTextTick",
+    "GLOBAL_FlagOverlayShow",
+    "GLOBAL_FlagOverlayDirty",
+    "GLOBAL_FlagOverlayRevealDirty",
+    "GLOBAL_FlagOverlayLine0Len",
+    "GLOBAL_FlagOverlayLine1Len",
+    "GLOBAL_FlagOverlayLine2Len",
+    "GLOBAL_FlagOverlayLine0",
+    "GLOBAL_FlagOverlayLine1",
+    "GLOBAL_FlagOverlayLine2",
+    "g_snowPerfMarker",
+    "s_pendingDisplayEnable",
+    "GLOBAL_DeathCount",
 ]
 
 
@@ -23,7 +35,7 @@ def parse_symbols(map_text: str):
     # Map lines look like:
     #  268      268      27a     1         ...:(.bss.GLOBAL_ActiveLevel)
     pattern = re.compile(
-        r"^\s*([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+[0-9a-fA-F]+\s+\d+\s+.*\((?:\.bss|\.data)\.([A-Za-z0-9_]+)\)\s*$"
+        r"^\s*([0-9a-fA-F]+)\s+[0-9a-fA-F]+\s+[0-9a-fA-F]+\s+\d+\s+.*\((?:\.bss|\.data|\.noinit|\.sbss|\.sdata)\.([A-Za-z0-9_]+)\)\s*$"
     )
     for line in map_text.splitlines():
         m = pattern.match(line)

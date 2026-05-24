@@ -11,7 +11,7 @@ It is deterministic: same cart + same parameters -> same output bytes.
 Run from repo root:
 
 ```powershell
-C:\Python37\python.exe python\p8_to_spc_pipeline.py `
+python python\p8_to_spc_pipeline.py `
   --cart C:\path\to\game.p8.png `
   --out-base C:\path\to\out `
   --spc-header C:\path\to\project\spc700\p8_music_data.h `
@@ -22,7 +22,7 @@ Config-based run:
 
 ```powershell
 copy python\p8_to_spc_pipeline.example.json my_cart.json
-C:\Python37\python.exe python\p8_to_spc_pipeline.py --config my_cart.json
+python python\p8_to_spc_pipeline.py --config my_cart.json
 ```
 
 ## How It Works
@@ -64,7 +64,7 @@ These values are in `python/p8_to_spc_pipeline.example.json` and can be overridd
 
 1. Generate assets:
 ```powershell
-C:\Python37\python.exe python\p8_to_spc_pipeline.py --config my_cart.json
+python python\p8_to_spc_pipeline.py --config my_cart.json
 ```
 2. Build/render all track WAVs from `spc700`:
 ```powershell
@@ -73,11 +73,11 @@ powershell -ExecutionPolicy Bypass -File .\build_spc700.ps1
 ```
 3. Score objective similarity:
 ```powershell
-C:\Python37\python.exe spc700\score_all.py
+python spc700\score_all.py
 ```
 4. Validate SFX correctness:
 ```powershell
-C:\Python37\python.exe spc700\sfx_conformance.py
+python spc700\sfx_conformance.py
 ```
 5. Iterate only on data-level knobs (`cap`, `noise_*`) unless engine changes are intentional.
 

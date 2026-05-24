@@ -2,7 +2,8 @@ param(
     [string]$ElfPath = "build/mainBankZero_llvm-mos.smc.elf",
     [int]$MinBank6Size = 0,
     [switch]$RequireBank6,
-    [switch]$AllowNoBank6
+    [switch]$AllowNoBank6,
+    [string]$LlvmMosPath = $env:LLVM_MOS_PATH
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,13 +12,18 @@ if (!(Test-Path $ElfPath)) {
     throw "ELF not found: $ElfPath"
 }
 
-$objdump = "C:\llvm-mos\bin\llvm-objdump.exe"
+if ([string]::IsNullOrWhiteSpace($LlvmMosPath)) {
+    $LlvmMosPath = Join-Path $env:SystemDrive "llvm-mos"
+}
+
+$objdump = Join-Path $LlvmMosPath "bin\llvm-objdump.exe"
 if (!(Test-Path $objdump)) {
     throw "llvm-objdump not found: $objdump"
 }
 
 $sectionText = & $objdump -h $ElfPath | Out-String
 $symbolText = & $objdump -t $ElfPath | Out-String
+$disassemblyText = & $objdump -d $ElfPath | Out-String
 
 function Assert-SymbolInSection($SymbolName, $SectionName) {
     $line = ($script:symbolText -split "`r?`n" | Where-Object { $_ -match ("\s" + [regex]::Escape($SymbolName) + "\s*$") } | Select-Object -First 1)
@@ -46,10 +52,137 @@ function Get-OptionalSectionSize($SectionName) {
     return [Convert]::ToInt32($m.Groups[1].Value, 16)
 }
 
+function Get-SymbolAddress($SymbolName) {
+    $line = ($script:symbolText -split "`r?`n" | Where-Object { $_ -match ("\s" + [regex]::Escape($SymbolName) + "\s*$") } | Select-Object -First 1)
+    if (!$line) {
+        throw "Required symbol not found: $SymbolName"
+    }
+    $m = [regex]::Match($line, "^\s*([0-9a-fA-F]+)\s+")
+    if (!$m.Success) {
+        throw "Could not parse symbol address for $SymbolName. Found: $line"
+    }
+    return [Convert]::ToInt32($m.Groups[1].Value, 16)
+}
+
+function Assert-SnesRamHeadroom {
+    $ramLimit = 0x2000
+    $minHeadroom = 0x80
+    $heapStart = Get-SymbolAddress "__heap_start"
+    $headroom = $ramLimit - $heapStart
+    if ($headroom -lt $minHeadroom) {
+        throw ("SNES near-RAM headroom too small: __heap_start=0x{0:X4}, limit=0x{1:X4}, free=0x{2:X}, required>=0x{3:X}. Reduce .bss/.noinit/static-stack pressure before adding code." -f $heapStart, $ramLimit, $headroom, $minHeadroom)
+    }
+    Write-Host ("verified SNES near-RAM headroom: __heap_start=0x{0:X4}, free=0x{1:X}" -f $heapStart, $headroom)
+}
+
+function Assert-NoBankLocalBankSwitchCalls {
+    $functionSections = @{}
+    foreach ($line in ($script:symbolText -split "`r?`n")) {
+        $m = [regex]::Match($line, "^\s*[0-9a-fA-F]+\s+\S+\s+F\s+(\S+)\s+[0-9a-fA-F]+\s+(\S+)\s*$")
+        if ($m.Success) {
+            $functionSections[$m.Groups[2].Value] = $m.Groups[1].Value
+        }
+    }
+
+    $currentFunction = $null
+    $currentSection = $null
+    $badCalls = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($script:disassemblyText -split "`r?`n")) {
+        $header = [regex]::Match($line, "^\s*[0-9a-fA-F]+\s+<([^>]+)>:")
+        if ($header.Success) {
+            $currentFunction = $header.Groups[1].Value
+            $currentSection = if ($functionSections.ContainsKey($currentFunction)) { $functionSections[$currentFunction] } else { $null }
+            continue
+        }
+
+        if ($currentSection -match "^rom_bank_[0-7]$") {
+            $call = [regex]::Match($line, "^\s*([0-9a-fA-F]+):.*\b(?:jsr|jmp)\s+\$[0-9a-fA-F]+\s+<(port_prg_bank_(?:push|pop|switch)|snes_prg_bank_switch_pc)>")
+            if ($call.Success) {
+                $badCalls.Add(("{0} in {1} ({2}) calls {3}: {4}" -f $call.Groups[1].Value, $currentFunction, $currentSection, $call.Groups[2].Value, $line.Trim()))
+            }
+        }
+    }
+
+    if ($badCalls.Count -gt 0) {
+        throw ("Unsafe SNES bank switch from bank-local code. port_prg_bank_* may only be called from mirrored fixed code:`n" + ($badCalls -join "`n"))
+    }
+
+    Write-Host "verified no bank-local calls to SNES PRG bank switch helpers"
+}
+
+function Assert-NoUnresolvedBankLocalCalls {
+    $functions = @{}
+    foreach ($line in ($script:symbolText -split "`r?`n")) {
+        $m = [regex]::Match($line, "^\s*([0-9a-fA-F]+)\s+\S+\s+F\s+(\S+)\s+([0-9a-fA-F]+)\s+(\S+)\s*$")
+        if ($m.Success) {
+            $name = $m.Groups[4].Value
+            $functions[$name] = @{
+                Addr = [Convert]::ToInt32($m.Groups[1].Value, 16)
+                Section = $m.Groups[2].Value
+                Size = [Convert]::ToInt32($m.Groups[3].Value, 16)
+                Name = $name
+            }
+        }
+    }
+
+    $currentFunction = $null
+    $currentSection = $null
+    $badCalls = New-Object System.Collections.Generic.List[string]
+    foreach ($line in ($script:disassemblyText -split "`r?`n")) {
+        $header = [regex]::Match($line, "^\s*([0-9a-fA-F]+)\s+<([^>]+)>:")
+        if ($header.Success) {
+            $currentFunction = $header.Groups[2].Value
+            $currentSection = if ($functions.ContainsKey($currentFunction)) { $functions[$currentFunction].Section } else { $null }
+            continue
+        }
+
+        $bankMatch = [regex]::Match($currentSection, "^rom_bank_([0-7])$")
+        if (!$bankMatch.Success) {
+            continue
+        }
+
+        $call = [regex]::Match($line, '^\s*([0-9a-fA-F]+):.*\b(?:jsr|jmp)\s+\$([0-9a-fA-F]{4})\b')
+        if (!$call.Success) {
+            continue
+        }
+
+        $target = [Convert]::ToInt32($call.Groups[2].Value, 16)
+        if ($target -lt 0x8000 -or $target -ge 0xB000) {
+            continue
+        }
+
+        $bank = [Convert]::ToInt32($bankMatch.Groups[1].Value, 10)
+        $fullTarget = ($bank -shl 16) + $target
+        $owner = $null
+        foreach ($fn in $functions.Values) {
+            if ($fn.Section -ne $currentSection) {
+                continue
+            }
+            if ($fn.Addr -le $fullTarget -and ($fn.Size -eq 0 -or ($fn.Addr + $fn.Size) -gt $fullTarget)) {
+                $owner = $fn
+                break
+            }
+        }
+
+        if ($null -eq $owner) {
+            $badCalls.Add(("{0} in {1} ({2}) targets local ${3:X4} with no function in the active bank: {4}" -f $call.Groups[1].Value, $currentFunction, $currentSection, $target, $line.Trim()))
+        }
+    }
+
+    if ($badCalls.Count -gt 0) {
+        throw ("Unsafe unresolved SNES bank-local call. Local `$8000-`$AFFF JSR/JMP targets must resolve inside the caller's active bank:`n" + ($badCalls -join "`n"))
+    }
+
+    Write-Host "verified bank-local JSR/JMP targets resolve within the active bank"
+}
+
 $BankLocalMax = 0x3000
 $FixedMirrorMax = 0x4FC0
 $match = [regex]::Match($sectionText, "^\s*\d+\s+rom_bank_6\s+([0-9a-fA-F]{8})\s+", [System.Text.RegularExpressions.RegexOptions]::Multiline)
 $mustRequireBank6 = $RequireBank6 -or !$AllowNoBank6
+Assert-SnesRamHeadroom
+Assert-NoBankLocalBankSwitchCalls
+Assert-NoUnresolvedBankLocalCalls
 if ($mustRequireBank6) {
     $bank1Size = Get-SectionSize "rom_bank_1"
     $bank2Size = Get-SectionSize "rom_bank_2"

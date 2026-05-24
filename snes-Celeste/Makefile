@@ -44,8 +44,16 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 	PROJECT_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(notdir $(PROJECT_C_FILES)))))
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(LIBFIXMATH_SOURCES) $(PORT_SOURCES)
 	OBJECTS = $(PROJECT_OBJECTS) $(BUILD_DIR)/initsnes.o $(BUILD_DIR)/fix16.o $(BUILD_DIR)/snes.o
-	# Override CCFLAGS to remove -I"lib" and add project src directory
-	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"$(PROJECT_SRC_DIR)" $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES) -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__ -c
+	# Override CCFLAGS / LDFLAGS to remove the shared -I"lib" and add the
+	# project src tree (the vbcc "link" phase re-compiles all sources with
+	# LDFLAGS, so those flags must also reach the project headers).
+	# LDFLAGS uses -O0 because vbcc's 65816 backend ICEs at -O2/-O4 when
+	# whole-program-compiling the Celeste port. Per-file CCFLAGS stays at
+	# -O4 because each .c parses fine in isolation. llvm-mos remains the
+	# shipping path; vbcc here is only checked to confirm the sources still
+	# parse — the resulting ROM is not banking-correct.
+	CCFLAGS = +snes-hi -lm -maxoptpasses=300 -O4 -inline-depth=1000 -unroll-all -fp-associative -force-statics -range-opt -I"$(SHARED_SRC_DIR)" -I"$(PROJECT_SRC_DIR)" $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES) -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__SNES__ -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__ -c
+	LDFLAGS = +snes-hi -lm -O0 -I"$(SHARED_SRC_DIR)" -I"$(PROJECT_SRC_DIR)" $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES) -I"include" -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib" -D__SNES__ -D__VBCC__=1 -DLUA_CROSS_COMPILER -D__VBCC65816__
 	vpath %.c $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port $(PROJECT_SRC_DIR)/libfixmath $(SHARED_SRC_DIR) .
 	vpath %.h $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port .
 endif
@@ -62,10 +70,12 @@ endif
 
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 	PROJECT_C_FILES = $(wildcard $(PROJECT_SRC_DIR)/*.c)
-	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c $(LIBFIXMATH_SOURCES) $(PORT_SOURCES) $(PROJECT_SRC_DIR)/port/snes_farcall.s $(PROJECT_SRC_DIR)/port/bg1_text_glyph_fetch.s
+	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c $(LIBFIXMATH_SOURCES) $(PORT_SOURCES)
+	ASM_SOURCES += $(PROJECT_SRC_DIR)/port/snes_farcall.s
 	CCFLAGS += -I$(PROJECT_SRC_DIR) $(PORT_INCLUDES) $(LIBFIXMATH_INCLUDES)
 	LDFLAGS += -Xlinker -Map -Xlinker $(BUILD_DIR)/mainBankZero_llvm-mos.map
-	POST_LINK = @powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/fix_snes_checksum.ps1" "$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)"
+	POST_LINK = @powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/verify_snes_banking.ps1"
+	POST_LINK += && powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/fix_snes_checksum.ps1" "$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)"
 	POST_LINK += && powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/sync_mesen_rom.ps1" "$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)" "$(BUILD_DIR)/mainBankZero_llvm-mos_mesen$(OUTPUT_EXT)"
 	vpath %.c $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port $(PROJECT_SRC_DIR)/libfixmath $(SHARED_SRC_DIR) $(SHARED_PORT_DIR)/llvm-mos .
 	vpath %.h $(PROJECT_SRC_DIR) $(PROJECT_SRC_DIR)/port .
@@ -110,24 +120,24 @@ spc700-build:
 
 spc700-payload-header: spc700-build
 	@echo Regenerating SPC payload header for SNES embed...
-	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'spc700/testrom/tools/gen_spc_payload.py' } else { python 'spc700/testrom/tools/gen_spc_payload.py' } }"
+	@powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/run_python_with_fallback.ps1" "spc700/testrom/tools/gen_spc_payload.py"
 
 spc700-sync: spc700-payload-header
 
 title-snes-header:
 	@echo Regenerating SNES title screen header...
-	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'python/convert_title_screen_snes.py' } else { python 'python/convert_title_screen_snes.py' } }"
+	@powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/run_python_with_fallback.ps1" "python/convert_title_screen_snes.py"
 
 title-snes-sync: title-snes-header
 
 pico8-font-header:
 	@echo Regenerating Pico-8 font header...
-	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'python/convert_pico8_font_snes.py' } else { python 'python/convert_pico8_font_snes.py' } }"
+	@powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/run_python_with_fallback.ps1" "python/convert_pico8_font_snes.py"
 
 pico8-font-sync: pico8-font-header
 
 score-snes-header:
 	@echo Regenerating SNES score sprite header...
-	@powershell -NoLogo -NoProfile -Command "& { if (Test-Path 'C:\Python37\python.exe') { & 'C:\Python37\python.exe' 'python/convert_score_1000_snes.py' } else { python 'python/convert_score_1000_snes.py' } }"
+	@powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "scripts/run_python_with_fallback.ps1" "python/convert_score_1000_snes.py"
 
 score-snes-sync: score-snes-header

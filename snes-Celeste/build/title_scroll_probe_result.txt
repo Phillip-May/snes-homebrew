@@ -1,1 +1,0 @@
-frame=180 fc=124 title=1 room=0 start=0 bg2x=0 bg2y=0 bg3x=0 bg3y=0 bg4x=724 bg4y=0 playerY=0 scrollPointY=0

@@ -8,17 +8,30 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
+$SpcDir = Split-Path -Parent $Root
+$ProjectRoot = Split-Path -Parent $SpcDir
+$env:SPC_TEST_ROOT = ((Resolve-Path $Root).Path -replace '\\', '/')
+$env:SNES_CELESTE_ROOT = ((Resolve-Path $ProjectRoot).Path -replace '\\', '/')
 
-$GitBash = "C:\Program Files\Git\bin\bash.exe"
+function Convert-ToGitBashPath([string]$Path) {
+    $full = ((Resolve-Path $Path).Path -replace '\\', '/')
+    if ($full -match '^([A-Za-z]):/(.*)$') {
+        return "/" + $matches[1].ToLowerInvariant() + "/" + $matches[2]
+    }
+    return $full
+}
+
+$GitBash = if (![string]::IsNullOrWhiteSpace($env:GIT_BASH)) { $env:GIT_BASH } else { "C:\Program Files\Git\bin\bash.exe" }
 if (!(Test-Path $GitBash)) { throw "Git Bash not found: $GitBash" }
 
 Write-Host "[1/4] Build SPC payload" -ForegroundColor Cyan
 Set-Location ..
-& $GitBash -lc "cd /c/Users/Admin/Documents/snes-homebrew/snes-Celeste/spc700 && bash build.sh"
+$SpcDirBash = Convert-ToGitBashPath $SpcDir
+& $GitBash -lc "cd '$SpcDirBash' && bash build.sh"
 if ($LASTEXITCODE -ne 0) { throw "SPC build failed" }
 
 Set-Location $Root
-& "C:\Python37\python.exe" tools\gen_spc_payload.py
+& python tools\gen_spc_payload.py
 if ($LASTEXITCODE -ne 0) { throw "Payload generation failed" }
 
 Write-Host "[2/4] Build ROM ($Compiler)" -ForegroundColor Cyan
@@ -30,13 +43,14 @@ if (!(Test-Path $rom)) { throw "ROM not found: $rom" }
 
 Write-Host "[3/4] Resolve Mesen executable" -ForegroundColor Cyan
 if ([string]::IsNullOrWhiteSpace($MesenPath)) {
+    if (![string]::IsNullOrWhiteSpace($env:MESEN_PATH)) {
+        $MesenPath = $env:MESEN_PATH
+    }
+}
+if ([string]::IsNullOrWhiteSpace($MesenPath)) {
     $candidates = @(
         "C:\Program Files\Mesen2\Mesen.exe",
-        "C:\Program Files\Mesen\Mesen.exe",
-        "C:\Users\Admin\Downloads\Mesen_2.1.0_Windows\Mesen.exe",
-        "C:\Users\Admin\Downloads\Mesen_2.1.0_Windows(1)\Mesen.exe",
-        "C:\Users\Admin\Documents\Mesen2\Backups\Mesen.2.1.1.exe",
-        "C:\Users\Admin\Documents\Mesen2\Backups\Mesen.2.1.0.b21e273.exe"
+        "C:\Program Files\Mesen\Mesen.exe"
     )
     foreach ($c in $candidates) {
         if (Test-Path $c) { $MesenPath = $c; break }

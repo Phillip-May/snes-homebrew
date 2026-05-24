@@ -1,6 +1,0 @@
-RUNNING
-f=1 fc=65535 room=0 state=00 lo=00 a=false
-f=180 fc=124 room=0 state=00 lo=00 a=false
-f=240 fc=184 room=0 state=00 lo=00 a=true
-f=260 fc=204 room=0 state=80 lo=80 a=true
-PASS f=292 fc=236 state=80 lo=80

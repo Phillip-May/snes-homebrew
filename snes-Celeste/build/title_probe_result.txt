@@ -1,1 +1,0 @@
-fc=124 room=0 scrollY=0 bg2y=0 bg3x=0 bg3y=0 bg4y=0 inidisp=00 tm=00 bgmode=00 bg3sc=00 bg34nba=00

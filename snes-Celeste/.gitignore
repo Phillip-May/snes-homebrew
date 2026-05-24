@@ -1,0 +1,33 @@
+# Build output
+/build/
+/build-nes/
+*.o
+*.obj
+*.elf
+*.smc
+*.sfc
+*.nes
+!/Makefile.nes
+*.map
+*.mlb
+
+# Logs and transient verification output
+*.log
+*_result.txt
+*_trace.txt
+tmp_*.lua
+tmp_*.txt
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local Windows device artifacts accidentally created by tools
+nul
+
+# Benchmark binaries; keep benchmark source files tracked.
+/bench/*
+!/bench/
+!/bench/**/*.c
+!/bench/**/*.h
+!/bench/**/

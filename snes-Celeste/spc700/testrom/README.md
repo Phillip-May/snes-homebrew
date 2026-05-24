@@ -35,7 +35,7 @@ bash build.sh
 2. Generate payload header:
 ```powershell
 cd testrom
-C:\Python37\python.exe tools\gen_spc_payload.py
+python tools\gen_spc_payload.py
 ```
 3. Build ROM:
 ```powershell

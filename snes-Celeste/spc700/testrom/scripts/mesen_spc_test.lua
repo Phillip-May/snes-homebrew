@@ -9,7 +9,7 @@ local started = false
 local result = 0
 local done = false
 local autoClose = (os.getenv("SPC_TEST_AUTOCLOSE") == "1")
-local outPath = "C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/spc700/testrom/spc_test_result.txt"
+local outPath = (os.getenv("SPC_TEST_ROOT") or ".") .. "/spc_test_result.txt"
 
 local function write_result(text)
     local f = io.open(outPath, "w")

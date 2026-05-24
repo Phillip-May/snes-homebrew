@@ -11,11 +11,13 @@ import argparse
 import shutil
 
 def main():
-    # Set up environment variables (similar to devEnvWin.bat)
-    os.environ["JAVA_PATH"] = r"C:\Users\Admin\Downloads\JCC816-main\openjdk-24.0.1_windows-x64_bin\jdk-24.0.1\bin"
-    os.environ["CC65_PATH"] = r"C:\Users\Admin\Downloads\cc65-snapshot-win32\bin"
-    os.environ["JCC816_PATH"] = r"C:\Users\Admin\Documents\JCC816"
-    os.environ["C_INC_PATH"] = r"C:\Users\Admin\Documents\JCC816\src\stdlib"
+    # Set up environment variables (similar to devEnvWin.bat), but let the
+    # caller provide machine-local tool paths.
+    required_env = ("JAVA_PATH", "CC65_PATH", "JCC816_PATH")
+    missing = [name for name in required_env if not os.environ.get(name)]
+    if missing:
+        raise RuntimeError("Missing required environment variables: " + ", ".join(missing))
+    os.environ.setdefault("C_INC_PATH", os.path.join(os.environ["JCC816_PATH"], "src", "stdlib"))
     
     # Update PATH
     os.environ["PATH"] = os.environ["JAVA_PATH"] + os.pathsep + os.environ["PATH"]

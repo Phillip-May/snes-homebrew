@@ -1,4 +1,5 @@
-local testlib = dofile("C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/scripts/mesen_testlib.lua")
+local projectRoot = os.getenv("SNES_CELESTE_ROOT") or "."
+local testlib = dofile(projectRoot .. "/scripts/mesen_testlib.lua")
 local cpu = emu.memType.cpu
 local sym = testlib.load_symbols({
     "GLOBAL_ActiveLevel",

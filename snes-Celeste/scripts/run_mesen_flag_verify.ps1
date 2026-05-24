@@ -25,25 +25,25 @@ Invoke-LlvmMosMesenPrecheck -Root $Root -Compiler $Compiler -CheckLuaScripts
 Write-Host "[2/3] Resolve Mesen executable" -ForegroundColor Cyan
 $MesenPath = Resolve-MesenExecutable -MesenPath $MesenPath
 
-$lua = Join-Path $Root "scripts\mesen_breakable_verify.lua"
-$result = Join-Path $Root "build\mesen_breakable_verify_result.txt"
+$lua = Join-Path $Root "scripts\mesen_flag_verify.lua"
+$result = Join-Path $Root "build\mesen_flag_verify_result.txt"
 if (Test-Path $result) { Remove-Item -LiteralPath $result -Force }
 
 $mesenRom = Join-Path $Root "build\mainBankZero_${Compiler}_mesen.smc"
 New-MesenRomCopy -SourceRom $rom -OutputRom $mesenRom
 
-Write-Host "[3/3] Run Mesen breakable verification" -ForegroundColor Cyan
+Write-Host "[3/3] Run Mesen flag verification" -ForegroundColor Cyan
 $args = @("--testRunner", "--doNotSaveSettings", "--timeout=$TimeoutSeconds", "--debug.scriptWindow.allowIoOsAccess=true", "$lua", "$mesenRom")
 $txt = Invoke-MesenProcess -MesenPath $MesenPath -ArgumentList $args -ResultPath $result -TimeoutSeconds $TimeoutSeconds -IsFinal { param($text) ($text -like "PASS*" -or $text -like "FAIL*") -and $text.Length -gt 0 }
 
 if (!(Test-Path $result)) {
-    throw "Breakable result file not generated (timeout/boot failure): $result"
+    throw "Flag result file not generated (timeout/boot failure): $result"
 }
 
 $txt = (Get-Content -Raw $result).Trim()
-Write-Host "Breakable verify result: $txt"
+Write-Host "Flag verify result: $txt"
 if ($txt -notlike "PASS*") {
-    throw "Breakable verification failed: $txt"
+    throw "Flag verification failed: $txt"
 }
 
 exit 0

@@ -1,7 +1,7 @@
 local spcDsp = emu.memType.spcDspRegisters
 local frame = 0
 local sawPlaying = false
-local outPath = 'C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/spc700/testrom/stop_verify_result.txt'
+local outPath = (os.getenv("SPC_TEST_ROOT") or ".") .. '/stop_verify_result.txt'
 
 local function setPad(tbl)
   if emu.setInput then emu.setInput(1, tbl) end

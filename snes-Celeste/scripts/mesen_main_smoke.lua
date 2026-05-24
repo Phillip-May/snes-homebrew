@@ -2,12 +2,14 @@
 -- Goal: prove we reached active gameplay logic, not just "emulator stayed open".
 
 local cpu = emu.memType.cpu
-local outPath = "C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/build/mesen_main_smoke_result.txt"
+local projectRoot = os.getenv("SNES_CELESTE_ROOT") or "."
+local buildDir = projectRoot .. "/build"
+local outPath = buildDir .. "/mesen_main_smoke_result.txt"
 local maxFrames = 2400 -- ~40s at 60fps
 local frame = 0
 local done = false
 
-local sym = dofile("C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/build/mesen_symbols.lua")
+local sym = dofile(buildDir .. "/mesen_symbols.lua")
 local ADDR_GLOBAL_ACTIVE_LEVEL = sym.GLOBAL_ActiveLevel
 local ADDR_GLOBAL_PLAYER_DATA = sym.GLOBAL_PlayerData
 local ADDR_GLOBAL_FRAME_COUNT = sym.GLOBAL_FrameCount

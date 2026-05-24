@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test all 5 tracks - patch, build, render, restore
 set -e
-SPC_DIR="C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/spc700"
+SPC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAINC="$SPC_DIR/main.c"
 
 # Save original

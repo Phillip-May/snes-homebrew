@@ -1,7 +1,15 @@
+param(
+    [string]$LlvmMosPath = $env:LLVM_MOS_PATH
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$clang = "C:\llvm-mos\bin\mos-sim-spc700-clang.bat"
+if ([string]::IsNullOrWhiteSpace($LlvmMosPath)) {
+    $LlvmMosPath = "C:\llvm-mos"
+}
+
+$clang = Join-Path $LlvmMosPath "bin\mos-sim-spc700-clang.bat"
 if (-not (Test-Path $clang)) {
     Write-Warning "Skipping spc700 build: $clang not found"
     exit 0

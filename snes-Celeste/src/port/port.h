@@ -178,6 +178,24 @@ struct sPlayerData
     bool hasDashed;
 
     bool isFliped;
+
+    // Level-intro hop (ccleste PLAYER_SPAWN). spawnState: 0=rising,
+    // 1=falling, 2=landing pause, 0xFF=done (normal play). Player is not
+    // controllable while spawnState != 0xFF. Appended at end of sPlayerData
+    // so the OBJ_DATA union layout stays untouched for LTO.
+    uint8_t spawnState;
+    uint8_t spawnDelay;
+    int16_t spawnTargetY;
+
+#ifdef __SNES__
+    // Hair particles trailing the player's head. 5 entries with soft-follow
+    // lerp, drawn behind the player sprite each frame. Stored as 8.8 fixed
+    // point so the / 1.5 lerp doesn't quantize to 0 on small deltas.
+    struct sHairParticle {
+        int16_t x;
+        int16_t y;
+    } hair[5];
+#endif
 };
 
 struct sActiveLevelData
@@ -245,6 +263,14 @@ void port_buildDoubleDashOrb(uint8_t index);
 void port_buildStaticDecor(uint8_t index);
 void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType);
 void port_resetSprites(void);
+#ifdef __SNES__
+void port_loadHairAssets(void);
+void port_updatePlayerHair(struct sPlayerData *player);
+void port_resetPlayerHair(struct sPlayerData *player);
+void port_showDedicationScreen(void);
+void port_endDedicationScreen(void);
+void port_drawDedicationText(void);
+#endif
 void port_drawText(const unsigned char *text, uint8_t x, uint8_t y);
 void port_drawTextN(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y);
 void port_drawChar(uint8_t ch, uint8_t x, uint8_t y);
@@ -252,9 +278,14 @@ void port_drawCharWhiteOnBlack(uint8_t ch, uint8_t x, uint8_t y);
 void port_clearChars(uint8_t x, uint8_t y, uint8_t count);
 void port_renderTextOverlays(void);
 #ifdef __SNES__
+void port_drainFlagOverlayPreRender(void);
+void port_drainBg1TextDma(void);
+#endif
+#ifdef __SNES__
 void port_drawTextPico8N(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y);
+bool port_reservePico8RunN(uint8_t x, uint8_t y, uint8_t length, uint8_t advancePx);
+bool port_clearReservedPico8RunN(uint8_t x, uint8_t y, uint8_t length, uint8_t advancePx);
 void port_drawTextWhiteOnBlack(const unsigned char *text, uint8_t x, uint8_t y);
-void port_drawTextWhiteOnBlackN(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y);
 void port_drawTextBoxBlack(uint8_t x, uint8_t y, uint8_t w, uint8_t h);
 #endif
 uint8_t port_getInputs(void);
@@ -310,6 +341,25 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 #define PORT_FUNC_BANK0
 #endif
 
+// Dual-target function placement macros. NES side always pins to bank 6;
+// the SNES side mirrors mainBankZero.c's logical-bank layout for objects.
+// Use these to collapse the per-function `#ifdef __NES__ ... #else ...`
+// boilerplate at each declaration.
+#ifdef __NES__
+#define PORT_FUNC_NES6_SNES1 PORT_FUNC_BANK6
+#define PORT_FUNC_NES6_SNES2 PORT_FUNC_BANK6
+#define PORT_FUNC_NES6_SNES3 PORT_FUNC_BANK6
+#define PORT_FUNC_NES6_SNES4 PORT_FUNC_BANK6
+/* NES-only annotation; SNES falls through to the fixed mirror. */
+#define PORT_FUNC_NES6       PORT_FUNC_BANK6
+#else
+#define PORT_FUNC_NES6_SNES1 PORT_FUNC_BANK1
+#define PORT_FUNC_NES6_SNES2 PORT_FUNC_BANK2
+#define PORT_FUNC_NES6_SNES3 PORT_FUNC_BANK3
+#define PORT_FUNC_NES6_SNES4 PORT_FUNC_BANK4
+#define PORT_FUNC_NES6
+#endif
+
 // Macros for data/rodata section attributes (bank placement)
 // For const/rodata, we need to use .rodata.prg_rom_X to avoid conflicts with code sections
 #ifdef __NES_UNROM_512__
@@ -341,6 +391,21 @@ void port_levelAnimAdvance(void); // Advance level animation on display frame (l
 #define PORT_DATA_BANK0
 #endif
 
+// Compiler-conditional attribute macros. llvm-mos / clang understand them;
+// real 65816 compilers (vbcc, wdc816cc, etc.) don't, and aggressive
+// llvm-style attributes can confuse or break their codegen — so they get
+// the empty fallback. Use these instead of bare __attribute__((...)) so
+// the source still parses through those toolchains.
+#if defined(__VBCC__) || defined(__WDC816CC__) || defined(__CALYPSI__)
+#define PORT_NOINLINE
+#define PORT_OPTNONE
+#define PORT_DATA_HIGH_BANK1
+#else
+#define PORT_NOINLINE        __attribute__((noinline))
+#define PORT_OPTNONE         __attribute__((optnone))
+#define PORT_DATA_HIGH_BANK1 __attribute__((section("rom_data_bank_1")))
+#endif
+
 // Wrapper function for bank switching (portable interface)
 #ifdef __NES_UNROM_512__
 static inline void port_prg_bank_switch(uint8_t bank) {
@@ -349,6 +414,8 @@ static inline void port_prg_bank_switch(uint8_t bank) {
 static inline void port_prg_bank_push(uint8_t bank) { port_prg_bank_switch(bank); }
 static inline void port_prg_bank_pop(void) { port_prg_bank_switch(0u); }
 #elif defined(__SNES__)
+/* SNES LLVM-MOS bank switches are only safe from mirrored fixed code
+ * ($B000-$FFDF). Do not call these from PORT_FUNC_BANK1..7 code. */
 void port_prg_bank_switch(uint8_t bank);
 void port_prg_bank_push(uint8_t bank);
 void port_prg_bank_pop(void);

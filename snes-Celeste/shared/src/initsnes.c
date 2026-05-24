@@ -738,24 +738,6 @@ void init_tcc816_interrupts(void) {
 }
 #endif
 
-void emitWAI(void) {
-#ifdef __VBCC__
-    __asm("\twai\n");
-#elif defined(__mos__)
-    __asm volatile("wai");
-#else
-#endif
-}
-
-void emitCLI(void) {
-	#ifdef __VBCC__
-		__asm("\tcli\n");
-	#else
-	#endif
-}
-
-
-
 /* Initialize SA1 BW-RAM mapping for F0:0000-FF:FFFF */
 void initSA1(void) {
     /* Enable BW-RAM for both SNES and SA-1 CPUs */

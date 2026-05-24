@@ -1,6 +1,6 @@
 local M = {}
 
-M.projectRoot = "C:/Users/Admin/Documents/snes-homebrew/snes-Celeste"
+M.projectRoot = os.getenv("SNES_CELESTE_ROOT") or "."
 M.buildDir = M.projectRoot .. "/build"
 M.cpuWramMin = 0x7E0000
 M.cpuWramMax = 0x7FFFFF

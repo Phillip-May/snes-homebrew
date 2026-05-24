@@ -42,8 +42,6 @@ unsigned char* snesXC_getIRQ_ASM_Buffer(void);
 #ifdef __VBCC__
 unsigned char* snesXC_getIRQ_ASM_Buffer_vbcc(void);
 #endif
-void emitWAI(void);
-void emitCLI(void);
 
 void initSA1(void);
 

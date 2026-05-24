@@ -4,10 +4,12 @@
 
 local cpu = emu.memType.cpu
 local vram = emu.memType.snesVideoRam
-local outPath = "C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/build/mesen_title_verify_result.txt"
-local checksums = dofile("C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/build/title_screen_checksums.lua")
+local projectRoot = os.getenv("SNES_CELESTE_ROOT") or "."
+local buildDir = projectRoot .. "/build"
+local outPath = buildDir .. "/mesen_title_verify_result.txt"
+local checksums = dofile(buildDir .. "/title_screen_checksums.lua")
 
-local sym = dofile("C:/Users/Admin/Documents/snes-homebrew/snes-Celeste/build/mesen_symbols.lua")
+local sym = dofile(buildDir .. "/mesen_symbols.lua")
 local ADDR_GLOBAL_ACTIVE_LEVEL = sym.GLOBAL_ActiveLevel
 local ADDR_GLOBAL_FRAME_COUNT = sym.GLOBAL_FrameCount
 

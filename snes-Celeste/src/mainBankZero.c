@@ -19,13 +19,17 @@
 
 // 60fps vs 30fps physics scaling factor
 
+// Per-frame gravity step in fix16 (0.21). Used by playerUpdate, and by
+// spring/breakable-wall bounces to pre-compensate for the gravity that
+// playerUpdate will apply on the next frame before moving the player —
+// without this, externally-set spd.y loses one gravity step on first move.
+#define FP_GRAVITY 0x000035C2
+
 //Prototypes
 int16_t randint16(int16_t min, int16_t max);
 
 //Basic math functions that a compiler should have
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static int16_t sign(int16_t v) {
     return v > 0 ? 1 : (v < 0 ? -1 : 0);
 }
@@ -61,6 +65,16 @@ enum eSoundEffect {
     static uint8_t s_musicTimer = 0u;
     static bool s_inTitleScreen = false;
     static int8_t s_titleStartTimer = 0;
+    static bool s_titleStartActive = false;  // true between press and begin_game (timer 0 is mid-sequence, can't gate on timer alone)
+#ifndef __NES__
+    // Konami-code easter-egg state. On title screen, pressing
+    // ↑↓↑↓←→←→Start shows a 10-second dedication screen before the
+    // game starts normally.
+    static uint8_t  s_cheatStep = 0u;
+    static uint8_t  s_prevTitleInput = 0u;
+    static uint16_t s_dedicationTimer = 0u;
+    #define CHEAT_STEP_COUNT 9u
+#endif
 
     static uint8_t mapSoundEffectToSpcID(enum eSoundEffect soundEffect) {
         switch (soundEffect) {
@@ -86,9 +100,7 @@ enum eSoundEffect {
     }
 #endif
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 void playSoundEffect(enum eSoundEffect soundEffect){
 #ifdef __NES__
     (void)soundEffect;
@@ -125,6 +137,26 @@ uint16_t GLOBAL_TimerMinutes = 0;
 #define GLOBAL_FRUIT_BITS_SIZE 4u
 #define GLOBAL_LEVEL_COUNT 32u
 
+#ifdef __SNES__
+// Room-title overlay. Drawn at room load, cleared ~30 gameplay ticks later.
+// Timer at (4, 4) is MM:SS — 5 chars span cells x=0..3, ending before the
+// flag overlay's cell range (x=4..12). HH:MM:SS would push into cells 4..5
+// and corrupt the shared BG1 slot pool in the summit room.
+#define ROOM_TITLE_VISIBLE_TICKS  30u
+#define ROOM_TITLE_OLD_SITE_ROOM  12u  // ccleste level_index 11 == room.x=3,y=1
+#define ROOM_TITLE_SUMMIT_ROOM    31u  // ccleste level_index 30
+#define ROOM_TITLE_BOX_X          24u
+// port_drawTextWhiteOnBlack adds PORT_PICO8_FONT_CELL_Y_OFFSET (4 SNES px =
+// 2 pico8 px) internally, so pass 60 to land glyphs at ccleste's pico8 y=62.
+#define ROOM_TITLE_TEXT_Y         60u
+#define ROOM_TITLE_TIMER_X        4u
+#define ROOM_TITLE_TIMER_Y        4u
+#define ROOM_TITLE_TIMER_LEN      5u   // "MM:SS"
+#define ROOM_TITLE_ALT_MAX_LEN    8u   // "old site"
+extern bool s_pendingDisplayEnable;
+static uint8_t s_roomTitleClearTimer = 0u;
+#endif
+
 
 
 enum eMovingPlatformDir {MOVING_PLATFORM_DIR_IDLE = 0, MOVING_PLATFORM_DIR_LEFT = 1, MOVING_PLATFORM_DIR_RIGHT = 2};
@@ -139,9 +171,7 @@ extern uint8_t GLOBAL_InputLo;
 
 void initObject(enum eOBJType eType, int16_t x, int16_t y);
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static uint8_t currentFruitIndex(void) {
     uint16_t roomID = GLOBAL_ActiveLevel.currentRoomID;
     if (roomID == 0u || roomID > GLOBAL_FRUIT_COUNT) {
@@ -150,9 +180,7 @@ static uint8_t currentFruitIndex(void) {
     return (uint8_t)(roomID - 1u);
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static bool gotFruitAt(uint8_t fruitIndex) {
     if (fruitIndex >= GLOBAL_FRUIT_COUNT) {
         return false;
@@ -160,16 +188,12 @@ static bool gotFruitAt(uint8_t fruitIndex) {
     return (GLOBAL_GotFruitBits[fruitIndex >> 3] & (uint8_t)(1u << (fruitIndex & 7u))) != 0u;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static bool currentRoomFruitCollected(void) {
     return gotFruitAt(currentFruitIndex());
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static void collectCurrentRoomFruit(void) {
     uint8_t fruitIndex = currentFruitIndex();
     uint8_t mask;
@@ -183,18 +207,14 @@ static void collectCurrentRoomFruit(void) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static bool objectSkipsWhenFruitCollected(enum eOBJType eType) {
     return eType == OBJ_STRAWBERRY || eType == OBJ_FLYING_BERRY ||
            eType == OBJ_BREAKABLE_WALL || eType == OBJ_KEY ||
            eType == OBJ_CHEST;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static void resetRunState(void) {
     uint8_t i;
     for (i = 0; i < GLOBAL_FRUIT_BITS_SIZE; ++i) {
@@ -230,11 +250,7 @@ static void syncCameraFromPlayer(void) {
 }
 #endif
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void smokeInit(uint8_t index) {
     GLOBAL_OBJList[index].data.smoke.frameCount = 0;
     GLOBAL_OBJList[index].data.smoke.smokeSpriteState = SMOKE_SPRITE_1;
@@ -258,11 +274,7 @@ void smokeInit(uint8_t index) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void smokeUpdate(uint8_t index) {
     OBJ_DATA *smoke = &GLOBAL_OBJList[index];
     smoke->data.smoke.frameCount++;
@@ -280,13 +292,150 @@ void smokeUpdate(uint8_t index) {
     smoke->flags |= OBJ_FLAG_DIRTY;
 }
 
+#ifdef __SNES__
+extern union uOAMCopy GLOBAL_OAMCopy;
+// Death particles are managed as a stand-alone subsystem rather than OBJ
+// entries, matching ccleste's separate dead_particles[] array. Lives outside
+// the OBJ list so it survives playerInit's port_resetSprites + slot reinit,
+// and keeps ticking during the post-death PLAYER_SPAWN hop (where the
+// updateAllObjects gate would otherwise freeze it).
+//
+// To avoid spending new near-RAM BSS (the project enforces a 128-byte heap
+// headroom), state is parked in GLOBAL_OBJList[0]'s otherwise-unused fields.
+// Slot 0 is the "player placeholder" — its eType is always OBJ_UNUSED, it's
+// skipped by initObject (loop starts at 1) and by playerInit's clearing loop,
+// and the various processObject paths bail out on UNUSED. So pos.x/pos.y and
+// data.smoke.frameCount are free scratch (5 bytes).
+//
+// Rendering uses fixed OAM slots DEAD_PARTICLE_OAM_BASE..+7 (above the player,
+// hair, and below the dynamic-extras allocator — see PORT_EXTRA_SPRITE_START
+// in snes.c). port_resetSprites clears Y=240 across all OAM; tickDeadParticles
+// re-writes these slots on the same gameplay frame, so death does not flicker
+// the particles.
+// Tile slots placed in the gap between hair (0xC4-C7 / 0xD4-D7) and the
+// score-1000 sprite (0xC0-C3 / 0xD0-D3). Previously these lived at 0xCE-D3
+// which clobbered the score's bottom-row tiles.
+#define DEAD_PARTICLE_BIG_CHARNUM    0xC8u
+#define DEAD_PARTICLE_MED_CHARNUM    0xCAu
+#define DEAD_PARTICLE_SMALL_CHARNUM  0xCCu
+#define DEAD_PARTICLE_PROPS_PINK     0x3Au
+#define DEAD_PARTICLE_PROPS_PEACH    0x3Cu
+#define DEAD_PARTICLE_COUNT          8u
+#define DEAD_PARTICLE_OAM_BASE       35u
+#define DEAD_PARTICLE_LIFETIME       10u
+
+// State aliases (zero BSS — these are slot-0 scratch fields).
+#define DEAD_PARTICLES_T       (GLOBAL_OBJList[0].data.smoke.frameCount)
+#define DEAD_PARTICLES_BASE_X  (GLOBAL_OBJList[0].pos.x)
+#define DEAD_PARTICLES_BASE_Y  (GLOBAL_OBJList[0].pos.y)
+
+// ccleste celeste.c:1582-1604 velocity table: sin/cos of (dir/8) * 3 for
+// dir = 0..7. Precomputed as signed int8 so no runtime trig / __mulhi3.
+static const int8_t s_deadParticleVelX[DEAD_PARTICLE_COUNT] = { 0,  2,  3,  2,  0, -2, -3, -2 };
+static const int8_t s_deadParticleVelY[DEAD_PARTICLE_COUNT] = { 3,  2,  0, -2, -3, -2,  0,  2 };
+
+// Forward decls. Particle logic lives in bank 2 (frees fixed-mirror; bank 2
+// has spare space after the OBJ_DEAD_PARTICLE dispatch was removed).
+static void spawnDeadParticlesViaBank2(int16_t cx, int16_t cy);
+static void tickDeadParticlesViaBank2(void);
+
+PORT_FUNC_NES6_SNES2
+void spawnDeadParticles(int16_t cx, int16_t cy) {
+    // ccleste centres the burst on (cx, cy); our 16x16 tiles anchor top-left,
+    // so back off by 4 pico-px to centre.
+    DEAD_PARTICLES_BASE_X = (int16_t)(cx - 4);
+    DEAD_PARTICLES_BASE_Y = (int16_t)(cy - 4);
+    DEAD_PARTICLES_T      = DEAD_PARTICLE_LIFETIME;
+}
+
+// Multiply an int8 velocity by a uint8 elapsed (0..LIFETIME). Repeated
+// addition stays small with elapsed ≤ 10 and avoids dragging in __mulhi3,
+// which has historically caused codegen issues under LTO (see
+// project_mulhi3_bug.md).
+static int16_t deadParticleDisp(uint8_t elapsed, int8_t vel) {
+    int16_t result = 0;
+    while (elapsed != 0u) {
+        result = (int16_t)(result + (int16_t)vel);
+        elapsed--;
+    }
+    return result;
+}
+
+PORT_FUNC_NES6_SNES2
+void tickDeadParticles(void) {
+    uint8_t t;
+    uint8_t elapsed;
+    uint8_t i;
+    uint8_t tile;
+    int16_t baseX;
+    int16_t baseY;
+    if (DEAD_PARTICLES_T == 0u) {
+        return;  // Inactive — slots already hidden from a prior expire.
+    }
+    DEAD_PARTICLES_T--;
+    t = DEAD_PARTICLES_T;
+    if (t == 0u) {
+        // Final tick: expire all particles, hide their OAM slots.
+        for (i = 0u; i < DEAD_PARTICLE_COUNT; ++i) {
+            GLOBAL_OAMCopy.arr.OAMArray[DEAD_PARTICLE_OAM_BASE + i].OBJY = 240u;
+        }
+        return;
+    }
+    elapsed = (uint8_t)(DEAD_PARTICLE_LIFETIME - t);
+    baseX = DEAD_PARTICLES_BASE_X;
+    baseY = DEAD_PARTICLES_BASE_Y;
+    // ccleste's `dt = ceil(t/5)` collapses to two sizes (big for t≥6, small
+    // for t≤5); our tile set keeps a med step at t∈[5,9] for smoother fade.
+    if (t >= 5u) {
+        tile = DEAD_PARTICLE_MED_CHARNUM;
+    } else {
+        tile = DEAD_PARTICLE_SMALL_CHARNUM;
+    }
+    (void)DEAD_PARTICLE_BIG_CHARNUM;  // tile sizes start at MED — see comment.
+
+    for (i = 0u; i < DEAD_PARTICLE_COUNT; ++i) {
+        uint8_t slot = (uint8_t)(DEAD_PARTICLE_OAM_BASE + i);
+        int16_t physX = (int16_t)(baseX + deadParticleDisp(elapsed, s_deadParticleVelX[i]));
+        int16_t physY = (int16_t)(baseY + deadParticleDisp(elapsed, s_deadParticleVelY[i]));
+
+        uint16_t table2Index = (uint16_t)(slot >> 2);
+        uint8_t shift = (uint8_t)((slot & 3u) << 1);
+        uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
+        uint8_t value = (uint8_t)(0x02u << shift);  // sizeBit=1, xBit=0
+        GLOBAL_OAMCopy.arr.OAMTable2[table2Index] =
+            (uint8_t)((currentByte & (uint8_t)~(uint8_t)(0x03u << shift)) | value);
+
+        int16_t screenY = (int16_t)((int16_t)(physY << 1) - (int16_t)GLOBAL_ScrollBG2Y - 1);
+        GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)(physX << 1);
+        GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)screenY;
+        GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM = tile;
+        GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES =
+            (uint8_t)((t & 1u) ? DEAD_PARTICLE_PROPS_PEACH : DEAD_PARTICLE_PROPS_PINK);
+    }
+}
+
+// Fixed-mirror trampolines. Bank switches must originate from fixed-mirror
+// code (the JSR return PC after a bank swap only lands correctly when the
+// saved low PC matches the new bank's code). Callers in other banks (e.g.
+// playerUpdate in bank 1) and in fixed mirror both go through these stubs.
+PORT_NOINLINE
+static void spawnDeadParticlesViaBank2(int16_t cx, int16_t cy) {
+    port_prg_bank_enter(2);
+    spawnDeadParticles(cx, cy);
+    port_prg_bank_leave();
+}
+
+PORT_NOINLINE
+static void tickDeadParticlesViaBank2(void) {
+    port_prg_bank_enter(2);
+    tickDeadParticles();
+    port_prg_bank_leave();
+}
+#endif
+
 
 #define COLLISION_FLAG_INDEX_FROM_TILE_XY(x,y) ((x) + (y) * 16)
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void breakableWallInit(uint8_t index) {
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
     uint8_t properties = 0;
@@ -309,11 +458,7 @@ void breakableWallInit(uint8_t index) {
 
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void breakableWallUpdate(uint8_t index) {
     //Check if player is touching the wall
     OBJ_DATA *wall = &GLOBAL_OBJList[index];
@@ -332,7 +477,8 @@ void breakableWallUpdate(uint8_t index) {
             int16_t knockDir = -sign(FIXED_TO_INT(GLOBAL_PlayerData.spd.x));
             GLOBAL_PlayerData.spd.x = (knockDir > 0) ? FLOAT_TO_FIXED(1.5f) : ((knockDir < 0) ? FLOAT_TO_FIXED(-1.5f) : 0);
         }
-        GLOBAL_PlayerData.spd.y = FLOAT_TO_FIXED(-1.5f);
+        // Pre-compensate for one frame of gravity (see spring fix at springUpdate).
+        GLOBAL_PlayerData.spd.y = FLOAT_TO_FIXED(-1.5f) - FP_GRAVITY;
         GLOBAL_PlayerData.dashCounter = -1;
         playSoundEffect(SOUND_EFFECT_BREAKABLE_WALL_HIT);
         initObject(OBJ_SMOKE, thisX, thisY);
@@ -346,22 +492,25 @@ void breakableWallUpdate(uint8_t index) {
         //Destroy the object
         wall->eType = OBJ_UNUSED;
         wall->flags |= OBJ_FLAG_DIRTY;
-        //Restore the original collision data
-        // Clear solid flag (bit 0) that breakableWallInit set
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY)]     &= ~0x01;
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY)]   &= ~0x01;
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX, tileY+1)]   &= ~0x01;
-        GLOBAL_ActiveLevel.collisionFlagsArr[COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX+1, tileY+1)] &= ~0x01;
+        // Restore the 4 tiles to their original ROM-loaded collision values.
+        // Plain `&= ~0x01` would wipe the solid bit off any static ground tile
+        // the wall overlapped (e.g. level 17, where the wall sits on ground).
+        {
+            uint16_t i0 = COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX,     tileY);
+            uint16_t i1 = COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX + 1, tileY);
+            uint16_t i2 = COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX,     tileY + 1);
+            uint16_t i3 = COLLISION_FLAG_INDEX_FROM_TILE_XY(tileX + 1, tileY + 1);
+            GLOBAL_ActiveLevel.collisionFlagsArr[i0] = GLOBAL_ActiveLevel.collisionFlagsReset[i0];
+            GLOBAL_ActiveLevel.collisionFlagsArr[i1] = GLOBAL_ActiveLevel.collisionFlagsReset[i1];
+            GLOBAL_ActiveLevel.collisionFlagsArr[i2] = GLOBAL_ActiveLevel.collisionFlagsReset[i2];
+            GLOBAL_ActiveLevel.collisionFlagsArr[i3] = GLOBAL_ActiveLevel.collisionFlagsReset[i3];
+        }
         return;
     }
     wall->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t properties) {
     OBJ_DATA *decor = &GLOBAL_OBJList[index];
     decor->oamTile = tile;
@@ -369,29 +518,17 @@ static void initSimpleDecorSprite(uint8_t index, uint8_t tile, uint8_t propertie
     decor->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 static void updateSimpleDecorSprite(uint8_t index) {
     GLOBAL_OBJList[index].flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void flowerInit(uint8_t index) {
     initSimpleDecorSprite(index, FLOWER_SPRITE_1, 0x32); // priority 3, palette 1
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void flowerUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
@@ -402,11 +539,7 @@ enum eCollapseTileState {
     COLLAPSE_TILE_STATE_HIDDEN = 2,
 };
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void collapseTileInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t tileX = GLOBAL_OBJList[index].pos.x / 8;
@@ -418,10 +551,8 @@ void collapseTileInit(uint8_t index) {
 
     // Collapse tiles render as background tiles, not sprites, so no OAM slots are needed
 
-    //Check if there is a spring linked to this tile
-    // Note: We only search for springs that are already initialized (eType == OBJ_SPRING)
-    // If a spring hasn't been initialized yet, the link will be established when the spring initializes (in springInit)
-    // This ensures bidirectional linking works regardless of initialization order
+    // Link to an adjacent spring if it's already been initialized; otherwise
+    // springInit will close the link from its side when it runs.
     for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         if (GLOBAL_OBJList[i].eType == OBJ_SPRING) {
             uint8_t springTileX = GLOBAL_OBJList[i].pos.x / 8;
@@ -443,11 +574,7 @@ void collapseTileInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void collapseTileUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint16_t thisX = this->pos.x;
@@ -532,11 +659,7 @@ void collapseTileUpdate(uint8_t index) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void springInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.spring.frameCount = 0;
@@ -562,11 +685,7 @@ void springInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void springUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     struct sPlayerData *player = &GLOBAL_PlayerData;
@@ -625,7 +744,10 @@ void springUpdate(uint8_t index) {
         
         // Apply spring physics (ccleste: spd.x *= 0.2, spd.y = -3).
         GLOBAL_PlayerData.spd.x = GLOBAL_PlayerData.spd.x / 5;
-        GLOBAL_PlayerData.spd.y = INT_TO_FIXED(-3); //Set upward velocity (original)
+        // Pre-compensate for one frame of gravity: playerUpdate applies gravity
+        // before moving next frame, so set spd.y = -3 - gravity so that after
+        // gravity the actual move uses -3 (matches ccleste's move-then-gravity order).
+        GLOBAL_PlayerData.spd.y = INT_TO_FIXED(-3) - FP_GRAVITY;
         GLOBAL_PlayerData.dashesLeft = player->doubleDashUnlocked ? 2 : 1; //Restore dashes
         
         //Spring animation and effects
@@ -657,11 +779,7 @@ void springUpdate(uint8_t index) {
 }
 
 enum eBalloonState {BALLOON_STATE_IDLE = 0, BALLOON_STATE_POPPED = 1};
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 void balloonInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->data.balloon.state = BALLOON_STATE_IDLE;
@@ -689,11 +807,7 @@ static const uint8_t balloonStringFrames[75] = {
     BALLOON_STRING_2, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_3, BALLOON_STRING_1, BALLOON_STRING_1,
 };
 #define BALLON_YTABLE_SIZE 304
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static uint8_t balloonYOffset(uint16_t tableIndex) {
     if (tableIndex < 26u) {
         return 0u;
@@ -717,11 +831,7 @@ static uint8_t balloonYOffset(uint16_t tableIndex) {
 }
 
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 void balloonUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     int8_t yOffset = (int8_t)balloonYOffset(this->data.balloon.yTableIndex);
@@ -767,11 +877,7 @@ void balloonUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void platMovInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     // ccleste: this->x -= 4 (center the 16px sprite on spawn tile)
@@ -798,11 +904,7 @@ void platMovInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void platMovUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t hitboxIndex = this->data.platMov.hitboxIndex;
@@ -839,11 +941,15 @@ void platMovUpdate(uint8_t index) {
     GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 2] = GLOBAL_OBJList[index].pos.x + 16;
     GLOBAL_ActiveLevel.movingPlatformHitboxes[hitboxIndex + 3] = GLOBAL_OBJList[index].pos.y + 4;
 
-    // Wrap around (ccleste: if x<-16 then x=128, if x>128 then x=-16)
+    // Wrap with a 128-game-pixel period (= 256 screen-px) so the screen X — which
+    // is rendered via natural uint8 wrap of pos.x*2 — stays continuous across the
+    // snap. ccleste's [-16, 128] range has period 144 and would teleport on the
+    // SNES; this modular wrap matches the vbcc-era smooth-wrap behaviour at the
+    // cost of ~16 frames of cloud-step time per cycle on the right edge.
     if (this->pos.x < -16) {
-        this->pos.x = 128;
-    } else if (this->pos.x > 128) {
-        this->pos.x = -16;
+        this->pos.x += 128;
+    } else if (this->pos.x > 111) {
+        this->pos.x -= 128;
     }
 
 
@@ -852,11 +958,7 @@ void platMovUpdate(uint8_t index) {
 
 enum eKeyState {KEY_STATE_1 = 0, KEY_STATE_2 = 1, KEY_STATE_3 = 2, KEY_STATE_4 = 3};
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void keyInit(uint8_t index) {
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -878,11 +980,7 @@ void keyInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void keyUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t properties = 0x30; // priority 3 baseline
@@ -949,11 +1047,7 @@ void keyUpdate(uint8_t index) {
 
 enum eChestState {CHEST_STATE_IDLE = 0, CHEST_STATE_SHAKING = 1, CHEST_STATE_OPEN = 2};
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void chestInit(uint8_t index) {   
     uint8_t i;
     OBJ_DATA *this = &GLOBAL_OBJList[index];
@@ -974,11 +1068,7 @@ void chestInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void chestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     int16_t shakeAmount = 0;
@@ -1013,11 +1103,13 @@ void chestUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
+PORT_FUNC_NES6_SNES4
+static bool monumentReserveHelper(void);
+#ifdef __SNES__
+static bool s_monumentTextReserved = false;
 #endif
+
+PORT_FUNC_NES6_SNES4
 void monumentInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -1027,6 +1119,16 @@ void monumentInit(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
     // Update nametable to show the monument tile (monuments render as background tiles)
     port_updateCollapseTileNametable(index);
+#ifdef __SNES__
+    s_monumentTextReserved = false;
+    // Don't pre-reserve the monument's text cells here. The full reserve
+    // eats ~45 of the 48 BG1 text slots, starving the room-title banner
+    // that draws next in LoadRoomData. monumentUpdate reserves lazily on
+    // first player touch, by which time the room-title has cleared and
+    // freed its slots.
+#else
+    (void)monumentReserveHelper();
+#endif
 }
 
 PORT_DATA_BANK0
@@ -1036,6 +1138,7 @@ static const unsigned char monumentText[][25] = {
     " perished on the climb "
 };
 static unsigned char monumentBlankLine[] = "                            ";
+#define MONUMENT_TEXT_LINE_LEN 23u
 #ifdef __NES__
 #define MONUMENT_TEXT_X 20u
 #define MONUMENT_TEXT_Y 92u
@@ -1044,7 +1147,7 @@ static unsigned char monumentBlankLine[] = "                            ";
 #else
 #define MONUMENT_TEXT_X 8u
 #define MONUMENT_TEXT_Y 80u
-#define MONUMENT_TEXT_LINE_SPACING 7u
+#define MONUMENT_TEXT_LINE_SPACING 8u
 #define MONUMENT_TEXT_CHAR_ADVANCE 5u
 #endif
 bool GLOBAL_MonumentTextDisplayed = false;
@@ -1052,11 +1155,7 @@ uint8_t GLOBAL_MonumentCurLineCharCount = 0;
 uint8_t GLOBAL_MonumentCurLineNum = 0;
 static uint8_t s_monumentTextTick = 0;
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void resetMonumentTextState(void) {
     GLOBAL_MonumentTextDisplayed = false;
     GLOBAL_MonumentCurLineCharCount = 0;
@@ -1064,11 +1163,26 @@ static void resetMonumentTextState(void) {
     s_monumentTextTick = 0;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
+PORT_FUNC_NES6_SNES4
+static bool monumentReserveHelper(void) {
+#ifdef __SNES__
+    bool ok = true;
+    ok = port_reservePico8RunN(MONUMENT_TEXT_X, MONUMENT_TEXT_Y, MONUMENT_TEXT_LINE_LEN, MONUMENT_TEXT_CHAR_ADVANCE) && ok;
+    ok = port_reservePico8RunN(MONUMENT_TEXT_X,
+                               (uint8_t)(MONUMENT_TEXT_Y + MONUMENT_TEXT_LINE_SPACING),
+                               MONUMENT_TEXT_LINE_LEN,
+                               MONUMENT_TEXT_CHAR_ADVANCE) && ok;
+    ok = port_reservePico8RunN(MONUMENT_TEXT_X,
+                               (uint8_t)(MONUMENT_TEXT_Y + (MONUMENT_TEXT_LINE_SPACING * 2u)),
+                               MONUMENT_TEXT_LINE_LEN,
+                               MONUMENT_TEXT_CHAR_ADVANCE) && ok;
+    s_monumentTextReserved = ok;
+    return ok;
 #endif
+    return true;
+}
+
+PORT_FUNC_NES6_SNES4
 static void monumentDrawCharHelper(uint8_t lineNum, uint8_t charIndex) {
 #ifdef __SNES__
     port_drawTextPico8N(&monumentText[lineNum][charIndex],
@@ -1083,12 +1197,19 @@ static void monumentDrawCharHelper(uint8_t lineNum, uint8_t charIndex) {
 #endif
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void monumentClearHelper(void) {
+#ifdef __SNES__
+    (void)port_clearReservedPico8RunN(MONUMENT_TEXT_X, MONUMENT_TEXT_Y, MONUMENT_TEXT_LINE_LEN, MONUMENT_TEXT_CHAR_ADVANCE);
+    (void)port_clearReservedPico8RunN(MONUMENT_TEXT_X,
+                                      (uint8_t)(MONUMENT_TEXT_Y + MONUMENT_TEXT_LINE_SPACING),
+                                      MONUMENT_TEXT_LINE_LEN,
+                                      MONUMENT_TEXT_CHAR_ADVANCE);
+    (void)port_clearReservedPico8RunN(MONUMENT_TEXT_X,
+                                      (uint8_t)(MONUMENT_TEXT_Y + (MONUMENT_TEXT_LINE_SPACING * 2u)),
+                                      MONUMENT_TEXT_LINE_LEN,
+                                      MONUMENT_TEXT_CHAR_ADVANCE);
+#else
     port_drawText(monumentBlankLine, MONUMENT_TEXT_X, MONUMENT_TEXT_Y);
     port_drawText(monumentBlankLine,
                   MONUMENT_TEXT_X,
@@ -1096,13 +1217,10 @@ static void monumentClearHelper(void) {
     port_drawText(monumentBlankLine,
                   MONUMENT_TEXT_X,
                   (uint8_t)(MONUMENT_TEXT_Y + (MONUMENT_TEXT_LINE_SPACING * 2u)));
+#endif
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 void monumentUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching;
@@ -1114,6 +1232,13 @@ void monumentUpdate(uint8_t index) {
                        (GLOBAL_PlayerData.objData.pos.y > this->pos.y) &&
                        (GLOBAL_PlayerData.objData.pos.y < this->pos.y+16);
     if (isPlayerTouching) {
+#ifdef __SNES__
+        if (!s_monumentTextReserved && !monumentReserveHelper()) {
+            GLOBAL_MonumentTextDisplayed = false;
+            s_monumentTextTick = 0u;
+            return;
+        }
+#endif
         GLOBAL_MonumentTextDisplayed = true;
         s_monumentTextTick ^= 1u;
         if (s_monumentTextTick != 0u) {
@@ -1121,7 +1246,7 @@ void monumentUpdate(uint8_t index) {
         }
 
         if (GLOBAL_MonumentCurLineNum < 3u) {
-            if (GLOBAL_MonumentCurLineCharCount < 23u) {
+            if (GLOBAL_MonumentCurLineCharCount < MONUMENT_TEXT_LINE_LEN) {
                 uint8_t charIndex = GLOBAL_MonumentCurLineCharCount;
                 GLOBAL_MonumentCurLineCharCount++;
                 playSoundEffect(SOUND_EFFECT_TEXT_DISPLAY);
@@ -1139,14 +1264,168 @@ void monumentUpdate(uint8_t index) {
 
 }
 
+#ifdef __SNES__
+// Strings live in bank 5 alongside the format helpers that build them.
+// "old site" used to live here too but level 12 is now skipped, see
+// roomTitlePrep.
+PORT_DATA_BANK5
+static const unsigned char roomTitle_Summit[]  = "summit";
+
+// Reuse the flag-overlay line buffers as scratch — they're only repopulated
+// when the player triggers the end-game flag (long after the room-title
+// clears), and the BG1 cells are already populated from those buffers by
+// drainFlagOverlayPreRender before we run, so overwriting them is safe.
+// Saves 18 bytes of near-RAM BSS.
+extern unsigned char GLOBAL_FlagOverlayLine0[17];
+extern unsigned char GLOBAL_FlagOverlayLine1[17];
+#define s_roomTitleAltBuf   GLOBAL_FlagOverlayLine0
+#define s_roomTitleTimerBuf GLOBAL_FlagOverlayLine1
+static uint8_t s_roomTitleAltLen = 0u;
+static uint8_t s_roomTitleAltX = 0u;
+
+PORT_FUNC_BANK5
+static uint8_t roomTitleAppendTwoDigits(unsigned char *out, uint8_t pos, uint8_t value) {
+    uint8_t tens = 0u;
+    while (value >= 100u) { value = (uint8_t)(value - 100u); }
+    while (value >= 10u)  { value = (uint8_t)(value - 10u); tens++; }
+    out[pos++] = (unsigned char)('0' + tens);
+    out[pos++] = (unsigned char)('0' + value);
+    return pos;
+}
+
+// Populate s_roomTitleAltBuf / s_roomTitleAltX / s_roomTitleAltLen and
+// s_roomTitleTimerBuf from the current room ID and timer globals. Sets
+// s_roomTitleAltLen=0 to signal "do not draw" for out-of-range rooms.
+PORT_FUNC_BANK5
+static void roomTitlePrep(void) {
+    uint16_t roomID = GLOBAL_ActiveLevel.currentRoomID;
+    uint16_t totalMinutes;
+    uint8_t pos;
+
+    if (roomID == ROOM_TITLE_OLD_SITE_ROOM) {
+        // Monument room: suppress the banner entirely. The monument reserves
+        // ~45 of the 48 BG1 text slots when the player touches it, and the
+        // pool can't carry both that and our banner. Same treatment as the
+        // summit room, but here we skip the altitude line too (not just the
+        // timer) since the monument's reserve happens at unpredictable points
+        // and would race with the banner's clear.
+        s_roomTitleAltLen = 0u;
+        return;
+    } else if (roomID == ROOM_TITLE_SUMMIT_ROOM) {
+        uint8_t i, len = (uint8_t)(sizeof(roomTitle_Summit) - 1u);
+        for (i = 0u; i < len; ++i) s_roomTitleAltBuf[i] = roomTitle_Summit[i];
+        s_roomTitleAltBuf[len] = '\0';
+        s_roomTitleAltLen = len;
+        s_roomTitleAltX = 52u;
+        // Suppress the timer in summit room. Its cells span rows 0..1, which
+        // are part of the flag-overlay's pre-rendered region (cells y=0..3).
+        // Any cell publish in rows 0..1 triggers a full-row map DMA in
+        // bg1TextPreBuildDma that auto-promotes the flag overlay's hidden
+        // cells to visible. Drawing nothing here avoids that.
+        s_roomTitleTimerBuf[0] = '\0';
+        return;
+    } else if (roomID >= 1u && roomID <= 30u) {
+        uint8_t r = (uint8_t)roomID;
+        pos = 0u;
+        if (r >= 30u) {
+            s_roomTitleAltBuf[pos++] = '3'; s_roomTitleAltBuf[pos++] = '0';
+        } else if (r >= 20u) {
+            s_roomTitleAltBuf[pos++] = '2'; s_roomTitleAltBuf[pos++] = (unsigned char)('0' + (uint8_t)(r - 20u));
+        } else if (r >= 10u) {
+            s_roomTitleAltBuf[pos++] = '1'; s_roomTitleAltBuf[pos++] = (unsigned char)('0' + (uint8_t)(r - 10u));
+        } else {
+            s_roomTitleAltBuf[pos++] = (unsigned char)('0' + r);
+        }
+        s_roomTitleAltBuf[pos++] = '0';
+        s_roomTitleAltBuf[pos++] = '0';
+        s_roomTitleAltBuf[pos++] = ' ';
+        s_roomTitleAltBuf[pos++] = 'm';
+        s_roomTitleAltBuf[pos] = '\0';
+        s_roomTitleAltLen = pos;
+        s_roomTitleAltX = (r < 10u) ? 54u : 52u;
+    } else {
+        s_roomTitleAltLen = 0u;
+        return;
+    }
+
+    // MM:SS — minutes wraps at 100 (1h 39m) which is well beyond any
+    // first-attempt playthrough. Drop hours rather than push glyphs into
+    // the flag overlay's cell column range (cell x=4+).
+    totalMinutes = GLOBAL_TimerMinutes;
+    while (totalMinutes >= 100u) {
+        totalMinutes = (uint16_t)(totalMinutes - 100u);
+    }
+    pos = roomTitleAppendTwoDigits(s_roomTitleTimerBuf, 0u, (uint8_t)totalMinutes);
+    s_roomTitleTimerBuf[pos++] = ':';
+    pos = roomTitleAppendTwoDigits(s_roomTitleTimerBuf, pos, GLOBAL_TimerSeconds);
+    s_roomTitleTimerBuf[pos] = '\0';
+}
+
+PORT_NOINLINE static void roomTitleDrawHelperFromBank5(void);
+
+// Bank-5 orchestrator. Single fixed-bank call site collapses room-ID range
+// check + prep + draw + timer-arm into one bank switch.
+PORT_FUNC_BANK5
+static void roomTitleArm(void) {
+    uint16_t roomID = GLOBAL_ActiveLevel.currentRoomID;
+    if (roomID == 0u || roomID > ROOM_TITLE_SUMMIT_ROOM) return;
+    roomTitlePrep();
+    if (s_roomTitleAltLen != 0u) {
+        roomTitleDrawHelperFromBank5();
+        s_roomTitleClearTimer = ROOM_TITLE_VISIBLE_TICKS;
+    }
+}
+
+// Bank-4 draw glue: consumes the pre-built strings and writes glyphs.
+// Each glyph carries its own dark cell background via port_drawTextWhiteOnBlack,
+// so no explicit box-fill is needed — keeps the bank-4 footprint small.
+PORT_FUNC_BANK4
+static void roomTitleDrawHelper(void) {
+    if (s_roomTitleAltLen == 0u) return;
+    port_drawTextWhiteOnBlack(s_roomTitleAltBuf, s_roomTitleAltX, ROOM_TITLE_TEXT_Y);
+    port_drawTextWhiteOnBlack(s_roomTitleTimerBuf, ROOM_TITLE_TIMER_X, ROOM_TITLE_TIMER_Y);
+}
+
+// Bank-4 clear glue. Hides the altitude band (length=16+advance=5 → 81 px,
+// covers worst-case altitude line) and the 5-char timer.
+PORT_FUNC_BANK4
+static void roomTitleClearHelper(void) {
+    (void)port_clearReservedPico8RunN(ROOM_TITLE_BOX_X, ROOM_TITLE_TEXT_Y, 16u, 5u);
+    (void)port_clearReservedPico8RunN(ROOM_TITLE_TIMER_X, ROOM_TITLE_TIMER_Y, ROOM_TITLE_TIMER_LEN, 5u);
+}
+
+// Fixed-mirror trampoline: lets bank-5 code call into the bank-4 draw glue.
+PORT_NOINLINE
+static void roomTitleDrawHelperFromBank5(void) {
+    port_prg_bank_enter(4);
+    roomTitleDrawHelper();
+    port_prg_bank_leave();
+}
+
+// In SNES mode 0, BG1 high-priority tiles sit BELOW sprite priority 3, so the
+// room-title text gets drawn under the player/hair/etc. While the banner is
+// visible, demote any priority-3 OAM entry to priority 2 — that puts BG1.hi
+// (text) above the sprites. Anything BG2.hi would also draw above the player
+// during this window, but the level layer doesn't use BG2 high-priority tiles
+// so the only visible effect is the intended one.
+extern union uOAMCopy GLOBAL_OAMCopy;
+PORT_FUNC_BANK5
+static void roomTitleDemoteSprites(void) {
+    uint8_t i;
+    for (i = 0u; i < 128u; ++i) {
+        uint8_t props = GLOBAL_OAMCopy.arr.OAMArray[i].PROPERTIES;
+        if ((props & 0x30u) == 0x30u) {
+            GLOBAL_OAMCopy.arr.OAMArray[i].PROPERTIES = (uint8_t)(props & 0xEFu);
+        }
+    }
+}
+
+#endif
+
 enum eBigChestState {BIG_CHEST_STATE_IDLE = 0, BIG_CHEST_STATE_OPEN_ANIM = 1, BIG_CHEST_STATE_OPENED = 2};
 
 // eBigChestSprite is defined in sprite_animation_enums.h
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 void bigChestInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -1160,11 +1439,7 @@ void bigChestInit(uint8_t index) {
     port_updateCollapseTileNametable(index);
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 void bigChestUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 4) &&
@@ -1201,7 +1476,7 @@ void bigChestUpdate(uint8_t index) {
                 port_updateCollapseTileNametable(index);
                 // Spawn the double dash orb only once when transitioning to OPENED state
                 GLOBAL_ActiveLevel.swapCloudPal = true;
-                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+4,this->pos.y+8);
+                initObject(OBJ_DOUBLE_JUMP_ORB,this->pos.x+4,this->pos.y+4);
             }
             break;
         case BIG_CHEST_STATE_OPENED:
@@ -1221,6 +1496,8 @@ PORT_DATA_BANK4
 #endif
 static const unsigned char flagBlankLine[] = "                ";
 bool GLOBAL_FlagOverlayShow = false;
+bool GLOBAL_FlagOverlayDirty = false;
+bool GLOBAL_FlagOverlayRevealDirty = false;
 uint8_t GLOBAL_FlagOverlayLine0Len = 0u;
 uint8_t GLOBAL_FlagOverlayLine1Len = 0u;
 uint8_t GLOBAL_FlagOverlayLine2Len = 0u;
@@ -1228,11 +1505,7 @@ unsigned char GLOBAL_FlagOverlayLine0[17] = {0};
 unsigned char GLOBAL_FlagOverlayLine1[17] = {0};
 unsigned char GLOBAL_FlagOverlayLine2[17] = {0};
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void flagLineReset(char *line) {
     uint8_t i;
     for (i = 0; i < 17u; ++i) {
@@ -1240,11 +1513,7 @@ static void flagLineReset(char *line) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void flagAppendText(char *line, uint8_t *pos, const char *text) {
     while (*text != '\0' && *pos < 16u) {
         line[*pos] = *text;
@@ -1253,11 +1522,7 @@ static void flagAppendText(char *line, uint8_t *pos, const char *text) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void flagAppendDecimal(char *line, uint8_t *pos, uint16_t value) {
     uint16_t divisor = 10000u;
     bool started = false;
@@ -1273,11 +1538,7 @@ static void flagAppendDecimal(char *line, uint8_t *pos, uint16_t value) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void flagAppendTwoDigits(char *line, uint8_t *pos, uint16_t value) {
     if (*pos < 16u) {
         line[*pos] = (char)('0' + ((value / 10u) % 10u));
@@ -1289,11 +1550,7 @@ static void flagAppendTwoDigits(char *line, uint8_t *pos, uint16_t value) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void flagDrawLineWhiteOnBlack(const char *line, uint8_t length, uint8_t x, uint8_t y) {
     uint8_t i;
     for (i = 0u; i < length; ++i) {
@@ -1301,11 +1558,100 @@ static void flagDrawLineWhiteOnBlack(const char *line, uint8_t length, uint8_t x
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
+#ifdef __SNES__
+// Flag overlay text formatters live in bank 5 to free bank 4 space for the
+// pre-render dispatch. flagUpdate calls them via a fixed-mirror trampoline
+// (flagDrawHelperViaBank5) — bank switching has to originate from fixed
+// mirror or RTS would land at the wrong bank's offset.
+PORT_FUNC_BANK5
+static uint8_t flagOverlayAppendDecimal(unsigned char *line, uint8_t pos, uint16_t value) {
+    uint16_t divisor = 10000u;
+    bool started = false;
+    while (divisor > 0u && pos < 16u) {
+        uint8_t digit = 0u;
+        while (value >= divisor) {
+            value = (uint16_t)(value - divisor);
+            digit++;
+        }
+        if (digit != 0u || started || divisor == 1u) {
+            line[pos] = (unsigned char)('0' + digit);
+            pos++;
+            started = true;
+        }
+        divisor = (uint16_t)(divisor / 10u);
+    }
+    line[pos] = '\0';
+    return pos;
+}
+
+PORT_FUNC_BANK5
+static uint8_t flagOverlayAppendTwoDigits(unsigned char *line, uint8_t pos, uint16_t value) {
+    uint8_t tens = 0u;
+    while (value >= 100u) {
+        value = (uint16_t)(value - 100u);
+    }
+    while (value >= 10u) {
+        value = (uint16_t)(value - 10u);
+        tens++;
+    }
+    if (pos < 16u) {
+        line[pos++] = (unsigned char)('0' + tens);
+    }
+    if (pos < 16u) {
+        line[pos++] = (unsigned char)('0' + (uint8_t)value);
+    }
+    line[pos] = '\0';
+    return pos;
+}
+
+PORT_FUNC_BANK5
+static void flagDrawHelper(uint16_t score, uint16_t totalMinutes, uint16_t seconds, uint16_t deaths) {
+    uint8_t pos;
+    uint16_t hours;
+    uint16_t minutes;
+
+    GLOBAL_FlagOverlayLine0[0] = 'x';
+    GLOBAL_FlagOverlayLine0Len = flagOverlayAppendDecimal(GLOBAL_FlagOverlayLine0, 1u, score);
+
+    hours = 0u;
+    while (totalMinutes >= 60u) {
+        totalMinutes = (uint16_t)(totalMinutes - 60u);
+        hours++;
+    }
+    minutes = totalMinutes;
+
+    pos = flagOverlayAppendTwoDigits(GLOBAL_FlagOverlayLine1, 0u, hours);
+    GLOBAL_FlagOverlayLine1[pos++] = ':';
+    pos = flagOverlayAppendTwoDigits(GLOBAL_FlagOverlayLine1, pos, minutes);
+    GLOBAL_FlagOverlayLine1[pos++] = ':';
+    GLOBAL_FlagOverlayLine1Len = flagOverlayAppendTwoDigits(GLOBAL_FlagOverlayLine1, pos, seconds);
+
+    GLOBAL_FlagOverlayLine2[0] = 'd';
+    GLOBAL_FlagOverlayLine2[1] = 'e';
+    GLOBAL_FlagOverlayLine2[2] = 'a';
+    GLOBAL_FlagOverlayLine2[3] = 't';
+    GLOBAL_FlagOverlayLine2[4] = 'h';
+    GLOBAL_FlagOverlayLine2[5] = 's';
+    GLOBAL_FlagOverlayLine2[6] = ':';
+    GLOBAL_FlagOverlayLine2Len = flagOverlayAppendDecimal(GLOBAL_FlagOverlayLine2, 7u, deaths);
+    GLOBAL_FlagOverlayDirty = true;
+}
+
+// Fixed-mirror trampoline. Bank switching must originate from fixed-mirror
+// code: a JSR/RTS round-trip across banks works only if the call site is at
+// an address mirrored into all banks. flagUpdate (bank 4) routes through
+// this trampoline to reach flagDrawHelper (bank 5). MUST stay noinline so it
+// keeps its fixed-mirror placement instead of being folded into flagUpdate.
+PORT_NOINLINE
+static void flagDrawHelperViaBank5(uint16_t score, uint16_t totalMinutes,
+                                   uint16_t seconds, uint16_t deaths)
+{
+    port_prg_bank_enter(5);
+    flagDrawHelper(score, totalMinutes, seconds, deaths);
+    port_prg_bank_leave();
+}
 #else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void flagDrawHelper(uint16_t score, uint16_t totalMinutes, uint16_t seconds, uint16_t deaths) {
     char line[17];
     uint8_t pos;
@@ -1356,12 +1702,9 @@ static void flagDrawHelper(uint16_t score, uint16_t totalMinutes, uint16_t secon
     port_drawText((const unsigned char *)line, 32, 20);
 #endif
 }
-
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
 #endif
+
+PORT_FUNC_NES6_SNES4
 void flagInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->pos.x += 5;
@@ -1378,22 +1721,25 @@ void flagInit(uint8_t index) {
     GLOBAL_FlagOverlayLine0[0] = '\0';
     GLOBAL_FlagOverlayLine1[0] = '\0';
     GLOBAL_FlagOverlayLine2[0] = '\0';
+    GLOBAL_FlagOverlayDirty = false;
+    GLOBAL_FlagOverlayRevealDirty = false;
     this->oamTile = FLAG_SPRITE_1;
     this->oamProps = 0x32; // priority 3, palette 2
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 void flagUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     bool isPlayerTouching = (GLOBAL_PlayerData.objData.pos.x > this->pos.x - 8) &&
                             (GLOBAL_PlayerData.objData.pos.x < this->pos.x + 8) &&
                             (GLOBAL_PlayerData.objData.pos.y > this->pos.y - 8) &&
                             (GLOBAL_PlayerData.objData.pos.y < this->pos.y + 8);
+    bool statsChanged = !this->data.flag.drawn ||
+                        this->data.flag.lastSeconds != GLOBAL_TimerSeconds ||
+                        this->data.flag.lastMinutes != GLOBAL_TimerMinutes ||
+                        this->data.flag.lastDeaths != GLOBAL_DeathCount ||
+                        this->data.flag.score != GLOBAL_FruitCount;
 
     switch ((GLOBAL_FrameCount / 10u) % 3u) {
         case 0u:
@@ -1408,35 +1754,34 @@ void flagUpdate(uint8_t index) {
     }
     this->oamProps = 0x32;
 
-    if (!this->data.flag.show && isPlayerTouching) {
-        this->data.flag.show = true;
+    if (statsChanged) {
         this->data.flag.score = GLOBAL_FruitCount;
-        this->data.flag.drawn = false;
-        playSoundEffect(SOUND_EFFECT_FLAG);
-    }
-
-    if (this->data.flag.show &&
-        (!this->data.flag.drawn ||
-         this->data.flag.lastSeconds != GLOBAL_TimerSeconds ||
-         this->data.flag.lastMinutes != GLOBAL_TimerMinutes ||
-         this->data.flag.lastDeaths != GLOBAL_DeathCount)) {
         this->data.flag.drawn = true;
         this->data.flag.lastSeconds = GLOBAL_TimerSeconds;
         this->data.flag.lastMinutes = GLOBAL_TimerMinutes;
         this->data.flag.lastDeaths = GLOBAL_DeathCount;
+#ifdef __SNES__
+        flagDrawHelperViaBank5(this->data.flag.score, GLOBAL_TimerMinutes, GLOBAL_TimerSeconds, GLOBAL_DeathCount);
+#else
+        flagDrawHelper(this->data.flag.score, GLOBAL_TimerMinutes, GLOBAL_TimerSeconds, GLOBAL_DeathCount);
+#endif
+    }
+
+    if (!this->data.flag.show && isPlayerTouching) {
+        this->data.flag.show = true;
+        GLOBAL_FlagOverlayShow = true;
+        GLOBAL_FlagOverlayRevealDirty = true;
+        playSoundEffect(SOUND_EFFECT_FLAG);
     }
     if (!this->data.flag.show) {
         GLOBAL_FlagOverlayShow = false;
+        GLOBAL_FlagOverlayRevealDirty = false;
     }
 
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void doubleDashOrbInit(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     this->extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -1444,20 +1789,15 @@ void doubleDashOrbInit(uint8_t index) {
     this->oamTile = DOUBLE_JUMP_ORB_SPRITE_1;
     this->oamProps = 0x38; // priority 3, palette 4
     this->data.doubleJumpOrb.frameCount = 0;
-    this->data.doubleJumpOrb.speedY = -2;  // original speed
+    this->data.doubleJumpOrb.speedY = -4;  // ccleste ORB_init: spd.y=-4
     this->data.doubleJumpOrb.accelAccumulator = 0;
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void doubleDashOrbUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
-    //Speed starts at -8 and goes down by 0.5 every frame
-    //alternatively 1 every 2 frames
+    // Speed starts at -8 and decelerates by 1 every 2 frames.
     int16_t *speedY = &this->data.doubleJumpOrb.speedY;
     int16_t *accelAccumulator = &this->data.doubleJumpOrb.accelAccumulator;
 
@@ -1497,11 +1837,7 @@ void doubleDashOrbUpdate(uint8_t index) {
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void strawberryInit(uint8_t index) {
     OBJ_DATA *strawberry = &GLOBAL_OBJList[index];
 
@@ -1524,19 +1860,11 @@ void strawberryInit(uint8_t index) {
     strawberry->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void decoTreeInit(uint8_t index) {
     initSimpleDecorSprite(index, DECO_TREE_SPRITE_1, 0x32); // priority 3, palette 2
 }
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 void decoTreeUpdate(uint8_t index) {
     updateSimpleDecorSprite(index);
 }
@@ -1553,11 +1881,7 @@ static const int8_t berry_y_positions[40] = {
     -5,  -5,  -5,  -4,  -4,  -4,  -3,  -2,  -2,  -1
 };
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void strawberryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t thisX = this->pos.x;
@@ -1570,7 +1894,6 @@ void strawberryUpdate(uint8_t index) {
                             (playerY < thisY+8);
 
     if (this->data.strawberry.isCollected) {
-        //Do the text display animation
         if (this->data.strawberry.frameCount == 0) {
             GLOBAL_ActiveLevel.textFlashActive = true;
             GLOBAL_ActiveLevel.swapActivePalette = true;
@@ -1596,7 +1919,6 @@ void strawberryUpdate(uint8_t index) {
             this->flags |= OBJ_FLAG_DIRTY;
             return;
         }
-        //Draw code for this state
         this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
@@ -1629,11 +1951,7 @@ void strawberryUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void flyingBerryInit(uint8_t index) {
     OBJ_DATA *berry = &GLOBAL_OBJList[index];
     berry->data.flyingBerry.frameCount = 0;
@@ -1648,11 +1966,7 @@ void flyingBerryInit(uint8_t index) {
     berry->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 void flyingBerryUpdate(uint8_t index) {
     OBJ_DATA *this = &GLOBAL_OBJList[index];
     uint8_t thisX = this->pos.x;
@@ -1666,7 +1980,6 @@ void flyingBerryUpdate(uint8_t index) {
                             (playerY < thisY+8);
 
     if (this->data.flyingBerry.isCollected) {
-        //Do the text display animation
         if (this->data.flyingBerry.frameCount == 0) {
             GLOBAL_ActiveLevel.textFlashActive = true;
             GLOBAL_ActiveLevel.swapActivePalette = true;
@@ -1692,7 +2005,6 @@ void flyingBerryUpdate(uint8_t index) {
             this->flags |= OBJ_FLAG_DIRTY;
             return;
         }
-        //Draw code for this state
         this->flags |= OBJ_FLAG_DIRTY;
         return;
     }
@@ -1756,12 +2068,8 @@ void flyingBerryUpdate(uint8_t index) {
     this->flags |= OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
-// Returns the index of the object in the list
+PORT_FUNC_NES6
 void initObject(enum eOBJType eType, int16_t x, int16_t y) {
-    // Find a free slot
     uint8_t i;
     if (objectSkipsWhenFruitCollected(eType) && currentRoomFruitCollected()) {
         return;
@@ -1916,19 +2224,13 @@ void initObject(enum eOBJType eType, int16_t x, int16_t y) {
 }
 
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static void clearObjectDirtyFlag(uint8_t index)
 {
     GLOBAL_OBJList[index].flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK2
-#endif
+PORT_FUNC_NES6_SNES2
 static void processObjectBank2(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -1979,11 +2281,7 @@ static void processObjectBank2(uint8_t index)
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK3
-#endif
+PORT_FUNC_NES6_SNES3
 static void processObjectBank3(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -2040,11 +2338,7 @@ static void processObjectBank3(uint8_t index)
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK4
-#endif
+PORT_FUNC_NES6_SNES4
 static void processObjectBank4(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -2082,9 +2376,7 @@ static void processObjectBank4(uint8_t index)
     }
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 static void processObject(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
@@ -2201,18 +2493,14 @@ void rebuildAllSprites(void) {
 }
 
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 void playerInit(struct sPlayerData* this);
 
 // onVblank is in fixed bank (bank 0), not bank 6
 static bool onVblank(void);
 static void runGameplayFrame(void);
 static void refreshGameplaySprites(void);
-static __attribute__((noinline)) bool shouldRunGameplayFrame(void);
+static PORT_NOINLINE bool shouldRunGameplayFrame(void);
 
 #ifndef __NES__
     PORT_FUNC_BANK7
@@ -2253,6 +2541,9 @@ void LoadRoomData(uint16_t roomID) {
     GLOBAL_MonumentCurLineCharCount = 0;
     GLOBAL_MonumentCurLineNum = 0;
     s_monumentTextTick = 0;
+#ifdef __SNES__
+    s_monumentTextReserved = false;
+#endif
 
     port_LoadRoomData(roomID);
 
@@ -2264,6 +2555,11 @@ void LoadRoomData(uint16_t roomID) {
     playerInit(&GLOBAL_PlayerData);
     port_prg_bank_leave();
     port_updatePlayerSprite(&GLOBAL_PlayerData);
+#ifdef __SNES__
+    port_prg_bank_enter(1);
+    port_updatePlayerHair(&GLOBAL_PlayerData);
+    port_prg_bank_leave();
+#endif
 
     port_beginSpriteBuild(&GLOBAL_PlayerData);
     for (i = 0; i < GLOBAL_OBJ_LIST_SIZE; ++i) {
@@ -2274,6 +2570,35 @@ void LoadRoomData(uint16_t roomID) {
     port_prg_bank_enter(7);
     updateRoomMusic(roomID);
     port_prg_bank_leave();
+
+    // If the room has a flag, drain its overlay pre-render in one shot
+    // here while the level transition still owns the frame, instead of
+    // bleeding 80+ state-machine steps into early gameplay frames.
+    {
+        uint8_t flagIdx;
+        bool hasFlag = false;
+        for (flagIdx = 1; flagIdx < GLOBAL_OBJ_LIST_SIZE; ++flagIdx) {
+            if (GLOBAL_OBJList[flagIdx].eType == OBJ_FLAG) {
+                hasFlag = true;
+                break;
+            }
+        }
+        if (hasFlag) {
+            port_drainFlagOverlayPreRender();
+        }
+    }
+
+    // Draw the room-title overlay. roomTitleArm internally filters out
+    // roomID 0 (title) and out-of-range rooms.
+    port_prg_bank_enter(5);
+    roomTitleArm();
+    port_prg_bank_leave();
+
+    // Drain all BG1 text DMA synchronously while force-blank is still
+    // engaged. Without this, the normal 2-slots-per-vblank throttle would
+    // stretch the un-blank gate (snes.c:port_vblank) by ~7 vblanks for
+    // typical room-title text, plus more if a flag overlay was pre-rendered.
+    port_drainBg1TextDma();
 #endif
 }
 
@@ -2307,6 +2632,13 @@ static bool debugHandleLevelSkip(uint8_t inputState)
 #define debugHandleLevelSkip(inputState) false
 #endif
 
+#ifdef __VBCC__
+/* vbcc's SNES startup pulls in an NMI vector that calls user code
+ * snesXC_nmi(). Provide an empty stub so the vbcc link resolves; the
+ * shipping llvm-mos path installs its own NMI via assembly vectors. */
+void snesXC_nmi(void) { }
+#endif
+
 int main(void){
     port_init();
     resetRunState();
@@ -2337,11 +2669,7 @@ int main(void){
 }
 
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     fixed_t diff = FIXED_SUB(target, current);
     if (diff > amount) {
@@ -2353,16 +2681,18 @@ fixed_t approachFixed(fixed_t current, fixed_t target, fixed_t amount){
     return target;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 void playerInit(struct sPlayerData* this){
     uint16_t i;
     this->objData.eType = OBJ_PLAYER;
     this->objData.pos.x = GLOBAL_ActiveLevel.playerSpawnX * 8;
-    this->objData.pos.y = GLOBAL_ActiveLevel.playerSpawnY * 8;
+    // Start the level-intro hop: player begins at y=128 (just below the room)
+    // with upward velocity, hops up to spawnTargetY+16, then falls back to
+    // spawnTargetY. playerUpdate gates on spawnState until the hop finishes.
+    this->spawnTargetY = (int16_t)(GLOBAL_ActiveLevel.playerSpawnY * 8);
+    this->objData.pos.y = 128;
+    this->spawnState = 0;
+    this->spawnDelay = 0;
     this->objData.flags = OBJ_FLAG_DIRTY;
     this->objData.oamTile = PLAYER_SPRITE_IDLE;
     this->objData.oamProps = 0x38;
@@ -2376,7 +2706,7 @@ void playerInit(struct sPlayerData* this){
     this->movingPlatformIndex = -1;
 
     this->spd.x = FLOAT_TO_FIXED(0.0);
-    this->spd.y = FLOAT_TO_FIXED(0.0);
+    this->spd.y = -INT_TO_FIXED(4);  // ccleste PLAYER_SPAWN_init: spd.y=-4
 
     this->eSriteState = PLAYER_SPRITE_IDLE;
     this->isFliped = false;
@@ -2399,7 +2729,7 @@ void playerInit(struct sPlayerData* this){
     GLOBAL_ActiveLevel.movingPlatformCount = 0;
 
 
-    //Clear out the object array
+    //Clear out the object array.
     for (i = 1; i < GLOBAL_OBJ_LIST_SIZE; i++) {
         GLOBAL_OBJList[i].eType = OBJ_UNUSED;
         GLOBAL_OBJList[i].extraSpriteBase = PORT_EXTRA_SLOT_UNUSED;
@@ -2407,7 +2737,11 @@ void playerInit(struct sPlayerData* this){
     }
 
     port_resetSprites();
-    // playerInit is now in bank 6, and initObject is also in bank 6, so we're already in the correct bank
+#ifdef __SNES__
+    // Snap hair particles to the new player position before the per-frame
+    // OAM update — otherwise the trail lerps in from the previous room.
+    port_resetPlayerHair(this);
+#endif
     for (i = 0; i < (GLOBAL_ActiveLevel.objectCount*3); i+=3) {
         if (GLOBAL_ActiveLevel.objectData[i] != 0) {
             //Player spawn, remove from generated code in future
@@ -2421,11 +2755,7 @@ void playerInit(struct sPlayerData* this){
 
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, fixed_t xspd, fixed_t yspd) {
     int16_t tx0 = x >> 3;
     int16_t ty0 = y >> 3;
@@ -2462,11 +2792,7 @@ bool isDeathAtPoint(int16_t x, int16_t y, int16_t w, int16_t h, fixed_t xspd, fi
     return false;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x + xOffset;
     int16_t y = this->objData.pos.y + yOffset;
@@ -2475,11 +2801,7 @@ static bool OBJ_isDeathAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     return isDeathAtPoint(x + 1, y + 3, 6, 5, this->spd.x, this->spd.y);
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     // Convert to unsigned for shift (avoids sign extension issues)
     // and use uint8_t to keep computation in 8-bit where possible
@@ -2494,11 +2816,7 @@ static bool isTileSolidAtPoint(int16_t x, int16_t y) {
     return GLOBAL_ActiveLevel.collisionFlagsArr[(tileY << 4) + tileX] & 0x01;
 }
 
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOffset) {
     int16_t x = this->objData.pos.x;
     int16_t y = this->objData.pos.y;
@@ -2552,12 +2870,63 @@ static bool OBJ_isSolidAt(struct sPlayerData* this, int16_t xOffset, int16_t yOf
     return false;
 }
 
+// Level-intro hop state machine (ccleste celeste.c:937-988 PLAYER_SPAWN).
+// Runs in place of the normal playerUpdate until landing. Skips input,
+// collision, dash, jump — just animates the hop with simple gravity and
+// snaps to the spawn position on landing.
+PORT_FUNC_NES6_SNES1
+static void playerSpawnUpdate(struct sPlayerData* this) {
+    int16_t step;
+
+    if (this->spawnState == 0u) {
+        // Rising: spd.y is -4 from init. Once y has risen to target+16, switch.
+        if (this->objData.pos.y < (int16_t)(this->spawnTargetY + 16)) {
+            this->spawnState = 1u;
+            this->spawnDelay = 3u;
+        }
+    } else if (this->spawnState == 1u) {
+        // Falling: apply gravity (+0.5/frame in 16.16 fixed). On delay > 0,
+        // hover at peak (zero spd) for spawnDelay frames. Once spd is positive
+        // and y has crossed back to the target, snap and start landing.
+        this->spd.y = FIXED_ADD(this->spd.y, 0x8000);
+        if (this->spd.y > 0 && this->spawnDelay > 0u) {
+            this->spd.y = 0;
+            this->spawnDelay--;
+        }
+        if (this->spd.y > 0 && this->objData.pos.y > this->spawnTargetY) {
+            this->objData.pos.y = this->spawnTargetY;
+            this->spd.x = 0;
+            this->spd.y = 0;
+            this->spawnState = 2u;
+            this->spawnDelay = 5u;
+            GLOBAL_ActiveLevel.shakeFrames = 5;
+            initObject(OBJ_SMOKE, this->objData.pos.x,
+                       (int16_t)(this->objData.pos.y + 4));
+        }
+    } else {
+        // Landing pause.
+        if (this->spawnDelay > 0u) {
+            this->spawnDelay--;
+        } else {
+            this->spawnState = 0xFFu;
+        }
+    }
+
+    // Apply spd.y → pos.y for states 0 and 1 (rising/falling). No collision
+    // checks — the hop is well-defined (target is the spawn position, which
+    // sits in open space).
+    if (this->spawnState <= 1u) {
+        this->posF.y = FIXED_ADD(this->posF.y, this->spd.y);
+        step = (int16_t)(((this->posF.y) + 32768) >> 16);
+        this->posF.y -= INT_TO_FIXED(step);
+        this->objData.pos.y = (int16_t)(this->objData.pos.y + step);
+    }
+
+    this->objData.flags |= OBJ_FLAG_DIRTY;
+}
+
 #define FPS60_SCALE_FACTOR 1.0f
-#ifdef __NES__
-PORT_FUNC_BANK6
-#else
-PORT_FUNC_BANK1
-#endif
+PORT_FUNC_NES6_SNES1
 void playerUpdate(struct sPlayerData* this) {
     int16_t spdXstepInt;
     int16_t spdYStepInt;
@@ -2572,7 +2941,7 @@ void playerUpdate(struct sPlayerData* this) {
     #define FP_MAXRUN      0x00010000   // 1.0 (original)
     #define FP_MAXFALL     0x00020000   // 2.0 (original)
     #define FP_MAXFALL_WALL 0x00006666  // 0.4 (original)
-    #define FP_GRAVITY     0x000035C2   // 0.21
+    // FP_GRAVITY is defined at file scope so spring/breakable-wall can reference it
     #define FP_SPD_THRESH  0x00004400   // ~0.266 (original 0.15, extended for +1 frame hover at peak)
     #define FP_ZERO        0x00000000
     fixed_t accel = FP_ACCEL;
@@ -2588,6 +2957,13 @@ void playerUpdate(struct sPlayerData* this) {
 
     if (!GLOBAL_ActiveLevel.isLevelLoadedVRAM) {
         //Prevents double room transitions
+        return;
+    }
+
+    // Level-intro hop: skip all normal gameplay logic until the spawn
+    // state machine reaches the "done" sentinel (0xFF). Set in playerInit.
+    if (this->spawnState != 0xFFu) {
+        playerSpawnUpdate(this);
         return;
     }
 
@@ -2915,9 +3291,28 @@ void playerUpdate(struct sPlayerData* this) {
     if (OBJ_isDeathAt(this, 0, 0) || this->objData.pos.y > 128) {
         playSoundEffect(SOUND_EFFECT_DEATH);
         GLOBAL_DeathCount++;
-        this->objData.pos.y = 128; //offscreen
         GLOBAL_ActiveLevel.shakeFrames = 10;
+#ifdef __SNES__
+        // Snapshot death position before playerInit overwrites it. Particles
+        // are now a separate flat array (not OBJ entries) so spawn order vs
+        // playerInit no longer matters for slot churn — ccleste celeste.c:1582.
+        {
+            int16_t deathX = this->objData.pos.x + 4;
+            int16_t deathY = this->objData.pos.y + 4;
+            this->objData.pos.y = 128;
+            playerInit(this);
+            spawnDeadParticlesViaBank2(deathX, deathY);
+            // playerInit's port_resetSprites cleared OAM for every slot; the
+            // spawn-hop freeze gate around updateAllObjects will skip the
+            // normal OBJ-OAM rebuild for ~25 frames, so other room sprites
+            // (springs, invisible walls, etc.) would briefly disappear.
+            // Force an OAM rebuild here so they reappear on the next vblank.
+            rebuildAllSprites();
+        }
+#else
+        this->objData.pos.y = 128;
         playerInit(this);
+#endif
         return;
     }
 
@@ -2957,57 +3352,234 @@ void playerUpdate(struct sPlayerData* this) {
 }
 
 
-// Simple 16-bit LCG. Smaller than the old lookup table and sufficient here.
+// 16-bit LCG.
 static uint16_t global_randSeed = 0xBEEFu;
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 uint16_t my_rand() {
     global_randSeed = (uint16_t)(global_randSeed * 109u + 89u);
     return global_randSeed;
 }
 
 // Returns a random integer in [min, max]
-#ifdef __NES__
-PORT_FUNC_BANK6
-#endif
+PORT_FUNC_NES6
 int16_t randint16(int16_t min, int16_t max) {
     uint16_t range;
     uint16_t randomValue;
-    if (max <= min) return min; // handle edge case
+    if (max <= min) return min;
     range = (uint16_t)(max - min) + 1;
     randomValue = my_rand();
     return (int16_t)((randomValue % range) + min);
 }
 
-static bool onVblank(void) {
-    //Start of vblank critical code
-    port_vblank();
+#ifndef __NES__
+// Pico-8 → SNES BGR15 conversions used by applyTitleFlash. ccleste's start-
+// game flash remaps the title's bright colors (pico-8 7/12/13) to one of
+// {10 yellow, 7 white, 2 dk purple, 1 dk blue, 0 black} depending on how
+// far into the 80-frame countdown we are.
+//   pico-8 0  (0,0,0)        = 0x0000
+//   pico-8 1  (29,43,83)     = 0x28A4
+//   pico-8 2  (126,37,83)    = 0x288F
+//   pico-8 7  (255,241,232)  = 0x73BF  (the original title palette[1])
+//   pico-8 10 (255,236,39)   = 0x17BF
+// Title palette[2]=0x4DD0 (pico-8 13 lavender) and palette[3]=0x7EA5
+// (pico-8 12 blue) — restored verbatim from python/title_screen_snes.h.
+#define TITLE_FLASH_BGR15_BLACK   0x0000u
+#define TITLE_FLASH_BGR15_DK_BLUE 0x28A4u
+#define TITLE_FLASH_BGR15_DK_PURP 0x288Fu
+#define TITLE_FLASH_BGR15_WHITE   0x73BFu
+#define TITLE_FLASH_BGR15_LAV     0x4DD0u
+#define TITLE_FLASH_BGR15_BLUE    0x7EA5u
 
-    // Music/audio update — target-specific backend.
+// Title-flash CGRAM staging. ApplyTitleFlash fills the byte buffer from bank
+// 7 during handleTitleScreenFrame; the actual CGRAM register writes are
+// deferred to port_vblank's early section (right after the HVBJOY sync), so
+// they happen at the *start* of vblank instead of partway through. Mid-
+// vblank CGRAM writes — especially after OAM DMA — were landing close
+// enough to active display that the backdrop visibly bled the flash colour.
+//
+// The 8-byte buffer aliases onto GLOBAL_FlagOverlayLine0 (declared at file
+// scope, 17 bytes, gameplay-only — dormant on the title screen). The
+// 1-byte dirty flag is its own BSS — kept tiny because we're at the
+// 128-byte heap-headroom floor.
+//
+// Buffer holds CGRAM[0x40..0x43] = BG3 palette 0 in mode 0:
+// {transparent, pico-8 7 white, pico-8 13 lavender, pico-8 12 blue}. The
+// transparent slot (0x40) is unused for display (mode 0 routes pixel-
+// value-0 to the master backdrop CGRAM[0]) but we rewrite it as 0 each
+// frame so it can't leak.
+#define GLOBAL_TitleFlashCgramBytes (GLOBAL_FlagOverlayLine0)
+uint8_t GLOBAL_TitleFlashCgramDirty = 0u;
+
+PORT_FUNC_BANK7
+static void applyTitleFlash(int8_t flash) {
+    uint16_t c = 0u;
+    bool doSwap = false;
+    if (flash > 10) {
+        // ccleste: default c=10 (no remap because c<10 gate is false),
+        // flipped to c=7 (remap) every 5 game-frames → strobe effect.
+        // ccleste runs at 30Hz, GLOBAL_FrameCount is per-vblank (60Hz),
+        // so divide by 2 to get a game-frame clock.
+        if (((GLOBAL_FrameCount >> 1) % 10u) < 5u) {
+            c = TITLE_FLASH_BGR15_WHITE;
+            doSwap = true;
+        }
+    } else if (flash > 5) {
+        c = TITLE_FLASH_BGR15_DK_PURP;
+        doSwap = true;
+    } else if (flash > 0) {
+        c = TITLE_FLASH_BGR15_DK_BLUE;
+        doSwap = true;
+    } else {
+        c = TITLE_FLASH_BGR15_BLACK;
+        doSwap = true;
+    }
+
+    GLOBAL_TitleFlashCgramBytes[0] = 0x00u;  // CGRAM[0x40] = 0 (transparent)
+    GLOBAL_TitleFlashCgramBytes[1] = 0x00u;
+    if (doSwap) {
+        uint8_t lo = (uint8_t)(c & 0xFFu);
+        uint8_t hi = (uint8_t)((c >> 8) & 0xFFu);
+        GLOBAL_TitleFlashCgramBytes[2] = lo; GLOBAL_TitleFlashCgramBytes[3] = hi;
+        GLOBAL_TitleFlashCgramBytes[4] = lo; GLOBAL_TitleFlashCgramBytes[5] = hi;
+        GLOBAL_TitleFlashCgramBytes[6] = lo; GLOBAL_TitleFlashCgramBytes[7] = hi;
+    } else {
+        // Restore originals for the c==10 strobe-back phase.
+        GLOBAL_TitleFlashCgramBytes[2] = (uint8_t)(TITLE_FLASH_BGR15_WHITE & 0xFFu);
+        GLOBAL_TitleFlashCgramBytes[3] = (uint8_t)(TITLE_FLASH_BGR15_WHITE >> 8);
+        GLOBAL_TitleFlashCgramBytes[4] = (uint8_t)(TITLE_FLASH_BGR15_LAV   & 0xFFu);
+        GLOBAL_TitleFlashCgramBytes[5] = (uint8_t)(TITLE_FLASH_BGR15_LAV   >> 8);
+        GLOBAL_TitleFlashCgramBytes[6] = (uint8_t)(TITLE_FLASH_BGR15_BLUE  & 0xFFu);
+        GLOBAL_TitleFlashCgramBytes[7] = (uint8_t)(TITLE_FLASH_BGR15_BLUE  >> 8);
+    }
+    GLOBAL_TitleFlashCgramDirty = 1u;
+}
+
+// Flush the staged title-flash CGRAM update. Called from port_vblank right
+// after the HVBJOY sync (well before OAM DMA) so the colour swap lands at
+// the start of vblank and can't bleed into active display. Lives in bank 7
+// to keep the fixed-mirror code small; the caller wraps with bank_enter(7)
+// / bank_leave().
+PORT_FUNC_BANK7
+void port_titleFlashFlush(void) {
+    REG_CGADD = 0x40u;
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[0];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[1];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[2];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[3];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[4];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[5];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[6];
+    REG_CGDATA = GLOBAL_TitleFlashCgramBytes[7];
+    // Force master backdrop CGRAM[0] back to black — the entry whose stray
+    // pulse the user originally reported. Keeps the title backdrop locked
+    // through the flash even if something else managed to write CGRAM[0].
+    REG_CGADD = 0x00u;
+    REG_CGDATA = 0x00u;
+    REG_CGDATA = 0x00u;
+}
+
+// Whole title-screen tick lives in rom_bank_7 (otherwise the fixed mirror
+// overflows with the cheat-code state machine + dedication wiring).
+// Returns nothing; caller in onVblank just `return false` after it runs.
+PORT_FUNC_BANK7
+static void handleTitleScreenFrame(void) {
+    GLOBAL_InputState = port_getInputs();
+    port_resetSprites();
+    bool startGame = false;
+    if (s_dedicationTimer > 0u) {
+        s_dedicationTimer--;
+        if (s_dedicationTimer == 0u) {
+            port_endDedicationScreen();
+            startGame = true;
+        }
+    } else if (s_titleStartActive) {
+        // ccleste runs start_game_flash from 50 down to -30 (80 game-frames):
+        //   >10           : strobe pico-8 colors {10 yellow, 7 white}
+        //   (5, 10]       : c=2 dark purple
+        //   (0, 5]        : c=1 dark blue
+        //   <=0           : c=0 black
+        // begin_game fires when it reaches -30. ccleste runs at 30Hz, so
+        // only tick the timer every other vblank; the CGRAM holds its last
+        // write on the off frames, giving a 30Hz-paced flash.
+        if ((GLOBAL_FrameCount & 1u) == 0u) {
+            s_titleStartTimer--;
+            applyTitleFlash(s_titleStartTimer);
+            if (s_titleStartTimer <= -30) {
+                startGame = true;
+                s_titleStartTimer = 0;
+                s_titleStartActive = false;
+            }
+        }
+    } else {
+        // Cheat-code edge detection (dpad + Start only). Sequence is
+        // UP DOWN UP DOWN LEFT RIGHT LEFT RIGHT START — encoded inline.
+        uint8_t newly = (uint8_t)(GLOBAL_InputState & ~s_prevTitleInput);
+        s_prevTitleInput = GLOBAL_InputState;
+        uint8_t newlyDir = (uint8_t)(newly & (PORT_INPUT_UP_MASK |
+                                              PORT_INPUT_DOWN_MASK |
+                                              PORT_INPUT_LEFT_MASK |
+                                              PORT_INPUT_RIGHT_MASK |
+                                              PORT_INPUT_START_MASK));
+        bool cheatConsumed = false;
+        if (newlyDir != 0u) {
+            uint8_t expected;
+            if (s_cheatStep >= 8u) {
+                expected = PORT_INPUT_START_MASK;
+            } else if ((s_cheatStep & 4u) == 0u) {
+                expected = (s_cheatStep & 1u) ? PORT_INPUT_DOWN_MASK : PORT_INPUT_UP_MASK;
+            } else {
+                expected = (s_cheatStep & 1u) ? PORT_INPUT_RIGHT_MASK : PORT_INPUT_LEFT_MASK;
+            }
+            if (newlyDir == expected) {
+                s_cheatStep++;
+                cheatConsumed = true;
+                if (s_cheatStep >= CHEAT_STEP_COUNT) {
+                    s_cheatStep = 0u;
+                    port_audioStopAll();
+                    port_showDedicationScreen();
+                    port_drawDedicationText();
+                    s_dedicationTimer = 600u; // ~10s at 60fps
+                }
+            } else {
+                // Wrong press — reset, crediting a stray UP as step 1.
+                s_cheatStep = (newlyDir == PORT_INPUT_UP_MASK) ? 1u : 0u;
+            }
+        }
+        if (!cheatConsumed) {
+            if ((GLOBAL_InputState & (PORT_INPUT_B_MASK | PORT_INPUT_Y_MASK | PORT_INPUT_START_MASK)) != 0u ||
+                (GLOBAL_InputLo & (PORT_INPUT_A_MASK | PORT_INPUT_X_MASK)) != 0u) {
+                port_audioStopAll();
+                playSoundEffect(SOUND_EFFECT_TITLE_START);
+                // Match ccleste: set start_game_flash=50 then decrement once
+                // before the first draw, so this frame's flash uses 49.
+                s_titleStartTimer = 50;
+                s_titleStartActive = true;
+                s_titleStartTimer--;
+                applyTitleFlash(s_titleStartTimer);
+            }
+        }
+    }
+    if (startGame) {
+        s_inTitleScreen = false;
+        port_setTitleMode(false);
+        port_showGameplayScreen();
+        GLOBAL_ActiveLevel.currentRoomID = 1;
+        GLOBAL_TimerFrames = 0;
+        GLOBAL_TimerSeconds = 0;
+        GLOBAL_TimerMinutes = 0;
+        LoadRoomData(1);
+    }
+}
+#endif
+
+static bool onVblank(void) {
+    port_vblank();
     port_audioUpdate();
 #ifndef __NES__
     if (s_inTitleScreen) {
-        GLOBAL_InputState = port_getInputs();
-        port_resetSprites();
-        if (s_titleStartTimer > 0) {
-            s_titleStartTimer--;
-            if (s_titleStartTimer == 0) {
-                s_inTitleScreen = false;
-                port_setTitleMode(false);
-                port_showGameplayScreen();
-                GLOBAL_ActiveLevel.currentRoomID = 1;
-                GLOBAL_TimerFrames = 0;
-                GLOBAL_TimerSeconds = 0;
-                GLOBAL_TimerMinutes = 0;
-                LoadRoomData(1);
-            }
-        } else if ((GLOBAL_InputState & (PORT_INPUT_B_MASK | PORT_INPUT_Y_MASK | PORT_INPUT_START_MASK)) != 0u ||
-                   (GLOBAL_InputLo & (PORT_INPUT_A_MASK | PORT_INPUT_X_MASK)) != 0u) {
-            port_audioStopAll();
-            playSoundEffect(SOUND_EFFECT_TITLE_START);
-            s_titleStartTimer = 50;
-        }
+        port_prg_bank_enter(7);
+        handleTitleScreenFrame();
+        port_prg_bank_leave();
         return false;
     }
 #endif
@@ -3015,7 +3587,7 @@ static bool onVblank(void) {
     return true;
 }
 
-static __attribute__((noinline)) bool shouldRunGameplayFrame(void)
+static PORT_NOINLINE bool shouldRunGameplayFrame(void)
 {
     uint16_t currentFrame = GLOBAL_FrameCount;
     if ((uint16_t)(currentFrame - s_lastGameplayFrame) < 2u) {
@@ -3042,6 +3614,17 @@ static void runGameplayFrame(void) {
         s_musicTimer--;
         if (s_musicTimer == 0u) {
             port_audioPlayMusic(MUSIC_PATTERN_ORB);
+        }
+    }
+    // Banner clear countdown. Held at full value while force-blank is
+    // pending so the visible 30-tick window starts the frame INIDISP
+    // un-blanks (not the LoadRoomData frame).
+    if (s_roomTitleClearTimer != 0u && !s_pendingDisplayEnable) {
+        --s_roomTitleClearTimer;
+        if (s_roomTitleClearTimer == 0u) {
+            port_prg_bank_enter(4);
+            roomTitleClearHelper();
+            port_prg_bank_leave();
         }
     }
 #endif
@@ -3071,9 +3654,33 @@ static void runGameplayFrame(void) {
     port_prg_bank_leave();
 #endif
     port_updatePlayerSprite(&GLOBAL_PlayerData);
-    updateAllObjects();
+#ifdef __SNES__
+    port_prg_bank_enter(1);
+    port_updatePlayerHair(&GLOBAL_PlayerData);
+    port_prg_bank_leave();
+#endif
+#ifdef __SNES__
+    // Death particles tick every frame regardless of player spawnState — they
+    // live outside the OBJ system (separate flat array) so the freeze gate
+    // below doesn't apply, matching ccleste's dead_particles[] behaviour.
+    tickDeadParticlesViaBank2();
+#endif
+    // Pause all non-player object ticks during the level-intro hop, matching
+    // ccleste's room-frozen feel while PLAYER_SPAWN animates. Player + hair
+    // still update above; room sprites stay frozen at their LoadRoomData
+    // initial positions until the hop completes (spawnState=0xFF).
+    if (GLOBAL_PlayerData.spawnState == 0xFFu) {
+        updateAllObjects();
+    }
     port_renderTextOverlays();
     port_levelAnimAdvance();
+#ifdef __SNES__
+    if (s_roomTitleClearTimer != 0u) {
+        port_prg_bank_enter(5);
+        roomTitleDemoteSprites();
+        port_prg_bank_leave();
+    }
+#endif
 }
 
 static void refreshGameplaySprites(void) {
@@ -3081,5 +3688,17 @@ static void refreshGameplaySprites(void) {
         return;
     }
     port_updatePlayerSprite(&GLOBAL_PlayerData);
+#ifdef __SNES__
+    port_prg_bank_enter(1);
+    port_updatePlayerHair(&GLOBAL_PlayerData);
+    port_prg_bank_leave();
+#endif
     rebuildAllSprites();
+#ifdef __SNES__
+    if (s_roomTitleClearTimer != 0u) {
+        port_prg_bank_enter(5);
+        roomTitleDemoteSprites();
+        port_prg_bank_leave();
+    }
+#endif
 }

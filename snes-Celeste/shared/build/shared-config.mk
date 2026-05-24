@@ -99,7 +99,8 @@ endif
 
 # LLVM-Mos Configuration
 ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
-	LLVM_MOS_PATH = C:\llvm-mos
+	LLVM_MOS_PATH ?= C:/llvm-mos
+	export LLVM_MOS_PATH
 	CC = mos-common-clang
 	AS = mos-common-clang
 	LD = mos-common-clang

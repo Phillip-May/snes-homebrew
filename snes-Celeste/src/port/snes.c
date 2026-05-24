@@ -4,8 +4,8 @@
 
 #include "../../shared/src/snes_regs_xc.h"
 #include "../../shared/src/initsnes.h"
-//Thank you llvm mos
-//making me micro manage where my graphics data in ROM
+// llvm-mos has 16-bit pointers, so ROM data must be explicitly bank-placed
+// via #pragma clang section rodata="rom_data_bank_N" to be reachable.
 #ifdef __SNESXC_16BIT_POINTERS__
 #pragma clang section rodata="rom_data_bank_1"
 #endif
@@ -77,14 +77,10 @@
 #endif
 #pragma SECTION CONST=CONST
 
-#ifdef __mos__
-#define PORT_NOINLINE __attribute__((noinline))
-#else
-#define PORT_NOINLINE
-#endif
-
 extern struct sPlayerData GLOBAL_PlayerData;
 extern bool GLOBAL_FlagOverlayShow;
+extern bool GLOBAL_FlagOverlayDirty;
+extern bool GLOBAL_FlagOverlayRevealDirty;
 extern uint8_t GLOBAL_FlagOverlayLine0Len;
 extern uint8_t GLOBAL_FlagOverlayLine1Len;
 extern uint8_t GLOBAL_FlagOverlayLine2Len;
@@ -99,6 +95,11 @@ uint8_t paletteBg[64];
 union uOAMCopy GLOBAL_OAMCopy;
 extern uint16_t GLOBAL_ScrollBG2Y;
 extern OBJ_DATA GLOBAL_OBJList[];
+// Title-flash CGRAM staging — written by handleTitleScreenFrame in bank 7,
+// flushed by port_vblank() at the start of vblank via port_titleFlashFlush
+// (also in bank 7; keeps the fixed-mirror code small).
+extern uint8_t GLOBAL_TitleFlashCgramDirty;
+extern void port_titleFlashFlush(void);
 
 //Global data used to update hardware registers
 uint16_t GLOBAL_ScrollBG1X = 0;
@@ -120,9 +121,14 @@ static uint16_t s_tilemapBg2[512];
 #define PORT_BG1_TEXT_SCREEN_MACRO_W 16u
 #define PORT_BG1_TEXT_SCREEN_MACRO_H 16u
 #define PORT_BG1_TEXT_CELL_COUNT (PORT_BG1_TEXT_SCREEN_MACRO_W * PORT_BG1_TEXT_SCREEN_MACRO_H)
-#define PORT_BG1_TEXT_SLOT_COUNT 50u
+// Three full 16-cell screen rows. Higher values push llvm-mos static-stack
+// allocation into the end of the SNES near-RAM window and make small code
+// changes corrupt memory.
+#define PORT_BG1_TEXT_SLOT_COUNT 48u
 #define PORT_BG1_TEXT_SLOT_ROW_COUNT ((PORT_BG1_TEXT_SLOT_COUNT + 7u) / 8u)
 #define PORT_BG1_TEXT_SLOT_FREE 0xFFu
+#define PORT_BG1_TEXT_CELL_SLOT_MASK 0x7Fu
+#define PORT_BG1_TEXT_CELL_VISIBLE 0x80u
 #define PORT_BG1_TEXT_CELL_NONE 0xFFFFu
 #define PORT_GAME_2BPP_TILE_COUNT SPRITE_GFX_2BPP_TILE_COUNT
 #define PORT_BG1_TEXT_TILE_BASE 18u
@@ -136,15 +142,18 @@ static uint16_t s_tilemapBg2[512];
 #define PORT_BG1_TEXT_COLOR_INK 1u
 #define PORT_BG1_TEXT_COLOR_BG 3u
 #define PORT_BG1_TEXT_IN_VBLANK() ((REG_HVBJOY & 0x80u) != 0u)
-#define PORT_BG1_TEXT_MAX_MAP_ROWS_PER_VBLANK 2u
+#define PORT_BG1_TEXT_MAX_MAP_ROWS_PER_VBLANK PORT_BG1_TEXT_SCREEN_MACRO_H
 #define PORT_BG1_TEXT_MAX_SLOTS_PER_VBLANK 4u
 #define PORT_BG1_TEXT_CODE PORT_FUNC_BANK4
 #define PORT_BG1_TEXT_CORE_CODE PORT_FUNC_BANK4
+#define PORT_BG1_TEXT_FLUSH_CODE PORT_FUNC_BANK5
+#define PORT_SNOW_STEP_CODE PORT_FUNC_BANK5
 #define PORT_PICO8_FONT_GLYPH_W_PX 4u
 #define PORT_PICO8_FONT_ADVANCE_PX 5u
 #define PORT_PICO8_FONT_SCALE 2u
 #define PORT_PICO8_FONT_CELL_Y_OFFSET 4u
 #define PORT_PICO8_TEXT_INK_X_OFFSET_PX 2u
+#define PORT_PICO8_RUN_INK_X_OFFSET_PX 1u
 #define PORT_PICO8_TEXT_BG_PAD_RIGHT_PX 2u
 #define PORT_BG1_TEXT_SLOT_MASK_BYTES 32u
 #define PORT_BG1_TEXT_DMA_SLOT_BYTES 64u
@@ -157,12 +166,24 @@ static union {
     uint16_t bg3Tilemap[PORT_BG_TILEMAP_WORDS];
 } s_bg1TextCoverScratch;
 static uint8_t s_bg1TextDmaSlotBytes[PORT_BG1_TEXT_DMA_STAGE_COUNT][PORT_BG1_TEXT_DMA_SLOT_BYTES];
-static uint8_t s_bg1TextDmaStageIndex;
 static uint8_t s_bg1TextSlotCell[PORT_BG1_TEXT_SLOT_COUNT];
 static uint8_t s_bg1TextCellSlot[PORT_BG1_TEXT_CELL_COUNT];
 static uint8_t s_bg1TextSlotDirtyBits[PORT_BG1_TEXT_SLOT_ROW_COUNT];
 static bool s_bg1TextAnySlotDirty;
 static uint16_t s_bg1TextMapDirtyRowBits;
+static bool s_bg1TextPublishHidden;
+// Caller-controlled flags for port_drawTextWithColorsLen. Default 0 = full
+// glyph + publish (so .bss zero-init does the right thing). The flag overlay
+// sets and clears these to split a char render across multiple sub-steps.
+// Callers must restore to 0 when done.
+//   bits 0-1 : glyph row quarter 0..3 (only meaningful when bit 2 set;
+//              rows [quarter*2, quarter*2 + 2))
+//   bit 2    : quarter mode (else full 0..8 row range)
+//   bit 7    : suppress trailing publishRect
+#define BG1_TEXT_RENDER_QUARTER_MASK   0x03u
+#define BG1_TEXT_RENDER_QUARTER_MODE   0x04u
+#define BG1_TEXT_RENDER_NO_PUBLISH     0x80u
+static uint8_t s_bg1TextRenderFlags;
 // Color 0 stays transparent. Color 1 is black ink/fill, color 3 is white.
 static uint16_t s_bg1TextPalette[4] = {0x0000u, 0x0000u, 0x0000u, 0x7FFFu};
 static uint16_t s_scoreSpritePalette[16];
@@ -172,10 +193,10 @@ static uint8_t s_pico8GlyphRows[8];
 #define s_tilemapBg3 s_bg1TextCoverScratch.bg3Tilemap
 
 // NMI-driven VBlank: pre-built staging for text DMA
-#define TEXT_MAX_MAP_DMA 1u
+#define TEXT_MAX_MAP_DMA PORT_BG1_TEXT_MAX_MAP_ROWS_PER_VBLANK
 #define TEXT_MAX_SLOT_DMA PORT_BG1_TEXT_DMA_STAGE_COUNT
-static uint16_t s_textMapDmaBufs[TEXT_MAX_MAP_DMA][PORT_BG1_TEXT_SCREEN_MACRO_W]; // 32 bytes
-static uint16_t s_textMapDmaDst[TEXT_MAX_MAP_DMA];
+#define s_textMapDmaBufs ((uint16_t (*)[PORT_BG1_TEXT_SCREEN_MACRO_W])s_tilemapBg2)
+static uint8_t  s_textMapDmaRows[TEXT_MAX_MAP_DMA];
 static uint8_t  s_textMapDmaCount;
 static uint16_t s_textSlotDmaTile[TEXT_MAX_SLOT_DMA];
 static uint8_t  s_textSlotDmaCount;
@@ -444,6 +465,15 @@ static bool s_altPaletteApplied = false;
 static bool s_prevTextFlashActive = false;
 static uint8_t s_textFlashPhase = 0;
 static bool s_titleMode = false;
+// Set by port_LoadRoomData when force-blank is engaged for a room transition.
+// port_vblank checks this *after* the OAM DMA so the display only un-blanks
+// once hardware OAM reflects the new room's sprite positions; otherwise the
+// new BG appears for one frame with the previous room's sprites overlaid.
+bool s_pendingDisplayEnable = false;
+// Konami-code dedication screen. While true, port_vblank flushes the BG1
+// text DMA even though we're still nominally in title mode, so caller-
+// drawn text becomes visible.
+static bool s_dedicationActive = false;
 static uint16_t s_effectsStepFrame = 0u;
 static uint16_t s_cloudCurHofs = 0u;
 static uint8_t s_cloudMoveAmount = 1u;
@@ -512,7 +542,14 @@ static void updateCloudsVblankSafe(void)
     GLOBAL_ScrollBG4X = s_cloudCurHofs;
 }
 
-#define PORT_EXTRA_SPRITE_START 30u
+// OAM layout: 0-28 are object indices (GLOBAL_OBJ_LIST_SIZE = 29). 30-34
+// are reserved for player hair particles. Dynamic extra sprites start at 35.
+#define PORT_HAIR_OAM_BASE 30u
+#define PORT_HAIR_COUNT 5u
+// OAM map: 0..28 are OBJ slots (GLOBAL_OBJ_LIST_SIZE = 29). Slot 29 is unused.
+// 30..34 are player-hair particles. 35..42 (8 slots) are death particles (see
+// DEAD_PARTICLE_OAM_BASE in mainBankZero.c). Dynamic extras start at 43.
+#define PORT_EXTRA_SPRITE_START 43u
 #define PORT_BREAKABLE_WALL_EXTRAS_PER_OBJECT 3u
 #define PORT_BALLOON_EXTRA_SPRITES 1u
 #define PORT_PLATMOV_EXTRA_SPRITES 2u
@@ -634,18 +671,6 @@ static uint8_t calcOAMTable2Byte(uint8_t index, uint8_t sizeBit, uint8_t xBit, u
     return (uint8_t)((currentByte & mask) | value);
 }
 
-static void writeStandardSprite(uint8_t index, const OBJ_DATA *obj)
-{
-    uint8_t table2Index = (uint8_t)(index / 4u);
-    uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
-    int16_t screenY = sprite_to_screen_y((int16_t)(obj->pos.y << 1));
-    GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(index, 1u, 0u, currentByte);
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = sprite_to_screen_x_byte((int16_t)(obj->pos.x << 1));
-    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = (uint8_t)screenY;
-    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = obj->oamTile;
-    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = obj->oamProps;
-}
-
 static void writeConditionalSprite(uint8_t index, const OBJ_DATA *obj, bool hide)
 {
     uint8_t table2Index = (uint8_t)(index / 4u);
@@ -668,7 +693,7 @@ static bool writeBreakableWallSprite(uint8_t index, OBJ_DATA *obj)
         return false;
     }
 
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
 
     obj->extraSpriteCount = PORT_BREAKABLE_WALL_EXTRAS_PER_OBJECT;
     uint8_t extraBase = obj->extraSpriteBase;
@@ -699,7 +724,7 @@ static bool writeMonumentSprite(uint8_t index, OBJ_DATA *obj)
         return false;
     }
 
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
 
     obj->extraSpriteCount = PORT_MONUMENT_EXTRA_SPRITES;
     uint8_t baseSlot = obj->extraSpriteBase;
@@ -776,7 +801,7 @@ static bool writeBigChestSprite(uint8_t index, OBJ_DATA *obj)
     return true;
 }
 
-__attribute__((optnone)) static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
+PORT_OPTNONE static bool writeBalloonSprite(uint8_t index, OBJ_DATA *obj)
 {
     if (!ensureExtraSpriteRange(&obj->extraSpriteBase, PORT_BALLOON_EXTRA_SPRITES)) {
         return false;
@@ -805,87 +830,61 @@ __attribute__((optnone)) static bool writeBalloonSprite(uint8_t index, OBJ_DATA 
     return true;
 }
 
-static bool computePlatMovWrap(const OBJ_DATA *obj, int16_t *outX, uint8_t *outTile, bool *outHide)
-{
-    int16_t baseX = (int16_t)((uint8_t)(obj->pos.x << 1));
-
-    if (!obj->data.platMov.isMovingLeft) {
-        if (baseX > 240) {
-            *outX = baseX - 256;
-            *outTile = PORT_PLATMOV_TILE_LEFT;
-            *outHide = false;
-            return true;
-        } else if ((baseX + PORT_PLATMOV_RIGHT_OFFSET) > 240) {
-            *outX = baseX - 256 + PORT_PLATMOV_RIGHT_OFFSET;
-            *outTile = PORT_PLATMOV_TILE_RIGHT;
-            *outHide = false;
-            return true;
-        }
-    } else {
-        if (baseX > 240) {
-            *outX = baseX + 256;
-            *outTile = PORT_PLATMOV_TILE_LEFT;
-            *outHide = false;
-            return true;
-        } else if (baseX > 224) {
-            *outX = baseX + 256 + PORT_PLATMOV_RIGHT_OFFSET;
-            *outTile = PORT_PLATMOV_TILE_RIGHT;
-            *outHide = false;
-            return true;
-        }
-    }
-
-    *outHide = true;
-    *outX = 0;
-    *outTile = PORT_PLATMOV_TILE_LEFT;
-    return false;
-}
-
 static bool writePlatMovSprite(uint8_t index, OBJ_DATA *obj)
 {
     if (!ensureExtraSpriteRange(&obj->extraSpriteBase, PORT_PLATMOV_EXTRA_SPRITES)) {
         return false;
     }
-
-    writeStandardSprite(index, obj);
-
     obj->extraSpriteCount = PORT_PLATMOV_EXTRA_SPRITES;
 
     uint8_t rightSlot = obj->extraSpriteBase;
     uint8_t wrapSlot = (uint8_t)(rightSlot + 1u);
+    uint8_t screenY = (uint8_t)sprite_to_screen_y((int16_t)(obj->pos.y << 1));
+    uint8_t props = obj->oamProps;
+    // vbcc-era rendering: both tiles use natural uint8 OBJX wrap; an X-MSB=1
+    // ghost slot extends the cloud across the screen-wrap boundary. The mod-128
+    // pos.x wrap (see platMovUpdate) keeps the screen position continuous.
+    uint8_t leftX = (uint8_t)(obj->pos.x << 1);
+    uint8_t rightX = (uint8_t)(leftX + PORT_PLATMOV_RIGHT_OFFSET);
 
-    int16_t screenY = sprite_to_screen_y((int16_t)(obj->pos.y << 1));
+    // Main LEFT tile.
+    uint8_t leftT2i = (uint8_t)(index / 4u);
+    GLOBAL_OAMCopy.arr.OAMTable2[leftT2i] = calcOAMTable2Byte(index, 1u, 0u,
+        GLOBAL_OAMCopy.arr.OAMTable2[leftT2i]);
+    GLOBAL_OAMCopy.arr.OAMArray[index].OBJX = leftX;
+    GLOBAL_OAMCopy.arr.OAMArray[index].OBJY = screenY;
+    GLOBAL_OAMCopy.arr.OAMArray[index].CHARNUM = PORT_PLATMOV_TILE_LEFT;
+    GLOBAL_OAMCopy.arr.OAMArray[index].PROPERTIES = props;
 
-    int16_t rightXFull = (int16_t)((uint16_t)(uint8_t)(obj->pos.x << 1) + PORT_PLATMOV_RIGHT_OFFSET);
-    uint8_t rightXBit = (uint8_t)((rightXFull < 0 || rightXFull >= 256) ? 1u : 0u);
-    uint8_t rightX = (uint8_t)rightXFull;
-    uint8_t rightTable2Index = (uint8_t)(rightSlot / 4u);
-    uint8_t rightCurrent = GLOBAL_OAMCopy.arr.OAMTable2[rightTable2Index];
-    GLOBAL_OAMCopy.arr.OAMTable2[rightTable2Index] = calcOAMTable2Byte(rightSlot, 1u, rightXBit, rightCurrent);
+    // Main RIGHT tile.
+    uint8_t rightT2i = (uint8_t)(rightSlot / 4u);
+    GLOBAL_OAMCopy.arr.OAMTable2[rightT2i] = calcOAMTable2Byte(rightSlot, 1u, 0u,
+        GLOBAL_OAMCopy.arr.OAMTable2[rightT2i]);
     GLOBAL_OAMCopy.arr.OAMArray[rightSlot].OBJX = rightX;
-    GLOBAL_OAMCopy.arr.OAMArray[rightSlot].OBJY = (uint8_t)screenY;
+    GLOBAL_OAMCopy.arr.OAMArray[rightSlot].OBJY = screenY;
     GLOBAL_OAMCopy.arr.OAMArray[rightSlot].CHARNUM = PORT_PLATMOV_TILE_RIGHT;
-    GLOBAL_OAMCopy.arr.OAMArray[rightSlot].PROPERTIES = obj->oamProps;
+    GLOBAL_OAMCopy.arr.OAMArray[rightSlot].PROPERTIES = props;
 
-    int16_t wrapX;
-    uint8_t wrapTile;
-    bool hideWrap;
-    computePlatMovWrap(obj, &wrapX, &wrapTile, &hideWrap);
-
-    uint8_t wrapTable2Index = (uint8_t)(wrapSlot / 4u);
-    uint8_t wrapCurrent = GLOBAL_OAMCopy.arr.OAMTable2[wrapTable2Index];
-    uint8_t wrapXBit = (wrapX < 0 || wrapX >= 256) ? 1u : 0u;
-    GLOBAL_OAMCopy.arr.OAMTable2[wrapTable2Index] = calcOAMTable2Byte(wrapSlot, 1u, wrapXBit, wrapCurrent);
-    GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].CHARNUM = wrapTile;
-    GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].PROPERTIES = obj->oamProps;
-    if (hideWrap) {
-        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJY = 240;
+    // Wrap ghost: X-MSB=1 puts the straddling tile at signed screen X − 256
+    // (i.e. screen -16..-1) to bridge the wrap. Mirrors the vbcc-era logic.
+    uint8_t wrapT2i = (uint8_t)(wrapSlot / 4u);
+    uint8_t wrapCur = GLOBAL_OAMCopy.arr.OAMTable2[wrapT2i];
+    if (leftX > 240u) {
+        GLOBAL_OAMCopy.arr.OAMTable2[wrapT2i] = calcOAMTable2Byte(wrapSlot, 1u, 1u, wrapCur);
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJX = leftX;
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJY = screenY;
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].CHARNUM = PORT_PLATMOV_TILE_LEFT;
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].PROPERTIES = props;
+    } else if (rightX > 240u) {
+        GLOBAL_OAMCopy.arr.OAMTable2[wrapT2i] = calcOAMTable2Byte(wrapSlot, 1u, 1u, wrapCur);
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJX = rightX;
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJY = screenY;
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].CHARNUM = PORT_PLATMOV_TILE_RIGHT;
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].PROPERTIES = props;
     } else {
-        uint8_t wrapXByte = (uint8_t)wrapX;
-        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJX = sprite_to_screen_x_byte((int16_t)wrapXByte);
-        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJY = (uint8_t)screenY;
+        GLOBAL_OAMCopy.arr.OAMTable2[wrapT2i] = calcOAMTable2Byte(wrapSlot, 1u, 0u, wrapCur);
+        GLOBAL_OAMCopy.arr.OAMArray[wrapSlot].OBJY = 240;
     }
-
     return true;
 }
 
@@ -895,7 +894,10 @@ static bool writeFlyingBerrySprite(uint8_t index, OBJ_DATA *obj)
         return false;
     }
 
-    bool hideMain = (obj->data.flyingBerry.isCollected != 0u);
+    // pos.y < 3 hides both body (game keeps it alive until pos.y < -16) and the
+    // wings 4-px above it — without this guard the uint8 OBJY cast wraps them to
+    // the bottom edge once the berry flies off the top of the screen.
+    bool hideMain = (obj->data.flyingBerry.isCollected != 0u) || (obj->pos.y < 3);
     writeConditionalSprite(index, obj, hideMain);
 
     obj->extraSpriteCount = PORT_FLYING_BERRY_EXTRA_SPRITES;
@@ -972,7 +974,7 @@ static bool writeBerryScoreSprite(uint8_t index, OBJ_DATA *obj)
 
 static bool writeFlagSprite(uint8_t index, OBJ_DATA *obj)
 {
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
 
     if (!obj->data.flag.show) {
         if (obj->extraSpriteBase != PORT_EXTRA_SLOT_UNUSED && obj->extraSpriteCount != 0u) {
@@ -1025,12 +1027,6 @@ static uint16_t bg1TextSlotByteOffset(uint8_t slot, uint8_t tilePart, uint8_t lo
     return (uint16_t)(((uint16_t)localY * 2u) + (uint16_t)(tilePart & 1u));
 }
 
-PORT_BG1_TEXT_CODE
-static uint16_t bg1TextCellMapIndex(uint8_t cell)
-{
-    return (uint16_t)(((uint16_t)(cell / PORT_BG1_TEXT_SCREEN_MACRO_W) * 32u) + (uint16_t)(cell & 0x0Fu));
-}
-
 PORT_BG1_TEXT_CORE_CODE
 static void bg1TextMarkMapDirty(uint8_t cell)
 {
@@ -1050,17 +1046,50 @@ static void bg1TextClearSlotDirty(uint8_t slot)
     s_bg1TextSlotDirtyBits[slot >> 3] &= (uint8_t)~(uint8_t)(1u << (slot & 7u));
 }
 
+PORT_BG1_TEXT_CODE
+static bool bg1TextSlotIsDirty(uint8_t slot)
+{
+    return (s_bg1TextSlotDirtyBits[slot >> 3] & (uint8_t)(1u << (slot & 7u))) != 0u;
+}
+
+PORT_BG1_TEXT_CODE
+static uint8_t bg1TextCellSlot(uint8_t cell)
+{
+    uint8_t value = s_bg1TextCellSlot[cell];
+    if (value == PORT_BG1_TEXT_SLOT_FREE) {
+        return PORT_BG1_TEXT_SLOT_FREE;
+    }
+    return (uint8_t)(value & PORT_BG1_TEXT_CELL_SLOT_MASK);
+}
+
+PORT_BG1_TEXT_CODE
+static bool bg1TextCellIsVisible(uint8_t cell)
+{
+    uint8_t value = s_bg1TextCellSlot[cell];
+    return value != PORT_BG1_TEXT_SLOT_FREE && (value & PORT_BG1_TEXT_CELL_VISIBLE) != 0u;
+}
+
+PORT_BG1_TEXT_CODE
+static void bg1TextSetCellVisible(uint8_t cell)
+{
+    if (s_bg1TextCellSlot[cell] != PORT_BG1_TEXT_SLOT_FREE) {
+        s_bg1TextCellSlot[cell] |= PORT_BG1_TEXT_CELL_VISIBLE;
+    }
+}
+
 PORT_BG1_TEXT_CORE_CODE
 static void bg1TextPublishCell(uint8_t cell)
 {
     uint8_t slot;
-    slot = s_bg1TextCellSlot[cell];
+    slot = bg1TextCellSlot(cell);
     if (slot == PORT_BG1_TEXT_SLOT_FREE) {
         return;
     }
 
     bg1TextMarkSlotDirty(slot);
-    bg1TextMarkMapDirty(cell);
+    if (!s_bg1TextPublishHidden && !bg1TextCellIsVisible(cell)) {
+        bg1TextMarkMapDirty(cell);
+    }
 }
 
 PORT_BG1_TEXT_CORE_CODE
@@ -1109,7 +1138,6 @@ static void bg1TextReset(void)
     memset(s_bg1TextInkBits, 0, sizeof(s_bg1TextInkBits));
     memset(s_bg1TextCoverBits, 0, sizeof(s_bg1TextCoverBits));
     memset(s_bg1TextDmaSlotBytes, 0, sizeof(s_bg1TextDmaSlotBytes));
-    s_bg1TextDmaStageIndex = 0u;
     memset(s_bg1TextSlotDirtyBits, 0, sizeof(s_bg1TextSlotDirtyBits));
     s_bg1TextAnySlotDirty = false;
     s_bg1TextMapDirtyRowBits = 0u;
@@ -1147,7 +1175,7 @@ static void bg1TextClearSlot(uint8_t slot)
 PORT_BG1_TEXT_CORE_CODE
 static uint8_t bg1TextGetSlot(uint8_t cell, bool allocate)
 {
-    uint8_t slot = s_bg1TextCellSlot[cell];
+    uint8_t slot = bg1TextCellSlot(cell);
     uint8_t i;
 
     if (slot != PORT_BG1_TEXT_SLOT_FREE) {
@@ -1170,7 +1198,7 @@ static uint8_t bg1TextGetSlot(uint8_t cell, bool allocate)
 }
 
 PORT_BG1_TEXT_CORE_CODE
-static PORT_NOINLINE __attribute__((optnone)) void bg1TextFetchGlyphRows(uint8_t ch)
+static PORT_NOINLINE PORT_OPTNONE void bg1TextFetchGlyphRows(uint8_t ch)
 {
     ch &= 0x7Fu;
     snesXC_setDataBank(BANK_ASSETS);
@@ -1229,18 +1257,10 @@ static PORT_NOINLINE uint16_t bg1TextSetPixelColorNoPublish(uint16_t sx, uint16_
 }
 
 PORT_BG1_TEXT_CODE
-static PORT_NOINLINE void bg1TextSetPixelColor(uint16_t sx, uint16_t sy, uint8_t color)
-{
-    uint16_t cell = bg1TextSetPixelColorNoPublish(sx, sy, color);
-    if (cell != PORT_BG1_TEXT_CELL_NONE) {
-        bg1TextPublishCell((uint8_t)cell);
-    }
-}
-
-PORT_BG1_TEXT_CODE
 static void bg1TextHideCell(uint8_t cell)
 {
-    uint8_t slot = s_bg1TextCellSlot[cell];
+    uint8_t slot = bg1TextCellSlot(cell);
+    bool visible = bg1TextCellIsVisible(cell);
     if (slot == PORT_BG1_TEXT_SLOT_FREE) {
         return;
     }
@@ -1248,7 +1268,64 @@ static void bg1TextHideCell(uint8_t cell)
     s_bg1TextSlotCell[slot] = PORT_BG1_TEXT_SLOT_FREE;
     s_bg1TextCellSlot[cell] = PORT_BG1_TEXT_SLOT_FREE;
     bg1TextClearSlotDirty(slot);
-    bg1TextMarkMapDirty(cell);
+    if (visible) {
+        bg1TextMarkMapDirty(cell);
+    }
+}
+
+PORT_DATA_BANK0
+static const uint8_t s_bg1TextFill10FirstMask0[16] = {
+    0xFFu, 0x7Fu, 0x3Fu, 0x1Fu, 0x0Fu, 0x07u, 0x03u, 0x01u,
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u
+};
+PORT_DATA_BANK0
+static const uint8_t s_bg1TextFill10FirstMask1[16] = {
+    0xC0u, 0xE0u, 0xF0u, 0xF8u, 0xFCu, 0xFEu, 0xFFu, 0xFFu,
+    0xFFu, 0x7Fu, 0x3Fu, 0x1Fu, 0x0Fu, 0x07u, 0x03u, 0x01u
+};
+PORT_DATA_BANK0
+static const uint8_t s_bg1TextFill10SecondMask0[16] = {
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x80u,
+    0xC0u, 0xE0u, 0xF0u, 0xF8u, 0xFCu, 0xFEu, 0xFFu, 0xFFu
+};
+PORT_DATA_BANK0
+static const uint8_t s_bg1TextFill10SecondMask1[16] = {
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x80u
+};
+
+PORT_BG1_TEXT_CORE_CODE
+static PORT_NOINLINE void bg1TextFillBgSlotMaskedNoPublish(uint8_t slot, uint8_t mask0, uint8_t mask1)
+{
+    uint8_t offset;
+
+    if (slot == PORT_BG1_TEXT_SLOT_FREE) {
+        return;
+    }
+    for (offset = 0u; offset < PORT_BG1_TEXT_SLOT_MASK_BYTES; offset += 2u) {
+        s_bg1TextCoverBits[slot][offset] |= mask0;
+        s_bg1TextCoverBits[slot][(uint8_t)(offset + 1u)] |= mask1;
+        s_bg1TextInkBits[slot][offset] &= (uint8_t)~mask0;
+        s_bg1TextInkBits[slot][(uint8_t)(offset + 1u)] &= (uint8_t)~mask1;
+    }
+}
+
+PORT_BG1_TEXT_CORE_CODE
+static PORT_NOINLINE void bg1TextFill10BgNoPublish(uint16_t sx, uint16_t sy)
+{
+    uint8_t cellY = (uint8_t)(sy >> 4);
+    uint8_t cellX = (uint8_t)(sx >> 4);
+    uint8_t localX = (uint8_t)(sx & 0x0Fu);
+    uint8_t cell = (uint8_t)((cellY * PORT_BG1_TEXT_SCREEN_MACRO_W) + cellX);
+
+    bg1TextFillBgSlotMaskedNoPublish(bg1TextGetSlot(cell, true),
+                                     s_bg1TextFill10FirstMask0[localX],
+                                     s_bg1TextFill10FirstMask1[localX]);
+    if (localX >= 7u && cellX < (PORT_BG1_TEXT_SCREEN_MACRO_W - 1u)) {
+        bg1TextFillBgSlotMaskedNoPublish(bg1TextGetSlot((uint8_t)(cell + 1u), true),
+                                         s_bg1TextFill10SecondMask0[localX],
+                                         s_bg1TextFill10SecondMask1[localX]);
+    }
 }
 
 PORT_BG1_TEXT_CORE_CODE
@@ -1258,6 +1335,14 @@ static PORT_NOINLINE void bg1TextFillRectNoPublish(uint16_t sx, uint16_t sy, uin
     uint16_t py;
 
     if (!bg1TextClipRect(&sx, &sy, &w, &h)) {
+        return;
+    }
+
+    if (h == 16u &&
+        w == (PORT_PICO8_FONT_ADVANCE_PX * PORT_PICO8_FONT_SCALE) &&
+        (sy & 0x0Fu) == 0u &&
+        color == PORT_BG1_TEXT_COLOR_BG) {
+        bg1TextFill10BgNoPublish(sx, sy);
         return;
     }
 
@@ -1275,8 +1360,24 @@ static PORT_NOINLINE void bg1TextFillRect(uint16_t sx, uint16_t sy, uint16_t w, 
     bg1TextPublishRect(sx, sy, w, h);
 }
 
+// Fast solid 16x16 INK fill for a single cell. Bypasses the per-pixel inner
+// loop (~25k cycles/cell) by writing slot bitmaps via memset. Caller is
+// expected to wrap with s_bg1TextPublishHidden=true; map publish is skipped.
+PORT_BG1_TEXT_CORE_CODE
+static PORT_NOINLINE void bg1TextFillCellSolidInk(uint8_t cell)
+{
+    uint8_t slot = bg1TextGetSlot(cell, true);
+    if (slot == PORT_BG1_TEXT_SLOT_FREE) {
+        return;
+    }
+    memset(s_bg1TextInkBits[slot], 0xFFu, PORT_BG1_TEXT_SLOT_MASK_BYTES);
+    memset(s_bg1TextCoverBits[slot], 0xFFu, PORT_BG1_TEXT_SLOT_MASK_BYTES);
+    bg1TextMarkSlotDirty(slot);
+}
+
+
 PORT_BG1_TEXT_CODE
-static PORT_NOINLINE void bg1TextHideRect(uint16_t sx, uint16_t sy, uint16_t w, uint16_t h)
+static PORT_NOINLINE bool bg1TextHideRect(uint16_t sx, uint16_t sy, uint16_t w, uint16_t h)
 {
     uint8_t cellX0;
     uint8_t cellY0;
@@ -1286,7 +1387,7 @@ static PORT_NOINLINE void bg1TextHideRect(uint16_t sx, uint16_t sy, uint16_t w, 
     uint8_t cellY;
 
     if (!bg1TextClipRect(&sx, &sy, &w, &h)) {
-        return;
+        return false;
     }
 
     cellX0 = (uint8_t)(sx >> 4);
@@ -1298,6 +1399,41 @@ static PORT_NOINLINE void bg1TextHideRect(uint16_t sx, uint16_t sy, uint16_t w, 
             bg1TextHideCell((uint8_t)((cellY * PORT_BG1_TEXT_SCREEN_MACRO_W) + cellX));
         }
     }
+    return true;
+}
+
+PORT_BG1_TEXT_CODE
+static PORT_NOINLINE bool bg1TextBlankRectCells(uint16_t sx, uint16_t sy, uint16_t w, uint16_t h, bool allocate)
+{
+    uint8_t cellX0;
+    uint8_t cellY0;
+    uint8_t cellX1;
+    uint8_t cellY1;
+    uint8_t cellX;
+    uint8_t cellY;
+    bool ok = true;
+
+    if (!bg1TextClipRect(&sx, &sy, &w, &h)) {
+        return false;
+    }
+
+    cellX0 = (uint8_t)(sx >> 4);
+    cellY0 = (uint8_t)(sy >> 4);
+    cellX1 = (uint8_t)((sx + w - 1u) >> 4);
+    cellY1 = (uint8_t)((sy + h - 1u) >> 4);
+    for (cellY = cellY0; cellY <= cellY1; ++cellY) {
+        for (cellX = cellX0; cellX <= cellX1; ++cellX) {
+            uint8_t cell = (uint8_t)((cellY * PORT_BG1_TEXT_SCREEN_MACRO_W) + cellX);
+            uint8_t slot = bg1TextGetSlot(cell, allocate);
+            if (slot == PORT_BG1_TEXT_SLOT_FREE) {
+                ok = false;
+                continue;
+            }
+            bg1TextClearSlot(slot);
+            bg1TextClearSlotDirty(slot);
+        }
+    }
+    return ok;
 }
 
 PORT_BG1_TEXT_CODE
@@ -1368,30 +1504,8 @@ static PORT_NOINLINE void bg1TextPreBuildDma(void)
         return;
     }
 
-    // Pre-build up to 2 dirty map rows
-    if (s_bg1TextMapDirtyRowBits != 0u) {
-        for (row = 0u; row < PORT_BG1_TEXT_SCREEN_MACRO_H; ++row) {
-            if (s_textMapDmaCount >= TEXT_MAX_MAP_DMA) break;
-            uint16_t dirtyMask = (uint16_t)(1u << row);
-            if ((s_bg1TextMapDirtyRowBits & dirtyMask) == 0u) continue;
-
-            uint8_t idx = s_textMapDmaCount;
-            volatile uint8_t col;
-            memset(s_textMapDmaBufs[idx], 0, sizeof(s_textMapDmaBufs[0]));
-            for (col = 0u; col < PORT_BG1_TEXT_SCREEN_MACRO_W; ++col) {
-                uint8_t cell = (uint8_t)(row * PORT_BG1_TEXT_SCREEN_MACRO_W + (uint8_t)col);
-                uint8_t activeSlot = s_bg1TextCellSlot[cell];
-                if (activeSlot != PORT_BG1_TEXT_SLOT_FREE) {
-                    s_textMapDmaBufs[idx][col] = (uint16_t)(PORT_BG1_TEXT_ATTR | bg1TextSlotTile(activeSlot));
-                }
-            }
-            s_textMapDmaDst[idx] = (uint16_t)(PORT_BG1_TEXT_TILEMAP_BASE + ((uint16_t)row * 32u * 2u));
-            s_bg1TextMapDirtyRowBits &= (uint16_t)~dirtyMask;
-            s_textMapDmaCount++;
-        }
-    }
-
-    // Pre-build up to 2 dirty tile slots
+    // Stage tile data first. New tilemap references must not become visible
+    // until the referenced dynamic tile has been uploaded.
     if (s_bg1TextAnySlotDirty) {
         for (row = 0u; row < PORT_BG1_TEXT_SLOT_ROW_COUNT; ++row) {
             while (s_bg1TextSlotDirtyBits[row] != 0u && s_textSlotDmaCount < PORT_BG1_TEXT_DMA_STAGE_COUNT) {
@@ -1422,19 +1536,46 @@ static PORT_NOINLINE void bg1TextPreBuildDma(void)
         }
         if (!anyLeft) s_bg1TextAnySlotDirty = false;
     }
+
+    // Map rows are cheap to DMA, and hiding text only needs tilemap updates.
+    // Reuse the BG2 room-load scratch buffer so all text rows can clear in one frame.
+    if (s_bg1TextMapDirtyRowBits != 0u) {
+        for (row = 0u; row < PORT_BG1_TEXT_SCREEN_MACRO_H; ++row) {
+            bool deferredSlot = false;
+            if (s_textMapDmaCount >= TEXT_MAX_MAP_DMA) break;
+            uint16_t dirtyMask = (uint16_t)(1u << row);
+            if ((s_bg1TextMapDirtyRowBits & dirtyMask) == 0u) continue;
+
+            uint8_t idx = s_textMapDmaCount;
+            volatile uint8_t col;
+            memset(s_textMapDmaBufs[idx], 0, sizeof(s_textMapDmaBufs[0]));
+            for (col = 0u; col < PORT_BG1_TEXT_SCREEN_MACRO_W; ++col) {
+                uint8_t cell = (uint8_t)(row * PORT_BG1_TEXT_SCREEN_MACRO_W + (uint8_t)col);
+                uint8_t activeSlot = bg1TextCellSlot(cell);
+                if (activeSlot == PORT_BG1_TEXT_SLOT_FREE) {
+                    continue;
+                }
+                if (bg1TextSlotIsDirty(activeSlot) && !bg1TextCellIsVisible(cell)) {
+                    deferredSlot = true;
+                    continue;
+                }
+                s_textMapDmaBufs[idx][col] = (uint16_t)(PORT_BG1_TEXT_ATTR | bg1TextSlotTile(activeSlot));
+                bg1TextSetCellVisible(cell);
+            }
+            s_textMapDmaRows[idx] = row;
+            if (!deferredSlot) {
+                s_bg1TextMapDirtyRowBits &= (uint16_t)~dirtyMask;
+            }
+            s_textMapDmaCount++;
+        }
+    }
 }
 
 // DMA-only text flush.  Called from NMI handler — zero computation.
-PORT_BG1_TEXT_CODE
+PORT_BG1_TEXT_FLUSH_CODE
 static void bg1TextDmaFlush(void)
 {
     snesXC_setDataBank(0x7Eu);
-
-    for (uint8_t i = 0u; i < s_textMapDmaCount; i++) {
-        LoadVram((const unsigned char *)s_textMapDmaBufs[i],
-                 s_textMapDmaDst[i],
-                 sizeof(s_textMapDmaBufs[0]));
-    }
 
     for (uint8_t i = 0u; i < s_textSlotDmaCount; i++) {
         uint16_t tile = s_textSlotDmaTile[i];
@@ -1445,6 +1586,12 @@ static void bg1TextDmaFlush(void)
         LoadVram(&stage[PORT_BG1_TEXT_SLOT_BOTTOM_OFFSET],
                  (uint16_t)(PORT_BG1_TEXT_TILEDATA_BASE + ((uint16_t)(tile + 16u) * 16u)),
                  32u);
+    }
+
+    for (uint8_t i = 0u; i < s_textMapDmaCount; i++) {
+        LoadVram((const unsigned char *)s_textMapDmaBufs[i],
+                 (uint16_t)(PORT_BG1_TEXT_TILEMAP_BASE + ((uint16_t)s_textMapDmaRows[i] * 32u * 2u)),
+                 sizeof(s_textMapDmaBufs[0]));
     }
 }
 
@@ -1476,7 +1623,10 @@ static void clearVramZero(uint16_t vramByteAddr, uint16_t wordCount) {
 
 static uint16_t s_snowX[SNOW_COUNT];
 static uint8_t  s_snowY[SNOW_COUNT];
-static uint16_t s_snowSpd[SNOW_COUNT];
+// Stores rawSpd (2..40); the effective 16-bit increment is rawSpd << 5 and
+// is reconstructed at the two use sites. Halves the BSS footprint vs storing
+// the precomputed uint16_t value.
+static uint8_t s_snowSpd[SNOW_COUNT];
 static uint8_t  s_snowPhase[SNOW_COUNT];
 static uint8_t  s_snowPrevCell[SNOW_COUNT];
 static uint16_t s_snowRng = 0x1234u;
@@ -1485,25 +1635,50 @@ static uint8_t  s_snowScanStart = 0u; // round-robin start row for DMA budget
 
 // Pre-built DMA staging: row buffers built before VBlank, blasted during VBlank.
 // Capped at 4 rows to fit RAM budget; excess rows deferred to next frame.
-#define SNOW_MAX_DMA_ROWS 4u
+#define SNOW_MAX_DMA_ROWS 3u
 static uint16_t s_snowDmaBufs[SNOW_MAX_DMA_ROWS][SNOW_VISIBLE_COLS]; // 128 bytes
 static uint8_t  s_snowDmaRowNums[SNOW_MAX_DMA_ROWS];
 static uint8_t  s_snowDmaCount = 0u;
 
-PORT_BG1_TEXT_CODE
+// Per-row bucket chain so the tile-placement loop walks only the particles
+// on a given row instead of scanning all 25 each time. The per-particle
+// "next" pointer aliases s_snowPrevCell: snowUpdate writes prev cells,
+// snowPreBuildRows reads them once (to compute prevOnlyRows) and then
+// repurposes the same byte as the chain link.
+#define SNOW_PARTICLE_NONE 0xFFu
+static uint8_t s_snowRowHead[SNOW_VISIBLE_ROWS];
+#define s_snowRowNext s_snowPrevCell
+
+// (1u << row) lookup; llvm-mos otherwise calls a runtime shift helper for
+// non-constant shift counts. Touched in two hot loops in snowPreBuildRows.
+static const uint16_t SNOW_ROW_BIT[SNOW_VISIBLE_ROWS] = {
+    1u<<0, 1u<<1, 1u<<2, 1u<<3, 1u<<4, 1u<<5, 1u<<6,
+    1u<<7, 1u<<8, 1u<<9, 1u<<10, 1u<<11, 1u<<12, 1u<<13,
+};
+
+// Sentinel byte for Mesen Lua-based cycle profiling. The harness installs a
+// write callback on this address and samples cpu.cycleCount on each write,
+// so diffs between consecutive markers yield per-phase cost. Markers:
+//   1/2 enter/leave snowPreBuildRows
+//   3/4 enter/leave snowFlushTilemap
+//   5/6 enter/leave snowUpdate
+// Volatile so the compiler keeps every write even when LTO inlines.
+volatile uint8_t g_snowPerfMarker;
+
+PORT_SNOW_STEP_CODE
 static uint8_t snow_rand_u8(void)
 {
     s_snowRng = (uint16_t)((s_snowRng * 109u) + 89u);
     return (uint8_t)(s_snowRng >> 8);
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static uint8_t snow_rand_range_u8(uint8_t lo, uint8_t hi)
 {
     return (uint8_t)(lo + (snow_rand_u8() % (uint8_t)(hi - lo + 1u)));
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static int8_t snowSineValue(uint8_t phase)
 {
     if (phase >= 6u && phase <= 26u) return 1;
@@ -1511,7 +1686,7 @@ static int8_t snowSineValue(uint8_t phase)
     return 0;
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static uint8_t snowCellFromPosition(uint16_t x, uint8_t y)
 {
     uint8_t px = (uint8_t)(x >> 8);
@@ -1522,7 +1697,7 @@ static uint8_t snowCellFromPosition(uint16_t x, uint8_t y)
          : SNOW_CELL_NONE;
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static void snowGenerateTiles(void)
 {
     clearVramZero(SNOW_TILE_VRAM_BASE, SNOW_TILE_VRAM_WORDS);
@@ -1555,7 +1730,7 @@ static void snowGenerateTiles(void)
     }
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static void snowUploadPalette(void)
 {
     // Direct register writes — avoids DMA bank-pointer issues
@@ -1566,7 +1741,7 @@ static void snowUploadPalette(void)
     REG_CGDATA = 0x00u; REG_CGDATA = 0x00u; // color 3: unused
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static void snowInitParticles(void)
 {
     for (uint8_t i = 0u; i < SNOW_COUNT; i++) {
@@ -1574,14 +1749,14 @@ static void snowInitParticles(void)
         s_snowY[i]    = snow_rand_range_u8(0u, 223u);
         // PICO-8 speed 0.25-5.0 px/frame at 30fps, 8.8 fixed point
         uint8_t rawSpd = snow_rand_range_u8(2u, 40u);
-        s_snowSpd[i]   = (uint16_t)rawSpd << 5;
+        s_snowSpd[i]   = rawSpd;
         s_snowPhase[i] = snow_rand_u8() & 63u;
         s_snowPrevCell[i] = SNOW_CELL_NONE;
     }
     s_snowActive = true;
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static void snowInit(void)
 {
     snowGenerateTiles();
@@ -1589,7 +1764,7 @@ static void snowInit(void)
     snowInitParticles();
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static void snowResetPrevCells(void)
 {
     for (uint8_t i = 0u; i < SNOW_COUNT; i++) {
@@ -1597,26 +1772,47 @@ static void snowResetPrevCells(void)
     }
 }
 
-PORT_BG1_TEXT_CODE
+PORT_SNOW_STEP_CODE
 static void snowUpdate(void)
 {
-    if (!s_snowActive || s_titleMode) return;
+    g_snowPerfMarker = 5u;
+    if (!s_snowActive || s_titleMode) { g_snowPerfMarker = 6u; return; }
     for (uint8_t i = 0u; i < SNOW_COUNT; i++) {
-        uint8_t oldCell = snowCellFromPosition(s_snowX[i], s_snowY[i]);
+        // Inline of snowCellFromPosition + drop the column part.
+        // s_snowPrevCell now stores just the row (snowPreBuildRows only
+        // uses `prev >> 4` of the old cell encoding).
         uint16_t oldX = s_snowX[i];
-        s_snowX[i] += s_snowSpd[i];
-        if (s_snowX[i] < oldX) {
-            s_snowY[i]    = snow_rand_range_u8(0u, 223u);
+        uint8_t  oldY = s_snowY[i];
+        uint8_t  prevRow = ((uint8_t)(oldX >> 8) < 0xF0u && oldY < 0xE0u)
+                         ? (uint8_t)(oldY >> 4)
+                         : SNOW_CELL_NONE;
+
+        uint8_t rawSpd = s_snowSpd[i];
+        uint16_t newX = oldX + ((uint16_t)rawSpd << 5);
+        s_snowX[i] = newX;
+
+        uint8_t y;
+        if (newX < oldX) {
+            y = snow_rand_range_u8(0u, 223u);
             s_snowPhase[i] = snow_rand_u8() & 63u;
+        } else {
+            y = oldY;
         }
-        uint8_t phaseInc = (uint8_t)((s_snowSpd[i] >> 8) + 1u);
-        s_snowPhase[i]   = (s_snowPhase[i] + phaseInc) & 63u;
-        int16_t newY     = (int16_t)s_snowY[i] + (int16_t)snowSineValue(s_snowPhase[i]);
-        if (newY < 0)    newY = 0;
-        if (newY > 223)  newY = 223;
-        s_snowY[i] = (uint8_t)newY;
-        s_snowPrevCell[i] = oldCell;
+
+        uint8_t phase = (uint8_t)((s_snowPhase[i] + (uint8_t)((rawSpd >> 3) + 1u)) & 63u);
+        s_snowPhase[i] = phase;
+
+        // Inline of snowSineValue (-1/0/+1) with uint8_t clamp.
+        if (phase >= 6u && phase <= 26u) {
+            s_snowY[i] = (y >= 223u) ? 223u : (uint8_t)(y + 1u);
+        } else if (phase >= 38u && phase <= 58u) {
+            s_snowY[i] = (y == 0u) ? 0u : (uint8_t)(y - 1u);
+        } else {
+            s_snowY[i] = y;
+        }
+        s_snowPrevCell[i] = prevRow;
     }
+    g_snowPerfMarker = 6u;
 }
 
 // Pre-build all snow DMA row buffers.  Called BEFORE the VBlank wait so
@@ -1624,56 +1820,81 @@ static void snowUpdate(void)
 PORT_BG1_TEXT_CODE
 static void snowPreBuildRows(void)
 {
+    g_snowPerfMarker = 1u;
     s_snowDmaCount = 0u;
-    if (!s_snowActive || s_titleMode) return;
+    if (!s_snowActive || s_titleMode) { g_snowPerfMarker = 2u; return; }
 
     // Collect dirty rows: current positions first (high priority),
-    // then previous positions (low priority — just clearing).
+    // then previous positions (low priority — just clearing). Also bucket
+    // particles into per-row chains so the placement loop later walks just
+    // the relevant particles instead of all 25.
+    for (uint8_t r = 0u; r < SNOW_VISIBLE_ROWS; r++) {
+        s_snowRowHead[r] = SNOW_PARTICLE_NONE;
+    }
     uint16_t currentRows = 0u;
     uint16_t prevOnlyRows = 0u;
     for (uint8_t i = 0u; i < SNOW_COUNT; i++) {
+        // Read prev cell FIRST since s_snowRowNext aliases s_snowPrevCell;
+        // the write below overwrites this byte for the current particle.
+        uint8_t prev = s_snowPrevCell[i];  // now stores just the row directly
+        if (prev != SNOW_CELL_NONE)
+            prevOnlyRows |= SNOW_ROW_BIT[prev];
+
         uint8_t cy = s_snowY[i] >> 4;
         uint8_t cx = (uint8_t)(s_snowX[i] >> 8) >> 4;
-        if (cx < SNOW_VISIBLE_COLS && cy < SNOW_VISIBLE_ROWS)
-            currentRows |= (uint16_t)(1u << cy);
-        uint8_t prev = s_snowPrevCell[i];
-        if (prev != SNOW_CELL_NONE)
-            prevOnlyRows |= (uint16_t)(1u << (prev / SNOW_VISIBLE_COLS));
+        if (cx < SNOW_VISIBLE_COLS && cy < SNOW_VISIBLE_ROWS) {
+            currentRows |= SNOW_ROW_BIT[cy];
+            s_snowRowNext[i] = s_snowRowHead[cy];
+            s_snowRowHead[cy] = i;
+        }
     }
     prevOnlyRows &= (uint16_t)~currentRows; // only rows that JUST have departures
     uint16_t priorityMask = currentRows; // do these first
 
     // Build each dirty row into the staging buffer (current rows first).
     // Round-robin the scan start so all rows get fair DMA budget over time.
+    // Walk the row index incrementally with a conditional wrap instead of
+    // `% SNOW_VISIBLE_ROWS` (=14, not a power of two) — llvm-mos otherwise
+    // emits a __divmodqi3 call for every iteration.
     for (uint8_t pass = 0u; pass < 2u; pass++) {
         uint16_t mask = (pass == 0u) ? priorityMask : prevOnlyRows;
+        uint8_t row = s_snowScanStart;
         for (uint8_t offset = 0u; offset < SNOW_VISIBLE_ROWS && mask != 0u; offset++) {
-            uint8_t row = (uint8_t)((s_snowScanStart + offset) % SNOW_VISIBLE_ROWS);
-            if (!(mask & (1u << row))) continue;
+            uint16_t rowBit = SNOW_ROW_BIT[row];
+            uint8_t curRow = row;
+            row++;
+            if (row >= SNOW_VISIBLE_ROWS) row = 0u;
+            if (!(mask & rowBit)) continue;
             if (s_snowDmaCount >= SNOW_MAX_DMA_ROWS) goto done;
 
             uint8_t idx = s_snowDmaCount;
-            s_snowDmaRowNums[idx] = row;
-            memset(s_snowDmaBufs[idx], 0, sizeof(s_snowDmaBufs[0]));
+            s_snowDmaRowNums[idx] = curRow;
 
-            // Text entries first (text takes priority over snow)
-            for (uint8_t col = 0u; col < SNOW_VISIBLE_COLS; col++) {
-                uint8_t cell = (uint8_t)(row * SNOW_VISIBLE_COLS + col);
-                uint8_t slot = s_bg1TextCellSlot[cell];
-                if (slot != PORT_BG1_TEXT_SLOT_FREE)
-                    s_snowDmaBufs[idx][col] = (uint16_t)(PORT_BG1_TEXT_ATTR | bg1TextSlotTile(slot));
+            // Lay text + initialise empty cells to 0 in ONE pass — replaces a
+            // separate memset(32 bytes). Encoding of s_bg1TextCellSlot:
+            // 0xFF = free, 0x00..0x7F = non-free hidden, 0x80..0xFE = visible.
+            {
+                const uint8_t *cellRow = &s_bg1TextCellSlot[curRow * SNOW_VISIBLE_COLS];
+                uint16_t *dst = s_snowDmaBufs[idx];
+                for (uint8_t col = 0u; col < SNOW_VISIBLE_COLS; col++) {
+                    uint8_t cellVal = cellRow[col];
+                    if ((cellVal & 0x80u) != 0u && cellVal != 0xFFu) {
+                        uint8_t slot = cellVal & 0x7Fu;
+                        dst[col] = (uint16_t)(PORT_BG1_TEXT_ATTR | bg1TextSlotTile(slot));
+                    } else {
+                        dst[col] = 0u;
+                    }
+                }
             }
 
-            // Snow entries for empty cells
-            for (uint8_t i = 0u; i < SNOW_COUNT; i++) {
-                uint8_t cy = s_snowY[i] >> 4;
-                if (cy != row) continue;
-                uint8_t px = (uint8_t)(s_snowX[i] >> 8);
+            // Snow entries for empty cells — walk only this row's chain.
+            for (uint8_t p = s_snowRowHead[curRow]; p != SNOW_PARTICLE_NONE; p = s_snowRowNext[p]) {
+                uint8_t px = (uint8_t)(s_snowX[p] >> 8);
                 uint8_t cx = px >> 4;
                 if (cx >= SNOW_VISIBLE_COLS || s_snowDmaBufs[idx][cx] != 0u) continue;
 
                 uint8_t qx = (px & 15u) >> 2;
-                uint8_t qy = (s_snowY[i] & 15u) >> 2;
+                uint8_t qy = (s_snowY[p] & 15u) >> 2;
                 uint8_t variant = (uint8_t)((qy << 2) | qx);
                 uint16_t tileChar = (uint16_t)(SNOW_TILE_CHAR_BASE
                                     + (uint16_t)(variant >> 3) * 32u
@@ -1685,19 +1906,26 @@ static void snowPreBuildRows(void)
         }
     }
 done:
-    s_snowScanStart = (uint8_t)((s_snowScanStart + SNOW_MAX_DMA_ROWS) % SNOW_VISIBLE_ROWS);
+    {
+        uint8_t nextStart = s_snowScanStart + SNOW_MAX_DMA_ROWS;
+        if (nextStart >= SNOW_VISIBLE_ROWS) nextStart -= SNOW_VISIBLE_ROWS;
+        s_snowScanStart = nextStart;
+    }
+    g_snowPerfMarker = 2u;
 }
 
 // VBlank-only: tight DMA loop, zero computation.
-PORT_BG1_TEXT_CODE
+PORT_BG1_TEXT_FLUSH_CODE
 static void snowFlushTilemap(void)
 {
+    g_snowPerfMarker = 3u;
     snesXC_setDataBank(0x7Eu);
     for (uint8_t i = 0u; i < s_snowDmaCount; i++) {
         LoadVram((const unsigned char *)s_snowDmaBufs[i],
                  (uint16_t)(PORT_BG1_TEXT_TILEMAP_BASE + (uint16_t)s_snowDmaRowNums[i] * 64u),
                  sizeof(s_snowDmaBufs[0]));
     }
+    g_snowPerfMarker = 4u;
 }
 
 static void LoadRoomDataVRAM(void) {
@@ -1712,7 +1940,7 @@ static void LoadRoomDataVRAM(void) {
     LoadCGRam(paletteBg, 0x0020, 0x40); //Bg2 palette
     bg1TextUploadPalette();
     bg1TextReset();
-    port_prg_bank_enter(4);
+    port_prg_bank_enter(5);
     snowUploadPalette();
     snowResetPrevCells();
     port_prg_bank_leave();
@@ -2096,9 +2324,18 @@ void port_LoadRoomData(uint16_t roomID) {
     GLOBAL_ActiveLevel.scrollPointY = 72;
     snesXC_setDataBank(BANK_00);
     LoadRoomDataVRAM();
-    REG_INIDISP = 0x0F;
+    // Don't un-blank yet: shadow OAM is being updated by the caller after we
+    // return, but hardware OAM still reflects the previous room. Let
+    // port_vblank flip INIDISP back on once it has DMA'd the new shadow OAM.
+    s_pendingDisplayEnable = true;
     GLOBAL_ActiveLevel.isLevelLoadedVRAM = true;
 }
+
+// Forward declarations for dead-particle assets defined later in this file.
+extern const unsigned char dead_particle_tile_top[192];
+extern const unsigned char dead_particle_tile_bot[192];
+extern const unsigned char dead_particle_palette_pink[2];
+extern const unsigned char dead_particle_palette_peach[2];
 
 // Load all initial graphics data to VRAM/CGRAM
 // This function handles all the one-time graphics setup
@@ -2133,10 +2370,15 @@ void LoadInitialGraphics(void) {
     LoadCGRam((char *)sprite_palettes_4bpp[4], 0x00D0, sizeof(sprite_palettes_4bpp[0])); // Deco tree
     LoadCGRam((char *)sprite_palettes_4bpp[5], 0x00E0, sizeof(sprite_palettes_4bpp[0])); // Spring
     LoadCGRam((char *)sprite_palettes_4bpp[6], 0x00F0, sizeof(sprite_palettes_4bpp[0])); // Flying berry
+    // Hair + dead-particle assets uploaded by a bank-1 helper (keeps them
+    // out of fixed-mirror code).
+    port_prg_bank_enter(1);
+    port_loadHairAssets();
+    port_prg_bank_leave();
     snesXC_setDataBank(BANK_00);
     scoreSpriteUploadPalette(false);
     bg1TextUploadPalette();
-    port_prg_bank_enter(4);
+    port_prg_bank_enter(5);
     snowInit();
     port_prg_bank_leave();
 }
@@ -2154,6 +2396,142 @@ void port_showGameplayScreen(void)
     REG_BG4SC = (0x0000ul >> (9)) | 0x03u;
     REG_BG34NBA = BG34NBA_GAMEPLAY;
     REG_TM = 0x1F;
+}
+
+// Easter-egg "dedication" screen — shown after the title-screen Konami
+// code. BG1 (the text overlay) is routed exactly like gameplay so
+// port_drawText works, but only BG1 is enabled in TM and sprites are
+// cleared. The deferred-un-blank flag keeps the screen black until the
+// next vblank has DMA'd the rendered text into VRAM. Placed in
+// rom_bank_4 alongside port_drawText so callers can share a single
+// bank switch (otherwise the cheat handler in fixed blows its budget).
+// Dedication screen uses BG3 directly with 8x8 tiles, bypassing the
+// BG1 text slot system (capped at 48 slots; the full message needs more).
+// Since this runs before the main game, we freely repurpose the title's
+// BG3 tile/tilemap VRAM area — LoadRoomData reloads BG3 on room start so
+// nothing leaks into gameplay.
+
+// 8-byte scratch buffer for pulling one char's font rows out of
+// rom_data_bank_1 via DMA. Tiny BSS footprint.
+static uint8_t s_dedicationCharRows[8];
+
+// 2x-replicate the high nibble of a pico-8 glyph byte across 8 SNES
+// pixels: 0bABCD_xxxx → 0bAABB_CCDD. Indexed by the top 4 bits.
+static const uint8_t s_dedicationScale2x[16] = {
+    0x00, 0x03, 0x0C, 0x0F, 0x30, 0x33, 0x3C, 0x3F,
+    0xC0, 0xC3, 0xCC, 0xCF, 0xF0, 0xF3, 0xFC, 0xFF,
+};
+
+PORT_FUNC_BANK7
+static void uploadDedicationFontAndTilemap(void)
+{
+    // Each ASCII char becomes a 8x16 character — 2x scale of the pico-8
+    // 4x8 glyph. That's two stacked 8x8 SNES tiles per char: tile
+    // (ch*2) holds the top half (source rows 0-3 each duplicated to two
+    // SNES rows), tile (ch*2+1) holds the bottom half (rows 4-7). 256
+    // tiles total fit in BG3's 4 KB tile bank at VRAM 0x6000.
+    // Source rows pulled via snesXC_memcpy_banked (direct cross-bank
+    // CPU dereference was unreliable).
+    REG_VMAIN = 0x80;
+    REG_VMADD = (uint16_t)(0x6000u >> 1);
+    for (uint16_t ch = 0; ch < 128u; ++ch) {
+        snesXC_setDataBank(BANK_ASSETS);
+        snesXC_memcpy_banked(s_dedicationCharRows, pico8_font_rows[ch], 8u);
+        snesXC_setDataBank(BANK_00);
+        // Top tile: source rows 0-3.
+        for (uint8_t r = 0; r < 4u; ++r) {
+            uint8_t scaled = s_dedicationScale2x[s_dedicationCharRows[r] >> 4];
+            REG_VMDATAL = scaled; REG_VMDATAH = 0u; // copy 1 of 2
+            REG_VMDATAL = scaled; REG_VMDATAH = 0u; // copy 2 of 2
+        }
+        // Bottom tile: source rows 4-7.
+        for (uint8_t r = 4; r < 8u; ++r) {
+            uint8_t scaled = s_dedicationScale2x[s_dedicationCharRows[r] >> 4];
+            REG_VMDATAL = scaled; REG_VMDATAH = 0u;
+            REG_VMDATAL = scaled; REG_VMDATAH = 0u;
+        }
+    }
+
+    // Wipe BG3 tilemap (32x32 cells × 1 word per cell).
+    REG_VMAIN = 0x80;
+    REG_VMADD = (uint16_t)(0x4000u >> 1);
+    for (uint16_t i = 0; i < (uint16_t)(32u * 32u); ++i) {
+        REG_VMDATAL = 0u;
+        REG_VMDATAH = 0u;
+    }
+
+    // Five lines, centered horizontally; 8x16 chars take 2 tilemap rows.
+    // 1 empty row between lines for breathing → 3 rows per line, 15 total
+    // across a 28-row visible screen → start at row 6.
+    static const unsigned char L1[] = "DEDICATED TO";
+    static const unsigned char L2[] = "FAE";
+    static const unsigned char L3[] = "THE JOY OF MY LIFE";
+    static const unsigned char L4[] = "LOVING ME THROUGH";
+    static const unsigned char L5[] = "ALL MY TRIALS";
+    const unsigned char *lines[5] = { L1, L2, L3, L4, L5 };
+    const uint8_t lineTopRow[5] = { 6u, 9u, 12u, 15u, 18u };
+    for (uint8_t l = 0; l < 5u; ++l) {
+        const unsigned char *t = lines[l];
+        uint8_t len = 0;
+        while (t[len]) ++len;
+        uint8_t startCol = (uint8_t)((32u - len) / 2u);
+        uint8_t topRow = lineTopRow[l];
+
+        // Top half of each char.
+        REG_VMADD = (uint16_t)((0x4000u >> 1) +
+                               (uint16_t)topRow * 32u + startCol);
+        for (uint8_t i = 0; i < len; ++i) {
+            REG_VMDATAL = (uint8_t)((uint16_t)t[i] * 2u);
+            REG_VMDATAH = 0u;
+        }
+        // Bottom half: same chars, +1 tile id, next cell row.
+        REG_VMADD = (uint16_t)((0x4000u >> 1) +
+                               (uint16_t)(topRow + 1u) * 32u + startCol);
+        for (uint8_t i = 0; i < len; ++i) {
+            REG_VMDATAL = (uint8_t)((uint16_t)t[i] * 2u + 1u);
+            REG_VMDATAH = 0u;
+        }
+    }
+}
+
+PORT_FUNC_BANK7
+void port_showDedicationScreen(void)
+{
+    REG_INIDISP = 0x8Fu;
+    REG_BGMODE = 0x00; // mode 0, all BGs 8x8 — gives us 32 cells per line
+    REG_BG3SC = (uint8_t)((0x4000ul >> 9) | 0x00u);
+    // BG34NBA: BG3 tile data base = 0x6000 (lower nibble = 3), BG4 doesn't
+    // matter since TM hides it. 0x6000 >> 13 = 0x3.
+    REG_BG34NBA = 0x03u;
+    REG_TM = 0x04; // BG3 only
+
+    uploadDedicationFontAndTilemap();
+
+    // BG3 palette 0: color 0 transparent/black, color 1 white text.
+    REG_CGADD = 0x40u;
+    REG_CGDATA = 0x00u; REG_CGDATA = 0x00u;
+    REG_CGDATA = 0xFFu; REG_CGDATA = 0x7Fu;
+
+    port_resetSprites();
+    s_dedicationActive = true;
+    s_pendingDisplayEnable = true;
+}
+
+PORT_FUNC_BANK7
+void port_endDedicationScreen(void)
+{
+    REG_INIDISP = 0x8Fu;
+    s_dedicationActive = false;
+    // No VRAM cleanup needed — LoadRoomData + port_showGameplayScreen
+    // overwrite BG3 tilemap (at 0x4000) and re-point BG3 tile data
+    // before the next un-blank.
+}
+
+// Stub kept so existing port.h declaration resolves; the BG3 path bakes
+// the text into uploadDedicationFontAndTilemap, so the standalone draw
+// call is a no-op now.
+void port_drawDedicationText(void)
+{
 }
 
 
@@ -2182,9 +2560,12 @@ void port_init(void)
     port_showGameplayScreen();
 
     REG_NMITIMEN = 0x81u; // Enable NMI + auto-joypad read
-    REG_INIDISP = 0x0F;
+    // Leave INIDISP at force-blank (initSNES set 0x8F). LoadInitialGraphics
+    // populated gameplay tiles + palettes but no tilemap is set up yet —
+    // un-blanking here would briefly flash garbage before the caller's
+    // first display target (port_showTitleScreen or LoadRoomData) is ready.
     port_audioInit();
- 
+
 }
 
 void port_showTitleScreen(void)
@@ -2230,6 +2611,220 @@ void port_finishSpriteBuild(void)
     s_maxExtraSpriteUsed = s_nextExtraSprite;
 }
 
+// === Player hair =============================================================
+// Five 16x16 sprites trailing the player's head. Each hair particle is a
+// 6x6 red dot centered in a 16x16 sprite cell (rest transparent). Particles
+// soft-follow the previous one with a ~2/3 lerp, matching ccleste's
+// draw_hair() (celeste.c:917). v1: single dot size, fixed red color.
+
+// Tile slots 0xC0-C3 / 0xD0-D3 are used by the strawberry "1000" score
+// sprite (python/score_1000_snes.h). Hair takes the next four 16x16 slots:
+//   0xC4 (TL,TR) + 0xD4 (BL,BR) = "large" particle (r=2 rounded square)
+//   0xC6 (TL,TR) + 0xD6 (BL,BR) = "small" particle (r=1 plus)
+// matching ccleste's draw_hair sizes [2,2,1,1,1] (celeste.c:909).
+#define PORT_HAIR_LARGE_CHARNUM  0xC4u
+#define PORT_HAIR_SMALL_CHARNUM  0xC6u
+#define PORT_HAIR_PROPS          0x38u  // priority 3, palette 4 (player palette)
+
+// Hair tile data: two 16x16 sprites in 4bpp, both using only color index 5
+// (bp0+bp2 set, bp1+bp3 clear) — matches the player's red in palette 4.
+//
+// Layout per 8x8 sub-tile: bytes 0-15 = bp0/bp1 interleaved per row,
+// bytes 16-31 = bp2/bp3 interleaved. Both bitplane pairs share the same
+// row mask for color index 5.
+//
+// LARGE = ccleste P8circfill r=2 (5x5 rounded square), scaled 2x → 10x10
+// centered in 16x16 (rows 3-12, cols 3-12). Rounded top/bottom: 6-col
+// caps; middle 6 rows: 10 cols.
+// SMALL = ccleste P8circfill r=1 (plus, 5 pixels), scaled 2x → 6x6 plus
+// centered in 16x16 (rows 5-10, cols 5-10). Center 2x2 row of arms,
+// horizontal/vertical bars span 6 px in their axis.
+//
+// Both placed in rom_data_bank_1 alongside sprite_gfx_4bpp so the
+// LoadInitialGraphics DMA (data bank = BANK_ASSETS) can reach them.
+PORT_DATA_HIGH_BANK1
+static const unsigned char hair_tile_top[128] = {
+    // LARGE TL (cols 0-7 of 16x16): rows 3-4 mask 0x07 (cols 5-7),
+    //                              rows 5-7 mask 0x1F (cols 3-7).
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x07, 0x00, 0x1F, 0x00, 0x1F, 0x00, 0x1F, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x07, 0x00, 0x1F, 0x00, 0x1F, 0x00, 0x1F, 0x00,
+    // LARGE TR (cols 8-15): rows 3-4 mask 0xE0 (cols 8-10),
+    //                       rows 5-7 mask 0xF8 (cols 8-12).
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x00, 0xE0, 0x00, 0xF8, 0x00, 0xF8, 0x00, 0xF8, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE0, 0x00, 0xE0, 0x00, 0xF8, 0x00, 0xF8, 0x00, 0xF8, 0x00,
+    // SMALL TL: rows 5-6 mask 0x01 (col 7 = vertical arm),
+    //           row 7 mask 0x07 (cols 5-7 = left half of horizontal bar).
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x07, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x07, 0x00,
+    // SMALL TR: rows 5-6 mask 0x80 (col 8 = vertical arm continues),
+    //           row 7 mask 0xE0 (cols 8-10 = right half of horizontal bar).
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x80, 0x00, 0xE0, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x80, 0x00, 0xE0, 0x00,
+};
+PORT_DATA_HIGH_BANK1
+static const unsigned char hair_tile_bot[128] = {
+    // LARGE BL: rows 0-2 (sprite rows 8-10) mask 0x1F,
+    //           rows 3-4 (sprite rows 11-12) mask 0x07.
+    0x1F, 0x00, 0x1F, 0x00, 0x1F, 0x00, 0x07, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x1F, 0x00, 0x1F, 0x00, 0x1F, 0x00, 0x07, 0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    // LARGE BR: rows 0-2 mask 0xF8, rows 3-4 mask 0xE0.
+    0xF8, 0x00, 0xF8, 0x00, 0xF8, 0x00, 0xE0, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xF8, 0x00, 0xF8, 0x00, 0xF8, 0x00, 0xE0, 0x00, 0xE0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    // SMALL BL: row 0 (sprite row 8) mask 0x07 (cols 5-7 = horizontal bar),
+    //           rows 1-2 (sprite rows 9-10) mask 0x01 (col 7 = vertical arm).
+    0x07, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x07, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    // SMALL BR: row 0 mask 0xE0, rows 1-2 mask 0x80.
+    0xE0, 0x00, 0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xE0, 0x00, 0x80, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+// === Dead particles (ccleste celeste.c:1582-1604 / 1867-1879) ================
+// Three 16x16 sprite shapes matching ccleste's P8rectfill at p->t/5 half-width:
+//   BIG    (t=10):  10x10 filled square (pico-8 5x5) — tile 0xCE
+//   MED    (t=5-9): 6x6  filled square (pico-8 3x3) — tile 0xD0
+//   SMALL  (t=1-4): 2x2  filled square (pico-8 1x1) — tile 0xD2
+// Each sprite's 4 tiles are laid out as standard SNES 16x16: TL=N, TR=N+1,
+// BL=N+16, BR=N+17. So BIG uses 0xCE/0xCF/0xDE/0xDF, MED uses 0xD0..0xD3 etc.
+// Colour uses palette index 5; flicker handled by alternating sprite palette
+// 5/6 via oamProps (see deadParticleUpdate).
+#define PORT_DEAD_PARTICLE_BIG_CHARNUM    0xCEu
+#define PORT_DEAD_PARTICLE_MED_CHARNUM    0xD0u
+#define PORT_DEAD_PARTICLE_SMALL_CHARNUM  0xD2u
+
+// Tile data: 4bpp 8×8 = 32 bytes each. pixels-at-index-5 means bp0=1, bp2=1
+// (bp1=bp3=0) for every "on" pixel. Layout: bytes 0-15 = bp0/bp1 interleaved
+// per row, bytes 16-31 = bp2/bp3.
+PORT_DATA_HIGH_BANK1
+const unsigned char dead_particle_tile_top[192] = {
+    // BIG TL (0xCE): rows 3-7 cols 3-7 → row mask 0x1F
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00,
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00,
+    // BIG TR (0xCF): rows 3-7 cols 0-4 of TR-local → row mask 0xF8
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00,
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00,
+    // MED TL (0xD0): rows 5-7 cols 5-7 → row mask 0x07
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x07,0x00, 0x07,0x00, 0x07,0x00,
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x07,0x00, 0x07,0x00, 0x07,0x00,
+    // MED TR (0xD1): rows 5-7 cols 0-2 of TR-local → row mask 0xE0
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0xE0,0x00, 0xE0,0x00, 0xE0,0x00,
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0xE0,0x00, 0xE0,0x00, 0xE0,0x00,
+    // SMALL TL (0xD2): row 7 col 7 → row mask 0x01
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x01,0x00,
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x01,0x00,
+    // SMALL TR (0xD3): row 7 col 0 → row mask 0x80
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x80,0x00,
+    0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x80,0x00,
+};
+PORT_DATA_HIGH_BANK1
+const unsigned char dead_particle_tile_bot[192] = {
+    // BIG BL (0xDE): rows 0-4 (sprite rows 8-12) cols 3-7 → 0x1F
+    0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x1F,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    // BIG BR (0xDF): rows 0-4 cols 0-4 → 0xF8
+    0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0xF8,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    // MED BL (0xE0): rows 0-2 cols 5-7 → 0x07
+    0x07,0x00, 0x07,0x00, 0x07,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    0x07,0x00, 0x07,0x00, 0x07,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    // MED BR (0xE1): rows 0-2 cols 0-2 → 0xE0
+    0xE0,0x00, 0xE0,0x00, 0xE0,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    0xE0,0x00, 0xE0,0x00, 0xE0,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    // SMALL BL (0xE2): row 0 col 7 → 0x01
+    0x01,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    0x01,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    // SMALL BR (0xE3): row 0 col 0 → 0x80
+    0x80,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+    0x80,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00,
+};
+
+// Palette entries for the 2-color flicker (pico-8 colors 14/15 converted to
+// BGR15). Stored as little-endian 16-bit. Each palette only needs index 5
+// populated; the rest stays 0 (transparent). Written to sprite palettes 5
+// and 6 (oamProps 0x3A and 0x3C respectively).
+PORT_DATA_HIGH_BANK1
+const unsigned char dead_particle_palette_pink[2]  = { 0xDF, 0x55 }; // pico8 14 #FF77A8
+PORT_DATA_HIGH_BANK1
+const unsigned char dead_particle_palette_peach[2] = { 0x3F, 0x57 }; // pico8 15 #FFCCAA
+
+// Banked: hair + dead-particle assets uploaded together to keep all this
+// out of fixed-mirror code. Caller (LoadInitialGraphics) bank-switches once.
+PORT_FUNC_BANK1
+void port_loadHairAssets(void)
+{
+    // Hair tiles live just above the score-1000 sprite in the unused VRAM
+    // gap before sprite_gfx_2bpp (0xA000). Dead-particle tiles slot into the
+    // gap between hair (0xC4-C7 / 0xD4-D7) and the score-1000 bottom row at
+    // 0xD0-D3 — namely 0xC8-CD / 0xD8-DD (VRAM 0x9900 / 0x9B00). The earlier
+    // 0xCE-D3 placement collided with the score bottom and cut off the "1000".
+    LoadVram(hair_tile_top, 0x9880, (uint16_t)sizeof(hair_tile_top));
+    LoadVram(hair_tile_bot, 0x9A80, (uint16_t)sizeof(hair_tile_bot));
+    LoadVram(dead_particle_tile_top, 0x9900, (uint16_t)sizeof(dead_particle_tile_top));
+    LoadVram(dead_particle_tile_bot, 0x9B00, (uint16_t)sizeof(dead_particle_tile_bot));
+    // Palette 5 / 6 index 5 = pico-8 14/15 (flicker colors).
+    LoadCGRam(dead_particle_palette_pink,  0x00D5u, 2u);
+    LoadCGRam(dead_particle_palette_peach, 0x00E5u, 2u);
+}
+
+PORT_FUNC_BANK1
+void port_resetPlayerHair(struct sPlayerData *player)
+{
+    if (player == 0) {
+        return;
+    }
+    // Snap all particles to the player's head so the trail doesn't fly in
+    // from the previous room's coordinates.
+    int16_t x_fx = (int16_t)((int16_t)(player->objData.pos.x + 4) << 8);
+    int16_t y_fx = (int16_t)((int16_t)(player->objData.pos.y + 3) << 8);
+    for (uint8_t i = 0; i < PORT_HAIR_COUNT; ++i) {
+        player->hair[i].x = x_fx;
+        player->hair[i].y = y_fx;
+    }
+}
+
+PORT_FUNC_BANK1
+void port_updatePlayerHair(struct sPlayerData *player)
+{
+    if (player == 0) {
+        return;
+    }
+    int8_t facing = player->isFliped ? -1 : 1;
+    // ccleste anchor: last_x = x + 4 - facing*2, last_y = y + 3 (v1 ignores 'down')
+    int16_t last_x = (int16_t)((int16_t)(player->objData.pos.x + 4 - facing * 2) << 8);
+    int16_t last_y = (int16_t)((int16_t)(player->objData.pos.y + 3) << 8);
+
+    for (uint8_t i = 0; i < PORT_HAIR_COUNT; ++i) {
+        // ccleste lerp: h += (last - h) / 1.5  →  delta * 171/256 in fixed point.
+        int16_t dx = (int16_t)(last_x - player->hair[i].x);
+        int16_t dy = (int16_t)(last_y - player->hair[i].y);
+        player->hair[i].x = (int16_t)(player->hair[i].x + (int16_t)(((int32_t)dx * 171) >> 8));
+        player->hair[i].y = (int16_t)(player->hair[i].y + (int16_t)(((int32_t)dy * 171) >> 8));
+
+        // Convert from 8.8 internal coords to 256-screen, then center the
+        // 16x16 sprite on the dot (sprite top-left = center − 8).
+        int16_t cx = (int16_t)((player->hair[i].x >> 8) << 1);
+        int16_t cy = (int16_t)((player->hair[i].y >> 8) << 1);
+        int16_t sx = (int16_t)(cx - 8);
+        int16_t sy = sprite_to_screen_y((int16_t)(cy - 8));
+
+        uint8_t slot = (uint8_t)(PORT_HAIR_OAM_BASE + i);
+        uint8_t table2Index = (uint8_t)(slot / 4u);
+        uint8_t currentByte = GLOBAL_OAMCopy.arr.OAMTable2[table2Index];
+        uint8_t xBit = (uint8_t)((sx < 0 || sx >= 256) ? 1u : 0u);
+        GLOBAL_OAMCopy.arr.OAMTable2[table2Index] = calcOAMTable2Byte(slot, 1u, xBit, currentByte);
+        GLOBAL_OAMCopy.arr.OAMArray[slot].OBJX = (uint8_t)sx;
+        GLOBAL_OAMCopy.arr.OAMArray[slot].OBJY = (uint8_t)sy;
+        // ccleste sizes [2,2,1,1,1] → first two particles use the LARGE
+        // (r=2 rounded) tile, the trailing three use the SMALL (r=1 plus).
+        GLOBAL_OAMCopy.arr.OAMArray[slot].CHARNUM =
+            (uint8_t)((i < 2u) ? PORT_HAIR_LARGE_CHARNUM : PORT_HAIR_SMALL_CHARNUM);
+        GLOBAL_OAMCopy.arr.OAMArray[slot].PROPERTIES = PORT_HAIR_PROPS;
+
+        last_x = player->hair[i].x;
+        last_y = player->hair[i].y;
+    }
+}
+
 void port_updatePlayerSprite(const struct sPlayerData *playerObj)
 {
     if (playerObj == 0) {
@@ -2267,7 +2862,7 @@ void port_buildUnused(uint8_t index)
 void port_buildSmoke(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
@@ -2309,14 +2904,14 @@ void port_buildFlag(uint8_t index)
 void port_buildChest(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
 void port_buildKey(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
@@ -2373,14 +2968,14 @@ void port_buildFlyingBerry(uint8_t index)
 void port_buildDoubleDashOrb(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
 void port_buildStaticDecor(uint8_t index)
 {
     OBJ_DATA *obj = &GLOBAL_OBJList[index];
-    writeStandardSprite(index, obj);
+    writeConditionalSprite(index, obj, false);
     obj->flags &= (uint8_t)~OBJ_FLAG_DIRTY;
 }
 
@@ -2433,7 +3028,7 @@ void port_buildSpriteIfDirty(uint8_t index, enum eOBJType eType)
 }
 
 PORT_BG1_TEXT_CODE
-static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColorsLen(const unsigned char *text,
+static PORT_NOINLINE PORT_OPTNONE void port_drawTextWithColorsLen(const unsigned char *text,
                                                                               uint8_t textLength,
                                                                               uint8_t x,
                                                                               uint8_t y,
@@ -2442,7 +3037,8 @@ static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColorsLen(co
                                                                               bool fillBackground,
                                                                               uint8_t advancePx,
                                                                               uint8_t inkXOffsetPx,
-                                                                              uint8_t cellYOffsetPx)
+                                                                              uint8_t cellYOffsetPx,
+                                                                              uint8_t bgPadRightPx)
 {
     uint16_t sx = (uint16_t)x << 1;
     uint16_t sy = (uint16_t)y << 1;
@@ -2459,8 +3055,7 @@ static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColorsLen(co
         return;
     }
     bgX = sx;
-    bgW = (uint16_t)(((uint16_t)textLength * advancePx +
-                      PORT_PICO8_TEXT_BG_PAD_RIGHT_PX) * PORT_PICO8_FONT_SCALE);
+    bgW = (uint16_t)(((uint16_t)textLength * advancePx + bgPadRightPx) * PORT_PICO8_FONT_SCALE);
     if (textLength > 1u && text[0] == (uint8_t)' ' && text[1] == (uint8_t)' ') {
         bg1TextHideRect(bgX, sy, bgW, 16u);
         return;
@@ -2478,8 +3073,15 @@ static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColorsLen(co
         uint8_t gy;
 
         if (ch != (uint8_t)' ') {
+            uint8_t flags = s_bg1TextRenderFlags;
+            uint8_t gyStart = 0u;
+            uint8_t gyEnd = 8u;
+            if ((flags & BG1_TEXT_RENDER_QUARTER_MODE) != 0u) {
+                gyStart = (uint8_t)((flags & BG1_TEXT_RENDER_QUARTER_MASK) << 1);
+                gyEnd = (uint8_t)(gyStart + 2u);
+            }
             bg1TextFetchGlyphRows(ch);
-            for (gy = 0; gy < 8u; ++gy) {
+            for (gy = gyStart; gy < gyEnd; ++gy) {
                 uint8_t row = s_pico8GlyphRows[gy];
                 uint8_t gx;
                 if (row == 0u) {
@@ -2503,11 +3105,13 @@ static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColorsLen(co
         }
     }
 
-    bg1TextPublishRect(bgX, sy, bgW, 16u);
+    if ((s_bg1TextRenderFlags & BG1_TEXT_RENDER_NO_PUBLISH) == 0u) {
+        bg1TextPublishRect(bgX, sy, bgW, 16u);
+    }
 }
 
 PORT_BG1_TEXT_CORE_CODE
-static PORT_NOINLINE __attribute__((optnone)) void port_drawCharWithColors(uint8_t ch,
+static PORT_NOINLINE PORT_OPTNONE void port_drawCharWithColors(uint8_t ch,
                                                                            uint8_t x,
                                                                            uint8_t y,
                                                                            uint8_t inkColor,
@@ -2550,7 +3154,7 @@ static PORT_NOINLINE __attribute__((optnone)) void port_drawCharWithColors(uint8
 }
 
 PORT_BG1_TEXT_CODE
-static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColors(const unsigned char *text,
+static PORT_NOINLINE PORT_OPTNONE void port_drawTextWithColors(const unsigned char *text,
                                                                            uint8_t x,
                                                                            uint8_t y,
                                                                            uint8_t inkColor,
@@ -2573,7 +3177,8 @@ static PORT_NOINLINE __attribute__((optnone)) void port_drawTextWithColors(const
                                fillBackground,
                                PORT_PICO8_FONT_ADVANCE_PX,
                                PORT_PICO8_TEXT_INK_X_OFFSET_PX,
-                               PORT_PICO8_FONT_CELL_Y_OFFSET);
+                               PORT_PICO8_FONT_CELL_Y_OFFSET,
+                               PORT_PICO8_TEXT_BG_PAD_RIGHT_PX);
 }
 
 PORT_BG1_TEXT_CODE
@@ -2588,7 +3193,8 @@ PORT_NOINLINE void port_drawTextN(const unsigned char *text, uint8_t length, uin
                                true,
                                PORT_PICO8_FONT_ADVANCE_PX,
                                PORT_PICO8_TEXT_INK_X_OFFSET_PX,
-                               PORT_PICO8_FONT_CELL_Y_OFFSET);
+                               PORT_PICO8_FONT_CELL_Y_OFFSET,
+                               PORT_PICO8_TEXT_BG_PAD_RIGHT_PX);
 }
 
 PORT_BG1_TEXT_CODE
@@ -2601,9 +3207,44 @@ PORT_NOINLINE void port_drawTextPico8N(const unsigned char *text, uint8_t length
                                PORT_BG1_TEXT_COLOR_INK,
                                PORT_BG1_TEXT_COLOR_BG,
                                true,
-                               4u,
-                               PORT_PICO8_TEXT_INK_X_OFFSET_PX,
-                               PORT_PICO8_FONT_CELL_Y_OFFSET);
+                               PORT_PICO8_FONT_ADVANCE_PX,
+                               PORT_PICO8_RUN_INK_X_OFFSET_PX,
+                               PORT_PICO8_FONT_CELL_Y_OFFSET,
+                               0u);
+}
+
+PORT_BG1_TEXT_CODE
+PORT_NOINLINE bool port_reservePico8RunN(uint8_t x, uint8_t y, uint8_t length, uint8_t advancePx)
+{
+    uint16_t sx = (uint16_t)x << 1;
+    uint16_t sy = (uint16_t)y << 1;
+    uint16_t bgW;
+
+    if (length == 0u || sx >= 256u || sy >= 256u) {
+        return false;
+    }
+
+    bgW = (uint16_t)((((uint16_t)(length - 1u) * advancePx) +
+                      PORT_PICO8_FONT_GLYPH_W_PX +
+                      PORT_PICO8_TEXT_BG_PAD_RIGHT_PX) * PORT_PICO8_FONT_SCALE);
+    return bg1TextBlankRectCells(sx, sy, bgW, 16u, true);
+}
+
+PORT_BG1_TEXT_CODE
+PORT_NOINLINE bool port_clearReservedPico8RunN(uint8_t x, uint8_t y, uint8_t length, uint8_t advancePx)
+{
+    uint16_t sx = (uint16_t)x << 1;
+    uint16_t sy = (uint16_t)y << 1;
+    uint16_t bgW;
+
+    if (length == 0u || sx >= 256u || sy >= 256u) {
+        return false;
+    }
+
+    bgW = (uint16_t)((((uint16_t)(length - 1u) * advancePx) +
+                      PORT_PICO8_FONT_GLYPH_W_PX +
+                      PORT_PICO8_TEXT_BG_PAD_RIGHT_PX) * PORT_PICO8_FONT_SCALE);
+    return bg1TextHideRect(sx, sy, bgW, 16u);
 }
 
 PORT_BG1_TEXT_CODE
@@ -2641,8 +3282,11 @@ PORT_NOINLINE void port_clearChars(uint8_t x, uint8_t y, uint8_t count)
     bg1TextFillRect(sx, sy, bgW, 16u, PORT_BG1_TEXT_COLOR_BG);
 }
 
+// Used by the flag overlay's pre-render: skips the per-pixel BG fill since
+// box cells are already solid INK (from row-fill steps), so the BG fill
+// would be redundant.
 PORT_BG1_TEXT_CODE
-PORT_NOINLINE void port_drawTextWhiteOnBlackN(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y)
+PORT_NOINLINE static void port_drawTextWhiteOnBlackNoFillN(const unsigned char *text, uint8_t length, uint8_t x, uint8_t y)
 {
     port_drawTextWithColorsLen(text,
                                length,
@@ -2650,10 +3294,11 @@ PORT_NOINLINE void port_drawTextWhiteOnBlackN(const unsigned char *text, uint8_t
                                y,
                                PORT_BG1_TEXT_COLOR_BG,
                                PORT_BG1_TEXT_COLOR_INK,
-                               true,
+                               false,
                                PORT_PICO8_FONT_ADVANCE_PX,
                                PORT_PICO8_TEXT_INK_X_OFFSET_PX,
-                               PORT_PICO8_FONT_CELL_Y_OFFSET);
+                               PORT_PICO8_FONT_CELL_Y_OFFSET,
+                               PORT_PICO8_TEXT_BG_PAD_RIGHT_PX);
 }
 
 PORT_BG1_TEXT_CODE
@@ -2694,26 +3339,244 @@ PORT_NOINLINE void port_drawTextBoxBlack(uint8_t x, uint8_t y, uint8_t w, uint8_
     bg1TextFillRect(sx, sy, (uint16_t)(ex - sx), (uint16_t)(ey - sy), PORT_BG1_TEXT_COLOR_INK);
 }
 
+// Pre-render layout (finer-grained chunking):
+//   Box fill phase (Show=false only): 8 sub-steps
+//     Substeps 1..8 = (row * 2) + halfIndex + 1
+//       Half 0 fills cells [0..4] of the row (5 cells)
+//       Half 1 fills cells [5..8] of the row (4 cells)
+//     Substep 1 also runs hideRect over the full 144x64 region.
+//   Per-char phase: 5 phases, encoded as (charIdx, charPhase):
+//     Phase 0: BG fill (Show=true only; not used for Show=false)
+//     Phase 1: glyph rows 0..1, publish suppressed
+//     Phase 2: glyph rows 2..3, publish suppressed
+//     Phase 3: glyph rows 4..5, publish suppressed
+//     Phase 4: glyph rows 6..7 + publish (publishes the merged rect covering
+//              all glyph quarters and any companion BG fill).
+//   Show=false starts each char at phase 1 (4 sub-steps/char total).
+//   Show=true  starts each char at phase 0 (5 sub-steps/char total).
+//   Total: 8 + (Show ? 5T : 4T) sub-steps. T = L0 + L1 + L2.
+#define FLAG_OVERLAY_BOX_FIRST_CELL 4u   // cellX = 64/16, cellY = 0
+#define FLAG_OVERLAY_BOX_W_CELLS 9u      // 144 px / 16
+#define FLAG_OVERLAY_BOX_H_CELLS 4u      // 64 px / 16
+#define FLAG_OVERLAY_BOX_HALVES_PER_ROW 2u
+#define FLAG_OVERLAY_BOX_HALF_LEFT_CELLS 5u  // cells [0..4]
+#define FLAG_OVERLAY_BOX_FILL_STEPS \
+    (FLAG_OVERLAY_BOX_H_CELLS * FLAG_OVERLAY_BOX_HALVES_PER_ROW)
+#define FLAG_OVERLAY_FIRST_TEXT_STEP (1u + FLAG_OVERLAY_BOX_FILL_STEPS)
+#define FLAG_OVERLAY_PER_CHAR_BG_W \
+    ((PORT_PICO8_FONT_ADVANCE_PX + PORT_PICO8_TEXT_BG_PAD_RIGHT_PX) * PORT_PICO8_FONT_SCALE)
+#define FLAG_OVERLAY_LAST_CHAR_PHASE 4u  // glyph quarter Q3 + publish
+// Box phase: 1..FLAG_OVERLAY_BOX_FILL_STEPS active, 0 = done. Skipped for
+// Show=true since the box stays revealed across re-renders.
+static uint8_t s_flagOverlayBoxStep;
+// Per-char text phase. Avoids decoding from a single step counter so neither
+// /N nor %N needs an LLVM helper for the LTO-tight fixed mirror.
+static uint8_t s_flagOverlayCharIdx;
+static uint8_t s_flagOverlayCharPhase;     // 0..4; phase 0 only used for Show=true
+
 PORT_BG1_TEXT_CODE
-static void renderFlagOverlay(void);
+static void flagOverlayDoBoxStep(uint8_t step)
+{
+    uint8_t boxOffset = (uint8_t)(step - 1u);
+    uint8_t row = (uint8_t)(boxOffset >> 1);
+    uint8_t half = (uint8_t)(boxOffset & 1u);
+    uint8_t colStart = (half == 0u) ? 0u : FLAG_OVERLAY_BOX_HALF_LEFT_CELLS;
+    uint8_t colEnd = (half == 0u) ? FLAG_OVERLAY_BOX_HALF_LEFT_CELLS
+                                  : FLAG_OVERLAY_BOX_W_CELLS;
+    uint8_t col;
+    if (step == 1u) {
+        (void)bg1TextHideRect(64u, 0u, 144u, 64u);
+    }
+    for (col = colStart; col < colEnd; ++col) {
+        bg1TextFillCellSolidInk((uint8_t)(row * PORT_BG1_TEXT_SCREEN_MACRO_W +
+                                          FLAG_OVERLAY_BOX_FIRST_CELL + col));
+    }
+}
+
+PORT_BG1_TEXT_CODE
+static void flagOverlayDoCharStep(uint8_t idx, uint8_t phase)
+{
+    // Phase encoding (unified across Show=true and Show=false):
+    //   0 = BG fill, no publish (Show=true sub 0; not used by Show=false)
+    //   1 = glyph rows 0..3, publish suppressed
+    //   2 = glyph rows 4..7, publish (publishes merged rect)
+    const unsigned char *line;
+    uint8_t baseX;
+    uint8_t baseY;
+    uint8_t glyphX;
+
+    if (idx < GLOBAL_FlagOverlayLine0Len) {
+        line = GLOBAL_FlagOverlayLine0;
+        baseX = 64u;
+        baseY = 9u;
+    } else {
+        idx = (uint8_t)(idx - GLOBAL_FlagOverlayLine0Len);
+        if (idx < GLOBAL_FlagOverlayLine1Len) {
+            line = GLOBAL_FlagOverlayLine1;
+            baseX = 50u;
+            baseY = 17u;
+        } else {
+            idx = (uint8_t)(idx - GLOBAL_FlagOverlayLine1Len);
+            line = GLOBAL_FlagOverlayLine2;
+            baseX = 48u;
+            baseY = 24u;
+        }
+    }
+    glyphX = (uint8_t)(baseX + idx * PORT_PICO8_FONT_ADVANCE_PX);
+
+    if (phase == 0u) {
+        bg1TextFillRectNoPublish((uint16_t)glyphX << 1,
+                                 (uint16_t)baseY << 1,
+                                 (uint16_t)FLAG_OVERLAY_PER_CHAR_BG_W,
+                                 16u,
+                                 PORT_BG1_TEXT_COLOR_BG);
+    } else {
+        // Phase n (1..4): glyph quarter (n-1), rendering rows
+        // [(n-1)*2, (n-1)*2 + 2). Publish only on the last quarter.
+        uint8_t flags = (uint8_t)(BG1_TEXT_RENDER_QUARTER_MODE |
+                                  (uint8_t)(phase - 1u));
+        if (phase < FLAG_OVERLAY_LAST_CHAR_PHASE) {
+            flags |= BG1_TEXT_RENDER_NO_PUBLISH;
+        }
+        s_bg1TextRenderFlags = flags;
+        port_drawTextWhiteOnBlackNoFillN(line + idx, 1u, glyphX, baseY);
+        s_bg1TextRenderFlags = 0u;
+    }
+}
 
 PORT_BG1_TEXT_CODE
 static void renderFlagOverlay(void)
 {
-    if (!GLOBAL_FlagOverlayShow) {
-        return;
+    if (GLOBAL_FlagOverlayDirty) {
+        s_flagOverlayCharIdx = 0u;
+        if (GLOBAL_FlagOverlayShow) {
+            // Show=true: skip box fill, run all 3 phases per char.
+            s_flagOverlayBoxStep = 0u;
+            s_flagOverlayCharPhase = 0u;
+        } else {
+            // Show=false: run box fill, then 2 glyph phases per char (skip
+            // BG-fill phase 0 since cells are already INK).
+            s_flagOverlayBoxStep = 1u;
+            s_flagOverlayCharPhase = 1u;
+        }
+        GLOBAL_FlagOverlayDirty = false;
     }
 
-    port_drawTextBoxBlack(32u, 2u, 65u, 30u);
-    port_drawTextWhiteOnBlackN(GLOBAL_FlagOverlayLine0, GLOBAL_FlagOverlayLine0Len, 64u, 9u);
-    port_drawTextWhiteOnBlackN(GLOBAL_FlagOverlayLine1, GLOBAL_FlagOverlayLine1Len, 50u, 17u);
-    port_drawTextWhiteOnBlackN(GLOBAL_FlagOverlayLine2, GLOBAL_FlagOverlayLine2Len, 48u, 24u);
+    if (s_flagOverlayBoxStep != 0u) {
+        s_bg1TextPublishHidden = true;
+        flagOverlayDoBoxStep(s_flagOverlayBoxStep);
+        s_bg1TextPublishHidden = false;
+        if (s_flagOverlayBoxStep >= FLAG_OVERLAY_BOX_FILL_STEPS) {
+            s_flagOverlayBoxStep = 0u;
+        } else {
+            ++s_flagOverlayBoxStep;
+        }
+    } else {
+        uint8_t totalChars = (uint8_t)(GLOBAL_FlagOverlayLine0Len +
+                                       GLOBAL_FlagOverlayLine1Len +
+                                       GLOBAL_FlagOverlayLine2Len);
+        if (s_flagOverlayCharIdx < totalChars) {
+            s_bg1TextPublishHidden = true;
+            flagOverlayDoCharStep(s_flagOverlayCharIdx, s_flagOverlayCharPhase);
+            s_bg1TextPublishHidden = false;
+            // Phase 4 is the last for both Show modes; on completion advance
+            // to the next char and reset phase to its starting value (0 for
+            // Show=true, 1 for Show=false).
+            if (s_flagOverlayCharPhase >= FLAG_OVERLAY_LAST_CHAR_PHASE) {
+                s_flagOverlayCharPhase = GLOBAL_FlagOverlayShow ? 0u : 1u;
+                ++s_flagOverlayCharIdx;
+            } else {
+                ++s_flagOverlayCharPhase;
+            }
+        }
+    }
+
+    if (GLOBAL_FlagOverlayRevealDirty) {
+        if (GLOBAL_FlagOverlayShow) {
+            // If pre-render hasn't finished yet, the box reveals empty/partial
+            // and subsequent per-char steps will fill it in over a few frames.
+            s_bg1TextMapDirtyRowBits |= 0x000Fu;
+        } else {
+            (void)bg1TextHideRect(64u, 0u, 144u, 64u);
+        }
+        GLOBAL_FlagOverlayRevealDirty = false;
+    }
 }
 
 void port_renderTextOverlays(void)
 {
     port_prg_bank_enter(4);
     renderFlagOverlay();
+    port_prg_bank_leave();
+}
+
+// Run the flag overlay state machine to completion in one tight loop with
+// the display force-blanked. Called from LoadRoomData when the room contains
+// a flag, so the per-A-frame state machine doesn't burn gameplay cycles
+// during background pre-render. Lines must already be populated and dirty
+// flag set (flagUpdate handles this from processObject's first pass).
+PORT_FUNC_BANK4
+static void drainFlagOverlayPreRender(void)
+{
+    // Called from inside LoadRoomData, after port_LoadRoomData has already
+    // engaged force-blank for the duration of the transition. No need to
+    // touch INIDISP here — the deferred un-blank in port_vblank handles it
+    // once hardware OAM is back in sync.
+    uint16_t guard;
+    for (guard = 0u; guard < 256u; ++guard) {
+        uint8_t totalChars = (uint8_t)(GLOBAL_FlagOverlayLine0Len +
+                                       GLOBAL_FlagOverlayLine1Len +
+                                       GLOBAL_FlagOverlayLine2Len);
+        if (totalChars == 0u) break;
+        if (s_flagOverlayBoxStep == 0u &&
+            s_flagOverlayCharIdx >= totalChars &&
+            !GLOBAL_FlagOverlayDirty) {
+            break;
+        }
+        renderFlagOverlay();
+    }
+}
+
+void port_drainFlagOverlayPreRender(void)
+{
+    port_prg_bank_enter(4);
+    drainFlagOverlayPreRender();
+    port_prg_bank_leave();
+}
+
+// Fixed-mirror trampoline so bank-5 code can reach bank-4 preBuildDma.
+PORT_NOINLINE
+static void bg1TextPreBuildDmaViaBank4(void)
+{
+    port_prg_bank_enter(4);
+    bg1TextPreBuildDma();
+    port_prg_bank_leave();
+}
+
+// Bank-5 drain loop. Each iteration stages up to PORT_BG1_TEXT_DMA_STAGE_COUNT
+// slot tiles via bg1TextPreBuildDma (bank 4) and DMAs them via bg1TextDmaFlush
+// (bank 5, same bank — intra-bank JSR). Loops until both dirty-flag groups
+// clear. The 32-iter guard prevents an infinite loop if the dirty state
+// somehow doesn't settle (each pass should clean ≥2 slots so 32 covers all
+// 48 slots with headroom).
+PORT_FUNC_BANK5
+static void drainBg1TextDmaLoop(void)
+{
+    uint8_t guard;
+    for (guard = 0u; guard < 32u; ++guard) {
+        if (!s_bg1TextAnySlotDirty && s_bg1TextMapDirtyRowBits == 0u) break;
+        bg1TextPreBuildDmaViaBank4();
+        bg1TextDmaFlush();
+    }
+}
+
+// Public entry. Call from LoadRoomData (under force-blank) to push all pending
+// BG1 text slot tiles and map rows to VRAM before the next un-blank — saves
+// the ~7-vblank wait that the normal 2-slots-per-vblank throttle would impose.
+void port_drainBg1TextDma(void)
+{
+    port_prg_bank_enter(5);
+    drainBg1TextDmaLoop();
     port_prg_bank_leave();
 }
 
@@ -2746,7 +3609,7 @@ void port_vblank(void)
     bool doScorePaletteFlash = false;
     bool doCloudPalSwap = false;
 
-    if (!s_titleMode) {
+    if (!s_titleMode || s_dedicationActive) {
         bool wantAltPalette = GLOBAL_PlayerData.doubleDashUnlocked;
         bool paletteDirty = false;
 
@@ -2814,9 +3677,32 @@ void port_vblank(void)
     // =================================================================
     // VBLANK IO: all DMA and register writes (main thread, in VBlank)
     // =================================================================
+    // Apply title-screen start-flash CGRAM update first (4 BG3 palette 0
+    // colours + master backdrop reset). Doing this before OAM DMA ensures
+    // the palette swap lands at the very start of vblank, well clear of
+    // active display — staged by applyTitleFlash() during the prior
+    // handleTitleScreenFrame() call. 1-frame display lag is invisible at
+    // the strobe's cadence.
+    if (GLOBAL_TitleFlashCgramDirty != 0u) {
+        port_prg_bank_enter(7);
+        port_titleFlashFlush();
+        port_prg_bank_leave();
+        GLOBAL_TitleFlashCgramDirty = 0u;
+    }
+
     snesXC_setDataBank(0x7Eu);
     LoadOAMCopy((char *)GLOBAL_OAMCopy.Bytes, 0x0000, sizeof(union uOAMCopy));
     snesXC_setDataBank(BANK_00);
+
+    // After the OAM DMA, hardware OAM is in sync with the new room's
+    // sprites — safe to un-blank if a transition was waiting. LoadRoomData
+    // now calls port_drainBg1TextDma before returning, so by the time we
+    // reach this check all BG1 text slots are already in VRAM — no need
+    // to gate on s_bg1TextAnySlotDirty here.
+    if (s_pendingDisplayEnable) {
+        REG_INIDISP = 0x0Fu;
+        s_pendingDisplayEnable = false;
+    }
 
     REG_BG1HOFS = 0; REG_BG1HOFS = 0;
     REG_BG1VOFS = 0; REG_BG1VOFS = 0;
@@ -2840,7 +3726,7 @@ void port_vblank(void)
     REG_CGDATA = (uint8_t)(hairColour);
     REG_CGDATA = (uint8_t)(hairColour >> 8);
 
-    if (!s_titleMode) {
+    if (!s_titleMode || s_dedicationActive) {
         if (doPaletteDma) {
             snesXC_setDataBank(0x7Eu);
             LoadCGRam((char *)s_bg1PaletteCurrent, 0x0000, sizeof(s_bg1PaletteCurrent));
@@ -2856,7 +3742,7 @@ void port_vblank(void)
         }
 
         {
-            port_prg_bank_enter(4);
+            port_prg_bank_enter(5);
             snesXC_setDataBank(0x7Eu);
             bg1TextDmaFlush();
             snowFlushTilemap();
@@ -2883,7 +3769,7 @@ void port_vblank(void)
     if (doHalfRateEffects) {
         updateCloudsVblankSafe();
         if (!s_titleMode) {
-            port_prg_bank_enter(4);
+            port_prg_bank_enter(5);
             snowUpdate();
             port_prg_bank_leave();
         }
