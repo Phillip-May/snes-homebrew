@@ -110,7 +110,7 @@ ifeq ($(COMPILER_LC),calypsi)
 	LD = "$(CALYPSI_HOME)/bin/ln65816"
 	# Check for huge model - requires --enable-huge-attribute with large data model
 	ifeq ($(ROM_TYPE),huge)
-#		CCFLAGS = --core=65816 -O2 --speed --code-model=large --data-model=huge --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
+		# huge model is pinned to -O0; higher opt levels have not been validated here.
 		CCFLAGS += --core=65816 -O0 --code-model=large --data-model=huge --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1
 		STDLIB = $(CALYPSI_HOME)/lib-huge/clib-huge.a
 		LDFLAGS = --raw-multiple-memories --rom-code --no-tree-shaking --no-copy-initialize huge
