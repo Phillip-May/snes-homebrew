@@ -12,11 +12,14 @@ import shutil
 
 def main():
     print("TCC816 wrapper starting...")
-    # Set up environment variables (similar to devEnv.bat)
-    os.environ["DEV_KIT_SNES_PATH"] = r"C:\pvsneslib\devkitsnes\bin"
-    os.environ["C_INC_PATH"] = r"C:\pvsneslib\devkitsnes\include"
-    os.environ["TOOLS_PATH"] = r"C:\pvsneslib\devkitsnes\tools"
-    os.environ["PVSNESLIB_HOME"] = r"C:\pvsneslib"
+    # Set up environment variables (similar to devEnv.bat).
+    # PVSNESLIB_HOME comes from the Makefile/toolchains.mk via the environment when
+    # invoked through make; the fallback default keeps the script usable standalone.
+    pvsneslib_home = os.environ.get("PVSNESLIB_HOME", r"C:\pvsneslib")
+    os.environ["DEV_KIT_SNES_PATH"] = os.path.join(pvsneslib_home, "devkitsnes", "bin")
+    os.environ["C_INC_PATH"] = os.path.join(pvsneslib_home, "devkitsnes", "include")
+    os.environ["TOOLS_PATH"] = os.path.join(pvsneslib_home, "devkitsnes", "tools")
+    os.environ["PVSNESLIB_HOME"] = pvsneslib_home
     
     # Update PATH
     os.environ["PATH"] = os.environ["DEV_KIT_SNES_PATH"] + os.pathsep + os.environ["PATH"]

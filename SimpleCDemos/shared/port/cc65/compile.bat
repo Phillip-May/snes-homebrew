@@ -2,8 +2,8 @@
 REM CC65 compile script for SNES
 REM Sets up environment and calls the compiler
 
-REM Set CC65 environment
-set CC65_HOME=C:\cc65-2.19
+REM Set CC65 environment (CC65_HOME may be supplied by the Makefile/toolchains.mk)
+if not defined CC65_HOME set CC65_HOME=C:\cc65-2.19
 set PATH=%CC65_HOME%\bin;%PATH%
 
 REM Create build directory if it doesn't exist

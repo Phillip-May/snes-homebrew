@@ -1,9 +1,0 @@
-local j = 0
-while j <= 10000 do
-    j = j + 1
-end
-j = j + 1
-print("Done")
-print(j)
-
-   

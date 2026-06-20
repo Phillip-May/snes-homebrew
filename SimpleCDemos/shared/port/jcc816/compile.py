@@ -11,11 +11,14 @@ import argparse
 import shutil
 
 def main():
-    # Set up environment variables (similar to devEnvWin.bat)
-    os.environ["JAVA_PATH"] = r"C:\Users\Admin\Downloads\JCC816-main\openjdk-24.0.1_windows-x64_bin\jdk-24.0.1\bin"
-    os.environ["CC65_PATH"] = r"C:\Users\Admin\Downloads\cc65-snapshot-win32\bin"
-    os.environ["JCC816_PATH"] = r"C:\Users\Admin\Documents\JCC816"
-    os.environ["C_INC_PATH"] = r"C:\Users\Admin\Documents\JCC816\src\stdlib"
+    # Set up environment variables (similar to devEnvWin.bat).
+    # Paths come from the Makefile/toolchains.mk via the environment when invoked
+    # through make; the fallback defaults keep the script usable standalone.
+    jcc816_home = os.environ.get("JCC816_HOME", r"C:\path\to\JCC816")
+    os.environ["JAVA_PATH"] = os.environ.get("JAVA_HOME", r"C:\path\to\jdk\bin")
+    os.environ["CC65_PATH"] = os.environ.get("JCC816_CC65_HOME", r"C:\path\to\cc65-snapshot\bin")
+    os.environ["JCC816_PATH"] = jcc816_home
+    os.environ["C_INC_PATH"] = os.path.join(jcc816_home, "src", "stdlib")
     
     # Update PATH
     os.environ["PATH"] = os.environ["JAVA_PATH"] + os.pathsep + os.environ["PATH"]

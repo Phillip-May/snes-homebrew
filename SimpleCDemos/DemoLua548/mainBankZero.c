@@ -869,10 +869,7 @@ void snesXC_nmi(void) {
     frameCounter++;
 }
 
-void snesXC_irq(void) {
-}
-
-int termM0Init(void){	
+int termM0Init(void){
 	static const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
 	static const unsigned char BGCLEAR[] = {0x20, 0x00};
 	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL)); /* Load BG Palette Data */

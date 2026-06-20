@@ -1,26 +1,12 @@
-# SNES Lua Demo Makefile
-# Uses shared build configuration system
-
-# Project-specific settings
-PROJECT_NAME = DemoLua548
-BUILD_DIR = build
+# DemoLua548 (eLua 0.9, integer-only, Calypsi huge/HiROM)
+SUPPORTED_COMPILERS = calypsi
 ROM_TYPE = huge
 ROM_MAPPING = HiROM
-
-# Disable floating point support for SNES optimization
-# Use integer-only arithmetic for better performance and memory usage
 USE_FLOATING_POINT = 0
-
-# Paths to shared build system
-SHARED_BUILD_DIR = ../shared/build
-SHARED_SRC_DIR = ../shared/src
-SHARED_PORT_DIR = ../shared/port
 
 # eLua 0.9 source files for SNES
 LUA_SRC_DIR = elua-0.9/src/lua
 PLATFORM_SRC_DIR = elua-0.9/src/platform/snes
-# Essential Lua sources for SNES - include core files needed for linking
-# Try minimal set first to avoid platform-specific issues
 LUA_ESSENTIAL_SOURCES = $(LUA_SRC_DIR)/lstate.c $(LUA_SRC_DIR)/lauxlib.c \
                         $(LUA_SRC_DIR)/lvm.c $(LUA_SRC_DIR)/lstring.c \
                         $(LUA_SRC_DIR)/lobject.c $(LUA_SRC_DIR)/lfunc.c \
@@ -37,52 +23,17 @@ LUA_ESSENTIAL_SOURCES = $(LUA_SRC_DIR)/lstate.c $(LUA_SRC_DIR)/lauxlib.c \
                         $(LUA_SRC_DIR)/lrotable.c \
                         snes_stubs.c
 
-# Problematic files that need to be compiled without huge attribute
-# LUA_PROBLEMATIC_SOURCES = $(LUA_SRC_DIR)/lstate.c
+include ../shared/build/shared-config.mk
 
-# Include shared build system
-include $(SHARED_BUILD_DIR)/shared-config.mk
-
-# Override C_SOURCES for this project - use eLua 0.9 integration with Calypsi
-# This must come after the include to override the shared config
 C_SOURCES = mainBankZero.c snes_memory_manager.c $(LUA_ESSENTIAL_SOURCES) $(SHARED_SRC_DIR)/initsnes.c
-
-# Add eLua include directories
 INCLUDES += -I"elua-0.9/inc" -I"elua-0.9/inc/snes" -I"elua-0.9/src/lua" -I"elua-0.9/inc/newlib"
-
-# Disable floating-point support at compiler level
-# Note: Calypsi uses CCFLAGS, not CFLAGS
-# CRITICAL: Define LUA_NUMBER_INTEGRAL at compiler level to ensure it's processed before luaconf.h
 CCFLAGS += -DLUA_NUMBER_INTEGRAL -DNO_FLOAT -DNO_DOUBLE -D__STRICT_ANSI__ -DLUA_ANSI
 
-# Override STDLIB for huge mode - we don't need the huge library since we built successfully without it
 ifeq ($(ROM_TYPE),huge)
-	STDLIB = 
+	STDLIB =
 endif
 
-# Override OBJECTS to include all Lua object files
 LUA_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(notdir $(LUA_ESSENTIAL_SOURCES)))))
 OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/snes_memory_manager.o $(LUA_OBJECTS) $(BUILD_DIR)/initsnes.o
 
-# VBCC65816 specific override for incremental linking
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
-	OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/snes_memory_manager.o $(LUA_OBJECTS) $(BUILD_DIR)/initsnes.o
-endif
-
-# Override vpath to include Lua and platform source directories
 vpath %.c $(LUA_SRC_DIR) $(PLATFORM_SRC_DIR) elua-0.9/src $(SHARED_SRC_DIR) .
-
-# Custom build rule for problematic files (compile without huge attribute due to compiler bug)
-# $(BUILD_DIR)/lstate.o: $(LUA_SRC_DIR)/lstate.c
-#	@mkdir $(BUILD_DIR) 2>nul || echo Build directory exists
-#	"C:\calypsi-65816-5.12\bin\cc65816" --core=65816 -O2 --speed --code-model=large --data-model=large --target=SNES --list-file=$(BUILD_DIR)/calypsi.lst -D__CALYPSI__=1 -I"$(SHARED_SRC_DIR)" -I"lib" -I"include" -o $@ $<
-
-# Target to copy pre-compiled files from build-backup-huge
-copy-huge-files:
-	@if exist "build-backup-huge" (
-		echo Copying pre-compiled files from build-backup-huge...
-		copy "build-backup-huge\*.o" "build\" /Y
-		echo Pre-compiled files copied successfully.
-	) else (
-		echo Warning: build-backup-huge directory not found.
-	)
