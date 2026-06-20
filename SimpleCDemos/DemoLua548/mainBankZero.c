@@ -873,7 +873,6 @@ int termM0Init(void){
 	static const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
 	static const unsigned char BGCLEAR[] = {0x20, 0x00};
 	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL)); /* Load BG Palette Data */
-	/*TODO Fix init snes and make it actually clear VRAM */
 	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin));
     ClearVram(BGCLEAR, 0xF800, 0x400); /* Clear VRAM Map To Fixed Tile Word */
 	
