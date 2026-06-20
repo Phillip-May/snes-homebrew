@@ -40,7 +40,7 @@ int system(const char *command) {
 }
 
 #include "snes_regs_xc.h"
-#include "include/imagedata.h"
+#include "build/assets/imagedata.inc"
 #include "initsnes.h"
 /* Use eLua 0.9 implementation for SNES */
 #include "elua-0.9/src/lua/lua.h"

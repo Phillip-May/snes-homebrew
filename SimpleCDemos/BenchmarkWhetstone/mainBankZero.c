@@ -102,7 +102,7 @@ static float simple_log(float x) {
 #endif
 #endif
 #include "snes_regs_xc.h"
-#include "include/imagedata.h"
+#include "build/assets/imagedata.inc"
 #include "initsnes.h"
 
 // Function declarations

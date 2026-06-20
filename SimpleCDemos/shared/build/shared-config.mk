@@ -10,6 +10,11 @@ PROJECT_NAME ?= $(notdir $(CURDIR))
 COMPILERS := wdc816cc vbcc65816 calypsi llvm-mos cc65 jcc816 tcc816
 SUPPORTED_COMPILERS ?= $(COMPILERS)
 
+# Assets a project regenerates from source art at build time (see per-project
+# Makefiles). Generated .inc files live under $(BUILD_DIR) and are #included by
+# the project sources; empty for demos with no converted assets.
+ASSETS ?=
+
 # Lowercased compiler name, computed once (was re-forked sh+echo+tr 27 times).
 COMPILER_LC := $(shell echo $(COMPILER) | tr A-Z a-z)
 
@@ -28,6 +33,9 @@ endif
 
 # Host tools
 PYTHON          ?= python
+# pySnesDevTools asset converter (repo-root package; demos build from their own
+# directory, so ../.. is the repo root).
+SNESCONV        ?= $(PYTHON) ../../pySnesDevTools/snescli.py
 
 # Compiler / toolchain install roots (set these in toolchains.mk).
 # Use FORWARD slashes: GNU make runs recipes through sh.exe, which strips
@@ -310,7 +318,7 @@ endif
 # =============================================================================
 
 # Default target
-all: $(BUILD_DIR)
+all: $(BUILD_DIR) $(ASSETS)
 ifeq ($(COMPILER_LC),wdc816cc)
 	@$(MAKE) $(OBJECTS)
 	$(LD) $(LDFLAGS)

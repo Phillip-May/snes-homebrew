@@ -10,7 +10,8 @@ typedef	unsigned char byte;
 #include "mainBankZero.h"
 #include "snes_regs_xc.h"
 #include "initsnes.h"
-#include "include/imagedata.h"
+#include "build/assets/school.inc"
+#include "build/assets/biker.inc"
 
 //Try not to put blocks of memory on stack
 //Not every compiler will be smart enough to move it automatically

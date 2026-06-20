@@ -10,7 +10,7 @@ typedef	unsigned char byte;
 #include "mainBankZero.h"
 #include "snes_regs_xc.h"
 #include "initsnes.h"
-#include "BG18_mode1.h" // Now contains Mode 1 data
+#include "build/assets/bg.inc"
 
 // 65816 Assembly Opcode Macros
 #define OP_LDA_ABS      0xAD  // LDA absolute

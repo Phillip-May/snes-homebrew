@@ -8,8 +8,10 @@ toolchains through one shared build system (`shared/build/shared-config.mk`).
 - **Windows** (the port wrappers use `.bat` / PowerShell).
 - **GNU make** with a Unix `sh` on `PATH` — make runs recipes through `sh.exe`,
   so forward slashes are used throughout. Git Bash / MSYS2 both provide this.
-- **Python 3** for the Calypsi hex converter and the jcc816 / tcc816 wrappers.
-  The Calypsi path also needs the `intelhex` package: `pip install intelhex`.
+- **Python 3** for the Calypsi hex converter, the jcc816 / tcc816 wrappers, and
+  the `pySnesDevTools` asset converter. The Calypsi path also needs `intelhex`
+  (`pip install intelhex`); demos with converted graphics need Pillow
+  (`pip install -r ../pySnesDevTools/requirements.txt`).
 - At least one of the C toolchains below.
 
 ## Toolchains
@@ -55,6 +57,14 @@ The output ROM is `build/mainBankZero_<compiler>.smc`. Each demo declares a
 `SUPPORTED_COMPILERS` set; requesting one outside it errors unless you pass
 `ALLOW_UNSUPPORTED=1`. See each demo's `README.md` for its purpose and status.
 
+## Assets
+
+Demos with converted graphics commit their source art (PNGs) and regenerate the
+C data at build time via `pySnesDevTools` (repo root), writing a gitignored
+`build/assets/*.inc` that the demo `#include`s. A demo opts in by setting
+`ASSETS` and an asset rule in its `Makefile`; see `Mode1HDMA`/`Mode1Sprite` for
+examples and `../pySnesDevTools/README.md` for the converter.
+
 ## Building everything
 
     .\build-all.ps1               # build every demo x its SUPPORTED_COMPILERS
@@ -71,7 +81,7 @@ Builds that currently succeed here (`build-all.ps1`: 22/43 pass):
 |--------------------|----------------------------------------------|
 | CGRamTest          | cc65, calypsi, llvm-mos, vbcc65816, tcc816   |
 | BenchmarkDhrystone | cc65, calypsi, llvm-mos, vbcc65816, tcc816   |
-| BenchmarkWhestone  | calypsi, vbcc65816                           |
+| BenchmarkWhetstone | calypsi, vbcc65816                           |
 | CEnvTests          | calypsi, llvm-mos, vbcc65816                 |
 | Mode1Sprite        | calypsi, vbcc65816, tcc816                   |
 | Mode1HDMA          | calypsi, vbcc65816, tcc816                   |

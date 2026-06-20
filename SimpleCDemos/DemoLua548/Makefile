@@ -3,6 +3,7 @@ SUPPORTED_COMPILERS = calypsi
 ROM_TYPE = huge
 ROM_MAPPING = HiROM
 USE_FLOATING_POINT = 0
+ASSETS = build/assets/imagedata.inc
 
 # eLua 0.9 source files for SNES
 LUA_SRC_DIR = elua-0.9/src/lua
@@ -37,3 +38,7 @@ LUA_OBJECTS = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(notdir $(LUA
 OBJECTS = $(BUILD_DIR)/mainBankZero.o $(BUILD_DIR)/snes_memory_manager.o $(LUA_OBJECTS) $(BUILD_DIR)/initsnes.o
 
 vpath %.c $(LUA_SRC_DIR) $(PLATFORM_SRC_DIR) elua-0.9/src $(SHARED_SRC_DIR) .
+
+build/assets/imagedata.inc: ../shared/assets/snesfont.png
+	@mkdir -p build/assets
+	$(SNESCONV) font $< -o $@ --symbol SNESFONT_bin

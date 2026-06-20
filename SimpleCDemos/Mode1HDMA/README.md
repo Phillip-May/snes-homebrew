@@ -1,8 +1,9 @@
 # Mode1HDMA
 
 Mode 1 4bpp background with an HDMA effect driven by a runtime-assembled IRQ
-handler (the demo writes 65816 opcodes into a buffer at startup). Background
-data is converted by `ConvertImageMode1.py`.
+handler (the demo writes 65816 opcodes into a buffer at startup). The background
+is regenerated at build time from `bg_001.png` by
+`pySnesDevTools bg --scanline-palettes` (see `../../pySnesDevTools/`).
 
 ## Building
 
