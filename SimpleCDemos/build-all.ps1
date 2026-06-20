@@ -33,7 +33,6 @@ foreach ($demo in $demos) {
             $rom = Get-ChildItem $bd -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.Extension -in '.smc', '.sfc', '.bin' } | Select-Object -First 1
         }
-        & make clean *> $null
         Pop-Location
 
         $pass = ($code -eq 0 -and $rom)

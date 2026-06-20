@@ -10,6 +10,9 @@ PROJECT_NAME ?= $(notdir $(CURDIR))
 COMPILERS := wdc816cc vbcc65816 calypsi llvm-mos cc65 jcc816 tcc816
 SUPPORTED_COMPILERS ?= $(COMPILERS)
 
+# Lowercased compiler name, computed once (was re-forked sh+echo+tr 27 times).
+COMPILER_LC := $(shell echo $(COMPILER) | tr A-Z a-z)
+
 # =============================================================================
 # TOOLCHAIN LOCATIONS
 # =============================================================================
@@ -52,7 +55,6 @@ else
 ifeq ($(COMPILER),)
 $(error Please specify a compiler. Usage: make COMPILER=wdc816cc, make COMPILER=vbcc65816, make COMPILER=calypsi, make COMPILER=llvm-mos, make COMPILER=cc65, make COMPILER=jcc816, or make COMPILER=tcc816 (case-insensitive))
 endif
-COMPILER_LC := $(shell echo $(COMPILER) | tr A-Z a-z)
 ifeq ($(filter $(COMPILER_LC),$(SUPPORTED_COMPILERS)),)
 ifneq ($(ALLOW_UNSUPPORTED),1)
 $(error $(PROJECT_NAME) does not support COMPILER=$(COMPILER_LC). Supported: $(SUPPORTED_COMPILERS). Set ALLOW_UNSUPPORTED=1 to try anyway.)
@@ -65,7 +67,7 @@ endif
 # =============================================================================
 
 # WDC816CC Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+ifeq ($(COMPILER_LC),wdc816cc)
 	CC = "$(WDC_HOME)/bin/wdc816cc"
 	AS = "$(WDC_HOME)/bin/wdc816as"
 	LD = "$(WDC_HOME)/bin/wdcln"
@@ -85,7 +87,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
 endif
 
 # VBCC65816 Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+ifeq ($(COMPILER_LC),vbcc65816)
 	# Use the existing batch file approach but with direct calls
 	CC = "$(SHARED_PORT_DIR)/vbcc816/vc_env.bat"
 	AS = "$(SHARED_PORT_DIR)/vbcc816/vc_env.bat"
@@ -102,7 +104,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 endif
 
 # Calypsi Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+ifeq ($(COMPILER_LC),calypsi)
 	CC = "$(CALYPSI_HOME)/bin/cc65816"
 	AS = "$(CALYPSI_HOME)/bin/cc65816"
 	LD = "$(CALYPSI_HOME)/bin/ln65816"
@@ -143,7 +145,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 endif
 
 # LLVM-Mos Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+ifeq ($(COMPILER_LC),llvm-mos)
 	CC = mos-common-clang
 	AS = mos-common-clang
 	LD = mos-common-clang
@@ -160,7 +162,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 endif
 
 # CC65 Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+ifeq ($(COMPILER_LC),cc65)
 	CC = $(CC65_HOME)/bin/cc65
 	AS = $(CC65_HOME)/bin/ca65
 	LD = $(CC65_HOME)/bin/ld65
@@ -175,7 +177,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
 endif
 
 # JCC816 Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
+ifeq ($(COMPILER_LC),jcc816)
 	CC = $(PYTHON) $(SHARED_PORT_DIR)/jcc816/compile.py
 	AS = $(PYTHON) $(SHARED_PORT_DIR)/jcc816/compile.py
 	LD = $(PYTHON) $(SHARED_PORT_DIR)/jcc816/compile.py
@@ -190,7 +192,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
 endif
 
 # TCC816 (pvsneslib) Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+ifeq ($(COMPILER_LC),tcc816)
 	CC = $(PYTHON) $(SHARED_PORT_DIR)/tcc816/compile.py
 	AS = $(PYTHON) $(SHARED_PORT_DIR)/tcc816/compile.py
 	LD = $(PYTHON) $(SHARED_PORT_DIR)/tcc816/compile.py
@@ -209,7 +211,7 @@ endif
 # =============================================================================
 
 # WDC816CC Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+ifeq ($(COMPILER_LC),wdc816cc)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_PORT_DIR)/wdc816cc/lorom/kernel.c $(SHARED_SRC_DIR)/initsnes.c
@@ -223,7 +225,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
 endif
 
 # VBCC65816 Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+ifeq ($(COMPILER_LC),vbcc65816)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
@@ -237,7 +239,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
 endif
 
 # Calypsi Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+ifeq ($(COMPILER_LC),calypsi)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
@@ -251,7 +253,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
 endif
 
 # LLVM-Mos Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+ifeq ($(COMPILER_LC),llvm-mos)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/llvm-mos/putchar_stub.c
@@ -264,7 +266,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
 endif
 
 # CC65 Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+ifeq ($(COMPILER_LC),cc65)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c $(SHARED_PORT_DIR)/cc65/putchar_stub.c
@@ -278,7 +280,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
 endif
 
 # JCC816 Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
+ifeq ($(COMPILER_LC),jcc816)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
@@ -290,7 +292,7 @@ ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
 endif
 
 # TCC816 Source Configuration
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+ifeq ($(COMPILER_LC),tcc816)
 	# Automatically include all C files in current directory
 	PROJECT_C_FILES = $(wildcard *.c)
 	C_SOURCES = $(PROJECT_C_FILES) $(SHARED_SRC_DIR)/initsnes.c
@@ -309,37 +311,37 @@ endif
 
 # Default target
 all: $(BUILD_DIR)
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+ifeq ($(COMPILER_LC),wdc816cc)
 	@$(MAKE) $(OBJECTS)
 	$(LD) $(LDFLAGS)
 	$(POST_LINK)
 else
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+ifeq ($(COMPILER_LC),calypsi)
 	@$(MAKE) $(OBJECTS)
 	$(LD) $(LDFLAGS) $(OBJECTS) $(LINKER_SCRIPT) $(STDLIB) --list-file=$(BUILD_DIR)/calypsi.lst --cross-reference --output-format=intel-hex -o $(BUILD_DIR)/calypsi.hex
 	$(POST_LINK)
 else
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),llvm-mos)
+ifeq ($(COMPILER_LC),llvm-mos)
 	@echo "Compiling with LLVM-MOS..."
 	@echo "$(CC) $(CCFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT) $(C_SOURCES) $(ASM_SOURCES)"
 	@powershell -Command "& '$(SHARED_PORT_DIR)/llvm-mos/compile.bat' '$(CC)' $(CCFLAGS) $(LDFLAGS) -o '$(BUILD_DIR)/mainBankZero_llvm-mos$(OUTPUT_EXT)' $(C_SOURCES) $(ASM_SOURCES)"
 	@echo "Compilation completed successfully"
 	$(POST_LINK)
 else
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+ifeq ($(COMPILER_LC),cc65)
 	@$(MAKE) $(OBJECTS)
 	$(LD) -C $(SHARED_PORT_DIR)/cc65/snes.cfg -o $(BUILD_DIR)/mainBankZero_cc65$(OUTPUT_EXT) -m $(BUILD_DIR)/mainBankZero_cc65.map $(OBJECTS) $(CC65_HOME)/lib/none.lib
 	$(POST_LINK)
 else
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),jcc816)
+ifeq ($(COMPILER_LC),jcc816)
 	$(CC) $(CCFLAGS) $(LDFLAGS) $(C_SOURCES)
 	$(POST_LINK)
 else
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+ifeq ($(COMPILER_LC),tcc816)
 	$(CC) $(CCFLAGS) $(INCLUDES) $(C_SOURCES)
 	$(POST_LINK)
 else
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+ifeq ($(COMPILER_LC),vbcc65816)
 	@echo "Compiling with VBCC65816 (incremental compilation)..."
 	@$(MAKE) $(OBJECTS)
 	@echo "Linking object files with vbcc..."
@@ -365,7 +367,7 @@ $(BUILD_DIR):
 	@mkdir -p $(BUILD_DIR)
 
 # WDC816CC specific rules
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),wdc816cc)
+ifeq ($(COMPILER_LC),wdc816cc)
 # Compile C sources (pattern rule)
 $(BUILD_DIR)/%.obj: %.c
 	@mkdir -p $(BUILD_DIR)
@@ -378,7 +380,7 @@ $(BUILD_DIR)/%.obj: %.asm
 endif
 
 # Calypsi specific rules
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),calypsi)
+ifeq ($(COMPILER_LC),calypsi)
 # Compile C sources (pattern rule)
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(BUILD_DIR)
@@ -386,7 +388,7 @@ $(BUILD_DIR)/%.o: %.c
 endif
 
 # TCC816 specific rules
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),tcc816)
+ifeq ($(COMPILER_LC),tcc816)
 # Compile C sources (pattern rule) - don't pass -o for ROM creation
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(BUILD_DIR)
@@ -394,7 +396,7 @@ $(BUILD_DIR)/%.o: %.c
 endif
 
 # VBCC65816 specific rules
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),vbcc65816)
+ifeq ($(COMPILER_LC),vbcc65816)
 # Compile C sources (pattern rule) - compile to object files for incremental linking
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(BUILD_DIR)
@@ -407,7 +409,7 @@ $(BUILD_DIR)/%.o: %.s
 endif
 
 # CC65 specific rules
-ifeq ($(shell echo $(COMPILER) | tr A-Z a-z),cc65)
+ifeq ($(COMPILER_LC),cc65)
 # Compile C sources (pattern rule)
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(BUILD_DIR)
@@ -432,13 +434,7 @@ endif
 
 # Clean target
 clean:
-	@powershell -Command "if (Test-Path '$(BUILD_DIR)') { Remove-Item -Recurse -Force '$(BUILD_DIR)' }"
-	@powershell -Command "if (Test-Path '*.obj') { Remove-Item '*.obj' }"
-	@powershell -Command "if (Test-Path '*.bin') { Remove-Item '*.bin' }"
-	@powershell -Command "if (Test-Path '*.bnk') { Remove-Item '*.bnk' }"
-	@powershell -Command "if (Test-Path '*.map') { Remove-Item '*.map' }"
-	@powershell -Command "if (Test-Path '*.smc') { Remove-Item '*.smc' }"
-	@powershell -Command "if (Test-Path 'PROG.LINK') { Remove-Item 'PROG.LINK' }"
+	@rm -rf $(BUILD_DIR) *.obj *.bin *.bnk *.map *.smc PROG.LINK
 	@echo Clean complete!
 
 # Convenience aliases: `make <compiler>` == `make clean && make COMPILER=<compiler>`
