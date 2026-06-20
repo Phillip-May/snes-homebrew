@@ -77,7 +77,6 @@ Builds that currently succeed here (`build-all.ps1`: 24/50 pass):
 | Mode1HDMA          | calypsi, vbcc65816, tcc816                   |
 | Mode5HDMA          | calypsi, vbcc65816                           |
 | DemoLua548         | calypsi                                      |
-| UndisbelieverOGAM  | (empty placeholder)                          |
 
 calypsi builds every demo; vbcc65816 builds every standard demo. The remaining
 failures are left surfaced (not hidden) and are toolchain limits, not config
