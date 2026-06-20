@@ -65,7 +65,7 @@ failure (with a log path). Failures are never hidden.
 
 ## Demos
 
-Builds that currently succeed here (`build-all.ps1`: 24/50 pass):
+Builds that currently succeed here (`build-all.ps1`: 22/43 pass):
 
 | Demo               | Builds with                                  |
 |--------------------|----------------------------------------------|
@@ -75,7 +75,6 @@ Builds that currently succeed here (`build-all.ps1`: 24/50 pass):
 | CEnvTests          | calypsi, llvm-mos, vbcc65816                 |
 | Mode1Sprite        | calypsi, vbcc65816, tcc816                   |
 | Mode1HDMA          | calypsi, vbcc65816, tcc816                   |
-| Mode5HDMA          | calypsi, vbcc65816                           |
 | DemoLua548         | calypsi                                      |
 
 calypsi builds every demo; vbcc65816 builds every standard demo. The remaining
@@ -84,9 +83,7 @@ bugs:
 
 - **cc65** — no floating point, single 32 KB ROM bank: fails Whetstone and the
   graphical demos (RODATA overflow).
-- **llvm-mos** — graphical demos overflow the fixed bank; Mode5HDMA crashes the
-  compiler frontend.
-- **tcc816** — missing soft-float runtime (Whetstone) and fails CEnvTests /
-  Mode5HDMA.
+- **llvm-mos** — graphical demos overflow the fixed bank.
+- **tcc816** — missing soft-float runtime (Whetstone) and fails CEnvTests.
 - **wdc816cc** — its C front end rejects the shared headers' declaration syntax.
 - **jcc816** — its toolchain wrapper does not run on this machine.
