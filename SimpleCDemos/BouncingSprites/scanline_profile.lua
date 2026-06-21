@@ -29,7 +29,7 @@ local readCount, gFrame = 0, 0
 local cbErr     = "untried"
 local done, diagged = false, false
 
-local function write_result(t) local f = io.open(OUT, "w"); if f then f:write(t); f:close() end end
+local function write_result(t) emu.log("[SCANLINE PROFILE] " .. t); local f = io.open(OUT, "w"); if f then f:write(t); f:close() end end
 
 local function getclock()
     local s = emu.getState()
