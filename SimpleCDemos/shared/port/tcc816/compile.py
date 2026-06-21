@@ -282,19 +282,47 @@ VBlank:
             print("hdr.asm assembly failed:", result.stderr)
         
         
+        # 816-opt then constify on the raw 816-tcc assembly, matching the stock
+        # pvsneslib %.asm rule in devkitsnes/snes_rules. Without these passes the
+        # tcc816 output is unoptimized and not comparable to a real pvsneslib build.
+        opt_path = os.path.join(os.environ["TOOLS_PATH"], "816-opt.exe")
+        ctf_path = os.path.join(os.environ["TOOLS_PATH"], "constify.exe")
+
         for asm_file in asm_files:
-            obj_file = asm_file.replace('.o', '.obj')
-            asm_cmd = [wla_path, "-d", "-s", "-x", "-o", obj_file, asm_file]
-            
-            print(f"Assembling {asm_file}...")
+            base = asm_file[:-2]              # strip trailing ".o"
+            c_file = base + ".c"
+            asp_file = base + ".asp"
+            opt_asm = base + ".asm"
+            obj_file = base + ".obj"
+
+            print(f"Optimizing {asm_file} (816-opt)...")
+            with open(os.path.join(build_dir, asp_file), "w") as asp_out:
+                result = subprocess.run([opt_path, asm_file], stdout=asp_out,
+                                        stderr=subprocess.PIPE, text=True, cwd=build_dir)
+            if result.returncode != 0:
+                print("816-opt STDERR:", result.stderr)
+                print(f"Failed to optimize {asm_file}")
+                sys.exit(result.returncode)
+
+            print(f"Moving constants {asp_file} (constify)...")
+            result = subprocess.run([ctf_path, c_file, asp_file, opt_asm],
+                                    capture_output=True, text=True, cwd=build_dir)
+            if result.returncode != 0:
+                print("constify STDOUT:", result.stdout)
+                print("constify STDERR:", result.stderr)
+                print(f"Failed to constify {asp_file}")
+                sys.exit(result.returncode)
+
+            asm_cmd = [wla_path, "-d", "-s", "-x", "-o", obj_file, opt_asm]
+            print(f"Assembling {opt_asm}...")
             result = subprocess.run(asm_cmd, capture_output=True, text=True, cwd=build_dir)
-            
+
             if result.returncode != 0:
                 print(f"Assembly STDOUT: {result.stdout}")
                 print(f"Assembly STDERR: {result.stderr}")
-                print(f"Failed to assemble {asm_file}")
+                print(f"Failed to assemble {opt_asm}")
                 continue
-                
+
             obj_files.append(obj_file)
         
         if obj_files:
