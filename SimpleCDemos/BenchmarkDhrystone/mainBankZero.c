@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "snes_regs_xc.h"
-#include "include/imagedata.h"
+#include "build/assets/imagedata.inc"
 #include "initsnes.h"
 
 /* External declarations for dhry.c functions */
@@ -224,8 +224,7 @@ int termM0Init(void){
 	const static unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
 	const static unsigned char BGCLEAR[] = {0x20, 0x00};
 	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL)); /* Load BG Palette Data */
-	/*TODO Fix init snes and make it actually clear VRAM */
-	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin));
+	LoadLoVram(snesfont_chr, 0x0000, sizeof(snesfont_chr));
     ClearVram(BGCLEAR, 0xF800, 0x400); /* Clear VRAM Map To Fixed Tile Word */
 	
 	REG_BGMODE  = 0x08;

@@ -10,7 +10,7 @@ typedef	unsigned char byte;
 #include "mainBankZero.h"
 #include "snes_regs_xc.h"
 #include "initsnes.h"
-#include "BG18_mode1.h" // Now contains Mode 1 data
+#include "build/assets/bg.inc"
 
 // 65816 Assembly Opcode Macros
 #define OP_LDA_ABS      0xAD  // LDA absolute
@@ -149,17 +149,17 @@ void main(void){
 
 	// Load initial palette to CGRAM (16 colors for Mode 1 BG1)
 	// Use first scanline palette for initialization
-	LoadCGRam((unsigned char *)&scanline_palettes[0][0], 0x0000, sizeof(scanline_palettes[0]));
+	LoadCGRam((unsigned char *)&bg_pal[0][0], 0x0000, sizeof(bg_pal[0]));
 
 	// Load tiles to VRAM (starting at 0x0000)
 	// Set VRAM increment mode for 4bpp bitplane data (increment by 2 for 128 times)
 	REG_VMAIN = 0x80; // Auto-increment, mode 80 (increment by 2 for 128 times for 4bpp bitplanes)
-	LoadVram((unsigned char *)bg_tiles, 0x0000, sizeof(bg_tiles));
+	LoadVram((unsigned char *)bg_chr, 0x0000, sizeof(bg_chr));
 
 	// Load tilemap to VRAM (further down in VRAM for Mode 1)
 	// Set VRAM increment mode for tilemap data (increment by 1 for 16-bit entries)
 	REG_VMAIN = 0x00; // Auto-increment by 1 for tilemap data
-	LoadVram((unsigned char *)&bg_tilemap, 0xE000, sizeof(bg_tilemap)); // Byte address 0xE000
+	LoadVram((unsigned char *)&bg_map, 0xE000, sizeof(bg_map)); // Byte address 0xE000
 
 	// Configure BG1 registers for Mode 1
 	REG_BG1SC = 0x72; // Screen base address word 0x7000 (byte 0xE000), 32x32 tilemap
@@ -186,7 +186,7 @@ void main(void){
 	REG_HVBJOY = 0x00;   // Clear H/V-Blank and joypad flags
 
 	//Setup DMA channel 0 for per-scanline palette system	
-	LoadCGRam((unsigned char *)&scanline_palettes[0][0], 0x0000, sizeof(scanline_palettes[0]));
+	LoadCGRam((unsigned char *)&bg_pal[0][0], 0x0000, sizeof(bg_pal[0]));
 	
 	//Write the irq handler to the irq extension buffer
 	write_irq_assembly_buffer();
@@ -221,7 +221,7 @@ void snesXC_nmi(void) {
     // NMI (Non-Maskable Interrupt) handler - VBlank only
     // Prepare IRQ assembly buffer for the first scanline of the next frame
 	REG_NMITIMEN = 0x30 | 0x80; // Enable NMI (bit 7) and H-IRQ (bit 4+5)	
-	LoadCGRam((unsigned char *)&scanline_palettes[0][0], 0x0000, sizeof(scanline_palettes[0]));
+	LoadCGRam((unsigned char *)&bg_pal[0][0], 0x0000, sizeof(bg_pal[0]));
 	write_irq_assembly_buffer();
 	dummyRead = REG_TIMEUP;  // Acknowledge the IRQ by reading TIMEUP register
 }

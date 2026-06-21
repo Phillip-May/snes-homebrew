@@ -40,11 +40,12 @@ REGION_ALIAS("c_writeable", ram)
 __stack = 0x0200;
 
 /* Set entry point to our startup code */
-ENTRY(_start)
+ENTRY(_reset)
 
 SECTIONS {
-  /* Place startup first - in the fixed section */
-  .text.startup : { *(.text.startup) } >code_bank_0_only
+  /* Reset entry (startup.s) must be in the fixed bank so its link address
+   * equals its physical ROM address for the 16-bit reset vector. */
+  .text.startup : { KEEP(*(.text.startup)) } >rom_bank_0_fixed
   .text.vectors : { *(.text.vectors) } >rom_bank_0_fixed
   
   /* Define bank-specific rodata sections FIRST, before c.ld */
@@ -156,7 +157,7 @@ SECTIONS {
     SHORT(DIRQ)       /* Reserved vector */
     SHORT(ABORT)      /* ABORT vector */
     SHORT(NMI)        /* NMI vector */
-    SHORT(_start)     /* RESET vector - points to program entry point */
+    SHORT(_reset)     /* RESET vector - clears RAM (startup.s) then calls main */
     SHORT(IRQ)        /* IRQ vector */
   } >rom_bank_0_fixed
 }

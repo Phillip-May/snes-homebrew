@@ -2,11 +2,12 @@
 REM TCC816 (pvsneslib) compilation wrapper
 REM Usage: compile.bat [TCC816 arguments]
 
-REM Set up pvsneslib environment
-call C:\pvsneslib\devEnv.bat
+REM Set up pvsneslib environment (PVSNESLIB_HOME may come from the Makefile/toolchains.mk)
+if not defined PVSNESLIB_HOME set PVSNESLIB_HOME=C:\pvsneslib
+call "%PVSNESLIB_HOME%\devEnv.bat"
 
 REM Add pvsneslib include paths
-set "ARGS=%ARGS% -IC:\pvsneslib\pvsneslib\include -IC:\pvsneslib\devkitsnes\include"
+set "ARGS=%ARGS% -I%PVSNESLIB_HOME%\pvsneslib\include -I%PVSNESLIB_HOME%\devkitsnes\include"
 
 REM Get the current working directory (where make was called from)
 set "WORK_DIR=%CD%"

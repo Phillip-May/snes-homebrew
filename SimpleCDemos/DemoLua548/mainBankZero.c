@@ -40,7 +40,7 @@ int system(const char *command) {
 }
 
 #include "snes_regs_xc.h"
-#include "include/imagedata.h"
+#include "build/assets/imagedata.inc"
 #include "initsnes.h"
 /* Use eLua 0.9 implementation for SNES */
 #include "elua-0.9/src/lua/lua.h"
@@ -869,15 +869,11 @@ void snesXC_nmi(void) {
     frameCounter++;
 }
 
-void snesXC_irq(void) {
-}
-
-int termM0Init(void){	
+int termM0Init(void){
 	static const unsigned char BGPAL[] = {0x00,0x00,0xFF,0x7F, 0x00, 0x00, 0x00, 0x00};
 	static const unsigned char BGCLEAR[] = {0x20, 0x00};
 	LoadCGRam(BGPAL, 0x00, sizeof(BGPAL)); /* Load BG Palette Data */
-	/*TODO Fix init snes and make it actually clear VRAM */
-	LoadLoVram(SNESFONT_bin, 0x0000, sizeof(SNESFONT_bin));
+	LoadLoVram(snesfont_chr, 0x0000, sizeof(snesfont_chr));
     ClearVram(BGCLEAR, 0xF800, 0x400); /* Clear VRAM Map To Fixed Tile Word */
 	
 	REG_BGMODE  = 0x08;

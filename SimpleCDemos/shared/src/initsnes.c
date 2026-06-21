@@ -79,11 +79,14 @@ void* farMalloc(uint32_t size) {
 //I am aware a switch is not ideal here, you could just add a constant to the
 //registers offset but I chose to use a switch anyway in the hope it's
 //optimised out.
+// Zero source for the CGRAM/VRAM clears. Must live in ROM (rodata): sourcing
+// the fill from a RAM variable DMAs from an uninitialised/wrong-bank address on
+// some toolchains, filling CGRAM/VRAM with garbage that varies every boot.
+static const uint16_t kZero = 0;
+
 void initSNES(uint8_t ROMSPEED){
 
 	int i;
-	volatile uint16_t cCONSTZERO = 0;
-	volatile uint16_t* pCONSTZERO = &cCONSTZERO;
 	REG_MEMSEL = ROMSPEED;  // Access Cycle Designation (Slow ROM / Fast ROM)
 
 	REG_INIDISP = 0x8F;// Display Control 1: Brightness & Screen Enable Register ($2100)
@@ -183,13 +186,13 @@ void initSNES(uint8_t ROMSPEED){
 
 	// Clear CGRAM
 	for(i = 0; i < 256; i++) {
-		LoadCGRam((const unsigned char*)pCONSTZERO, i, sizeof(cCONSTZERO));
+		LoadCGRam((const unsigned char*)&kZero, i, sizeof(kZero));
 	}
 
 	// Clear VRAM using existing ClearVram function in chunks
 	// Clear VRAM in 32KB chunks (0x8000 bytes each) to avoid DMA size issues
 	for(i = 0; i < 2; i++) {
-		ClearVram((const unsigned char*)pCONSTZERO, i * 0x4000, 0x8000);
+		ClearVram((const unsigned char*)&kZero, i * 0x4000, 0x8000);
 	}
 	
 #ifdef __TCC816__
@@ -278,7 +281,70 @@ FUNCTIONATR void LoadVram(const unsigned char *pSource, uint16_t pVRAMDestinatio
 	REG_DAS0 = cSize;
 	REG_MDMAEN = 0x01;
 #endif
-}	
+}
+
+#ifdef __mos__
+//=================================================
+// LoadVramBanked - LoadVram with an explicit source bank
+//=================================================
+// llvm-mos near-pointers drop the bank byte, so an asset placed in a data bank
+// (PORT_DATA_BANK1) needs its physical bank passed in for the DMA source.
+void LoadVramBanked(const unsigned char *pSource, uint8_t bank,
+				uint16_t pVRAMDestination, uint16_t cSize){
+	REG_VMAIN = 0x80;
+	REG_VMADD = (pVRAMDestination >> 1);
+
+	// Always use channel 0
+	REG_DMAP0 = 0x01;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = (uint16_t)((uint32_t)pSource);
+	REG_A1B0 = bank;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+}
+#endif
+
+//=================================================
+// LoadVramColumn - Load A Vertical Column To VRAM
+//=================================================
+//  SRC: 24-Bit Address Of Source Data (a contiguous run of tilemap words)
+// DEST: 16-Bit VRAM Destination (WORD Address)
+// SIZE: Size Of Data (BYTE Size)
+// Like LoadVram but the VRAM address steps by +32 words after each entry
+// (REG_VMAIN low bits = 01), so a run of words lands down one tilemap column
+// of a 32-wide screen -- used to stream BG map columns after horizontal scroll.
+FUNCTIONATR void LoadVramColumn(const unsigned char *pSource, uint16_t pVRAMDestination,
+			 uint16_t cSize){
+#ifdef __TCC816__
+	PtrSplit src;
+	REG_VMAIN = 0x81;
+	REG_VMADD = (pVRAMDestination >> 1);
+	src.ptr = pSource;
+
+	// Always use channel 0
+	REG_DMAP0 = 0x01;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = src.parts.low16;
+	REG_A1B0 = src.parts.high8;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#else
+	uint16_t regWrite1; //Variable for storing hardware registers
+	uint8_t  regWrite2; //Variable for storing hardware registers
+	REG_VMAIN = 0x81;
+	REG_VMADD = (pVRAMDestination >> 1);
+	regWrite1 = (uint16_t) ((uint32_t)pSource);
+	regWrite2 = (uint8_t) (((uint32_t)pSource)>> 16);
+
+	// Always use channel 0
+	REG_DMAP0 = 0x01;
+	REG_BBAD0 = 0x18;
+	REG_A1T0 = regWrite1;
+	REG_A1B0 = regWrite2;
+	REG_DAS0 = cSize;
+	REG_MDMAEN = 0x01;
+#endif
+}
 
 //=============================================
 // LoadLOVRAM - Load GFX Data To VRAM Lo Bytes

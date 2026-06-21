@@ -1,0 +1,47 @@
+# =============================================================================
+# Local toolchain locations  --  TEMPLATE
+# =============================================================================
+# Copy this file to "toolchains.mk" (same directory) and edit the paths to match
+# where each compiler/toolchain is installed on YOUR machine:
+#
+#   cp toolchains.mk.example toolchains.mk     # then edit toolchains.mk
+#
+# toolchains.mk is git-ignored, so your local paths never get committed. This is
+# the single place to configure tool locations - the build does not read any
+# environment variables for them. You only need correct paths for the compilers
+# you actually use; leave the rest pointing anywhere.
+#
+# Use FORWARD slashes (GNU make runs recipes through sh.exe, which mangles
+# backslashes in unquoted paths). Avoid trailing slashes.
+
+# --- Host tools -------------------------------------------------------------
+# Python 3 interpreter used by the Calypsi hex converter and the jcc816/tcc816
+# wrappers.
+PYTHON           = python
+
+# --- Compiler / toolchain install roots -------------------------------------
+# WDC816CC: root of the WDC Tools install (the folder containing bin/ and include/).
+WDC_HOME         = C:/wdc/Tools
+
+# VBCC65816: root of the vbcc install (the folder containing bin/vc).
+VBCC_HOME        = C:/vbcc65816/vbcc65816/vbcc65816_win/vbcc
+
+# Calypsi 65816: root of the Calypsi install (the folder containing bin/cc65816).
+CALYPSI_HOME     = C:/calypsi-65816-5.12
+
+# LLVM-MOS: root of the llvm-mos install (the folder containing devEnv.bat).
+LLVM_MOS_HOME    = C:/llvm-mos
+
+# cc65: root of the cc65 install (the folder containing bin/cc65 and lib/none.lib).
+CC65_HOME        = C:/cc65-2.19
+
+# PVSnesLib (tcc816): root of the PVSnesLib install (the folder containing devkitsnes).
+PVSNESLIB_HOME   = C:/pvsneslib
+
+# --- JCC816 ------------------------------------------------------------------
+# Root of the JCC816 checkout (the folder containing JCC816.jar).
+JCC816_HOME      = C:/path/to/JCC816
+# JDK bin directory used to run JCC816 (the folder containing java.exe).
+JAVA_HOME        = C:/path/to/jdk/bin
+# bin directory of the cc65 snapshot that JCC816 shells out to.
+JCC816_CC65_HOME = C:/path/to/cc65-snapshot/bin

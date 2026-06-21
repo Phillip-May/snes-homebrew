@@ -10,7 +10,8 @@ typedef	unsigned char byte;
 #include "mainBankZero.h"
 #include "snes_regs_xc.h"
 #include "initsnes.h"
-#include "imagedata.h"
+#include "build/assets/school.inc"
+#include "build/assets/biker.inc"
 
 //Try not to put blocks of memory on stack
 //Not every compiler will be smart enough to move it automatically
@@ -33,14 +34,14 @@ void main(void){
 	//Initialize the stack
 	initSNES(SLOWROM);
 	
-	LoadVram(school_bin, 0x2000, sizeof(school_bin));
+	LoadVram(school_chr, 0x2000, sizeof(school_chr));
 	LoadCGRam(school_pal, 0x00, sizeof(school_pal));
-	LoadCGRam(biker_clr, 0x80, sizeof(biker_clr)); // Load BG Palette Data
-	LoadVram(biker_pic, 0x0000, sizeof(biker_pic));
+	LoadCGRam(biker_pal, 0x80, sizeof(biker_pal)); // Load BG Palette Data
+	LoadVram(biker_chr, 0x0000, sizeof(biker_chr));
 	
 	//ClearVram(BGCLEAR, 0xF800, 0x400, 0); // Clear VRAM Map To Fixed Tile Word
 	//Initialise BG1's tilemap to incrementing tiles indexes bitmap
-	LoadVram(school_tilemap, BGTileLocation, sizeof(school_tilemap));	
+	LoadVram(school_map, BGTileLocation, sizeof(school_map));	
 	//Initialize OAM copy structure
 	initOAMCopy(oamCopy.Bytes);
 	

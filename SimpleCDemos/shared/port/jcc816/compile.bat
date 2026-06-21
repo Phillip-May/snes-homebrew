@@ -2,8 +2,9 @@
 REM JCC816 compilation wrapper
 REM Usage: compile.bat [JCC816 arguments]
 
-REM Set up JCC816 environment
-call C:\Users\Admin\Documents\JCC816\devEnvWin.bat
+REM Set up JCC816 environment (JCC816_HOME may come from the Makefile/toolchains.mk)
+if not defined JCC816_HOME set JCC816_HOME=C:\path\to\JCC816
+call "%JCC816_HOME%\devEnvWin.bat"
 
 REM Get the current working directory (where make was called from)
 set "WORK_DIR=%CD%"

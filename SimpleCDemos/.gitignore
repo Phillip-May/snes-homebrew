@@ -1,0 +1,41 @@
+# =============================================================================
+# SimpleCDemos build hygiene
+# =============================================================================
+
+# Per-project build output directories...
+build/
+build-backup-huge/
+# ...but NOT shared/build, which holds the build system itself (shared-config.mk,
+# toolchains.mk.example). Re-include it and everything under it.
+!/shared/build/
+!/shared/build/**
+
+# Stray build artifacts some toolchains drop in the project root
+*.o
+*.obj
+*.bin
+*.bnk
+*.smc
+*.sfc
+*.srm
+*.hex
+*.map
+*.lst
+*.elf
+*.msu
+PROG.LINK
+
+# Spurious file created by `mkdir ... 2>nul` under sh/MinGW shells
+# (the Makefiles now use `mkdir -p`, but keep this so old copies stay clean)
+nul
+
+# Python caches from the jcc816 / tcc816 toolchain wrappers
+__pycache__/
+*.pyc
+
+# Temp files dropped by the WDC toolchain
+*.TMP
+
+# Local, machine-specific toolchain locations (keep LAST so it wins over the
+# shared/build re-include above). Copy toolchains.mk.example -> toolchains.mk.
+/shared/build/toolchains.mk

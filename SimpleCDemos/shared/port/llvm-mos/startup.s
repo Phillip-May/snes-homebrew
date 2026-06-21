@@ -1,60 +1,41 @@
-; SNES Startup Code for LLVM-MOS
-; Simple startup that clears RAM and calls main
+; SNES reset entry for LLVM-MOS
+;
+; The "common" llvm-mos platform's crt0 _start does NOT zero .bss or copy
+; .data -- it just calls main. Globals therefore start as whatever is in RAM,
+; which is garbage on hardware / randomised-RAM emulators (e.g. an
+; uninitialised animation counter giving a different palette every boot).
+;
+; This reset entry zeroes the low RAM holding .data/.bss/.noinit, then calls
+; main. The linker (linker.ld) makes it the ENTRY and points the reset vector
+; here. It must live in rom_bank_0_fixed so its link address equals its
+; physical ROM address (the 16-bit reset vector can only reach that region).
+; Code runs in 6502 emulation mode at reset, so the clear is an 8-bit loop.
 
 .section .text.startup,"ax",@progbits
 
-.global _start
+.global _reset
 .extern main
 
-_start:
-    ; Disable interrupts during initialization
+_reset:
     sei
-    
-    ; Set up stack pointer to end of RAM
     ldx #$ff
     txs
-    
-    ; Clear all RAM from $0200 to $1FFF
+
+    ; Zero $0200-$1FFF (the .data/.bss/.noinit region and scratch RAM).
     lda #$00
-    ldx #$00
-    
-clear_ram_loop:
-    sta $0200,x
-    sta $0300,x
-    sta $0400,x
-    sta $0500,x
-    sta $0600,x
-    sta $0700,x
-    sta $0800,x
-    sta $0900,x
-    sta $0A00,x
-    sta $0B00,x
-    sta $0C00,x
-    sta $0D00,x
-    sta $0E00,x
-    sta $0F00,x
-    sta $1000,x
-    sta $1100,x
-    sta $1200,x
-    sta $1300,x
-    sta $1400,x
-    sta $1500,x
-    sta $1600,x
-    sta $1700,x
-    sta $1800,x
-    sta $1900,x
-    sta $1A00,x
-    sta $1B00,x
-    sta $1C00,x
-    sta $1D00,x
-    sta $1E00,x
-    sta $1F00,x
-    inx
-    bne clear_ram_loop
-    
-    ; Call main function
+    sta $00            ; pointer low  (llvm-mos imaginary reg, reset before use)
+    ldx #$02
+    stx $01            ; pointer high -> start at page $02
+    ldy #$00
+clear_loop:
+    sta ($00),y
+    iny
+    bne clear_loop
+    inc $01
+    ldx $01
+    cpx #$20           ; stop once we pass page $1F ($2000)
+    bne clear_loop
+
     jsr main
-    
-    ; If main returns, halt
 halt:
     jmp halt
