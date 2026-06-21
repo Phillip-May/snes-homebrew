@@ -1,0 +1,8 @@
+#!/bin/sh
+# Strip any Claude/Anthropic co-author trailer from commit messages.
+# Prevents "Claude" from appearing as a GitHub contributor by accident.
+msg_file="$1"
+# Remove Co-authored-by lines referencing Claude or anthropic (case-insensitive).
+grep -viE '^[[:space:]]*Co-authored-by:.*(claude|anthropic)' "$msg_file" > "$msg_file.tmp"
+mv "$msg_file.tmp" "$msg_file"
+exit 0
